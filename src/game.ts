@@ -17,3 +17,4 @@ function play(player: Choice): string {
 }
 
 console.log(play("rock"));
+//console.log(play("rock"));
