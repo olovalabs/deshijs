@@ -1,0 +1,80 @@
+<script>
+  const title = "About Deshi";
+  const story = "Deshi is a lightweight, zero-JS compiler and static site generator designed for speed and simplicity.";
+  const stats = [
+    { label: "Client JS", value: "0 KB" },
+    { label: "Build Engine", value: "Vite + AST" },
+    { label: "Component Syntax", value: ".deshi" }
+  ];
+</script>
+
+<head>
+  <title>About · Deshi</title>
+</head>
+
+<div class="about-page">
+  <span class="badge">Route: /about</span>
+  <h1>{title}</h1>
+  <p class="lede">{story}</p>
+
+  <div class="stats-grid">
+    {stats.map((s) => (
+      <div class="stat-box">
+        <div class="stat-value">{s.value}</div>
+        <div class="stat-label">{s.label}</div>
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .about-page {
+    max-width: 800px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 9999px;
+    margin-bottom: 1.25rem;
+  }
+  h1 {
+    font-size: 2.5rem;
+    margin: 0 0 1rem;
+    color: #fafafa;
+  }
+  .lede {
+    font-size: 1.2rem;
+    color: #a1a1aa;
+    line-height: 1.6;
+    margin-bottom: 2.5rem;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+  }
+  .stat-box {
+    background: #18181b;
+    border: 1px solid #27272a;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 1.75rem;
+    font-weight: bold;
+    color: #38bdf8;
+    margin-bottom: 0.25rem;
+  }
+  .stat-label {
+    font-size: 0.85rem;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+</style>

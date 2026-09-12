@@ -1,0 +1,171 @@
+<script>
+  import docs from '../../data/docs.js';
+
+  const defaultArticles = {
+    "getting-started": {
+      title: "Getting Started with Deshi",
+      date: "Sep 2026",
+      readTime: "3 min read",
+      content: "<p>Creating static pages in Deshi is effortless. Simply create layout.deshi and page.deshi in your src directory. No complex boilerplate needed!</p>"
+    },
+    "architecture": {
+      title: "Under the Hood: AST Compiler & Vite",
+      date: "Sep 2026",
+      readTime: "5 min read",
+      content: "<p>Deshi uses parse5 for HTML parsing, acorn + acorn-jsx for JavaScript expressions, and css-tree for style scoping. At build time, Vite drives static HTML generation.</p>"
+    }
+  };
+
+  export async function getStaticParams() {
+    const staticList = [
+      { slug: "getting-started" },
+      { slug: "architecture" }
+    ];
+    return [...staticList, ...docs.map((d) => ({ slug: d.slug }))];
+  }
+
+  const currentSlug = params.slug;
+  const docMatch = docs.find((d) => d.slug === currentSlug);
+  const post = docMatch || defaultArticles[currentSlug] || {
+    title: "Article Not Found",
+    date: "",
+    readTime: "",
+    content: "<p>This article does not exist.</p>"
+  };
+</script>
+
+<head>
+  <title>{post.title} · Deshi Blog</title>
+</head>
+
+<article class="article">
+  <div class="badge-row">
+    <span class="badge">Dynamic Route: /blog/{currentSlug}</span>
+    {post.readTime ? <span class="badge badge-accent">{post.readTime}</span> : null}
+  </div>
+
+  <h1>{post.title}</h1>
+  <time class="meta">{post.date}</time>
+
+  <div class="body" set:html={post.content}></div>
+
+  <div class="footer-nav">
+    <a href="/blog" class="back-link">&larr; Back to all posts</a>
+    {post.sourceUrl ? (
+      <a href={post.sourceUrl} target="_blank" rel="noopener noreferrer" class="source-link">
+        Original Article on Cloudflare Blog &nearr;
+      </a>
+    ) : null}
+  </div>
+</article>
+
+<style>
+  .badge-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #a3e635;
+    background: rgba(163, 230, 53, 0.1);
+    border: 1px solid rgba(163, 230, 53, 0.3);
+    border-radius: 9999px;
+  }
+  .badge-accent {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(56, 189, 248, 0.3);
+  }
+  h1 {
+    margin: 0 0 0.5rem;
+    font-size: 2.25rem;
+    line-height: 1.3;
+    color: #fafafa;
+  }
+  .meta {
+    display: block;
+    color: #71717a;
+    font-size: 0.875rem;
+    margin-bottom: 2rem;
+  }
+  .body {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: #d4d4d8;
+  }
+  .body h2 {
+    color: #fafafa;
+    font-size: 1.6rem;
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid #27272a;
+  }
+  .body h3 {
+    color: #f4f4f5;
+    font-size: 1.3rem;
+    margin: 2rem 0 0.75rem;
+  }
+  .body p {
+    margin: 0 0 1.5rem;
+  }
+  .body ul, .body ol {
+    margin: 0 0 1.5rem 1.5rem;
+  }
+  .body li {
+    margin-bottom: 0.5rem;
+  }
+  .body a {
+    color: #38bdf8;
+    text-decoration: none;
+  }
+  .body a:hover {
+    text-decoration: underline;
+  }
+  .body blockquote {
+    margin: 1.5rem 0;
+    padding: 0.75rem 1.25rem;
+    border-left: 3px solid #38bdf8;
+    background: #121215;
+    border-radius: 0 6px 6px 0;
+    color: #a1a1aa;
+    font-style: italic;
+  }
+  .body pre {
+    background: #000;
+    border: 1px solid #27272a;
+    padding: 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    margin: 1.5rem 0;
+  }
+  .footer-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #27272a;
+  }
+  .back-link {
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .back-link:hover {
+    text-decoration: underline;
+  }
+  .source-link {
+    color: #71717a;
+    font-size: 0.85rem;
+    text-decoration: none;
+  }
+  .source-link:hover {
+    color: #a1a1aa;
+    text-decoration: underline;
+  }
+</style>

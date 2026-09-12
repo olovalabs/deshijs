@@ -1,0 +1,125 @@
+<script>
+  import docs from '../data/docs.js';
+
+  const initialPosts = [
+    {
+      slug: "getting-started",
+      title: "Getting Started with Deshi",
+      date: "Sep 2026",
+      excerpt: "Learn how to write .deshi templates, build static sites, and deploy zero-JS applications."
+    },
+    {
+      slug: "architecture",
+      title: "Under the Hood: AST Compiler & Vite",
+      date: "Sep 2026",
+      excerpt: "Deep dive into how parse5, acorn, css-tree, and Vite dev server work together."
+    }
+  ];
+
+  const posts = [...initialPosts, ...docs];
+</script>
+
+<head>
+  <title>Blog · Deshi</title>
+  <meta name="description" content="Engineering guides, compiler insights, and Cloudflare CASB security deep dives." />
+</head>
+
+<div class="blog-index">
+  <div class="badge-row">
+    <span class="badge">Route: /blog</span>
+    <span class="badge badge-accent">{posts.length} Articles</span>
+  </div>
+  <h1>Engineering & Guides</h1>
+  <p class="sub">Insights into compiler-based SSG web development, AST transformation, and Cloudflare CASB architecture.</p>
+
+  <div class="post-list">
+    {posts.map((p) => (
+      <article class="post-item">
+        <div class="post-meta">
+          <span class="date">{p.date}</span>
+          {p.readTime ? <span class="read-time">&bull; {p.readTime}</span> : null}
+        </div>
+        <h2><a href={`/blog/${p.slug}`}>{p.title}</a></h2>
+        <p>{p.excerpt}</p>
+      </article>
+    ))}
+  </div>
+</div>
+
+<style>
+  .badge-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #a3e635;
+    background: rgba(163, 230, 53, 0.1);
+    border: 1px solid rgba(163, 230, 53, 0.3);
+    border-radius: 9999px;
+  }
+  .badge-accent {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(56, 189, 248, 0.3);
+  }
+  h1 {
+    margin: 0 0 0.5rem;
+    font-size: 2.25rem;
+    color: #fafafa;
+  }
+  .sub {
+    color: #71717a;
+    margin: 0 0 2rem;
+  }
+  .post-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .post-item {
+    padding: 1.5rem;
+    background: #121215;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+  .post-item:hover {
+    border-color: #3f3f46;
+    transform: translateY(-2px);
+  }
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+  }
+  .date {
+    color: #71717a;
+  }
+  .read-time {
+    color: #38bdf8;
+  }
+  .post-item h2 {
+    margin: 0.35rem 0 0.5rem;
+    font-size: 1.35rem;
+  }
+  .post-item a {
+    color: #fafafa;
+    text-decoration: none;
+  }
+  .post-item a:hover {
+    color: #a3e635;
+  }
+  .post-item p {
+    margin: 0;
+    color: #a1a1aa;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+</style>
