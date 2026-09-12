@@ -11,6 +11,7 @@ import { CLIENT_ROUTER_SCRIPT } from './client-router';
 // codegen emits `import "/_deshi/<hash>.css"` per CSS-having file (React-style),
 // resolveId/load below serve the text, and vite:css transforms it like any CSS.
 const deshiCss = new Map<string, string>();
+const deshiClientJs = new Map<string, string>();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,7 +57,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         return '\0virtual:_deshi/router.js';
       }
       // Per-file CSS (ends in .css so vite:css transforms it).
-      if (/^\/_deshi\/[^/]+\.css$/.test(id.split('?')[0])) {
+      if (/^\/_deshi\/[^/]+\.css$/.test(id.split('?')[0]) || id.split('?')[0].startsWith('/_deshi/c/')) {
         return id;
       }
       return null;
@@ -76,6 +77,9 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         if (/^\/_deshi\/[^/]+\.css$/.test(clean)) {
           const css = deshiCss.get(clean);
           if (css !== undefined) return css;
+        }
+        if (clean.startsWith('/_deshi/c/') && deshiClientJs.has(clean)) {
+          return deshiClientJs.get(clean)!;
         }
       }
       return null;
@@ -126,6 +130,13 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         // as text/css so <link> stylesheets apply. Vite's default JS-module
         // form only works for JS `import`s, so request `?direct` internally —
         // page markup stays identical between dev and prod.
+        if (url.startsWith('/_deshi/c/') && deshiClientJs.has(url)) {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          res.statusCode = 200;
+          res.end(deshiClientJs.get(url)!);
+          return;
+        }
+
         if (/^\/_deshi\/[^/]+\.css$/.test(url)) {
           try {
             const t = await server.transformRequest(url + '?direct');
@@ -186,6 +197,9 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           // Refresh the virtual CSS registry (dev serves per-file CSS through
           // Vite's pipeline) and drop Vite's cached transform for changed files.
           for (const f of result.files) {
+            if (f.kind === 'js' && ('/' + f.path).startsWith('/_deshi/c/')) {
+              deshiClientJs.set('/' + f.path, f.content);
+            }
             if (f.kind !== 'css') continue;
             const url = '/' + f.path;
             if (deshiCss.get(url) !== f.content) {
