@@ -40,12 +40,16 @@ export interface Element {
   /** document-mode <head>: children are lifted into a head contribution */
   isDocHead?: boolean;
 }
+export type ClientStrategy = 'load' | 'visible' | 'idle' | 'click';
+
 export interface Component {
   type: 'Component';
   ident: string;
   props: Attr[];
   slots: Record<string, Node[]>;
   clientProps?: Expression;
+  /** Per-usage island strategy from client:load | client:visible | client:idle. */
+  clientStrategy?: ClientStrategy;
   loc: Loc;
 }
 export interface Text {
@@ -144,6 +148,7 @@ export const ERROR_CATALOG: Record<string, string> = {
   PF4023: 'set:html on an element with children',
   PF4024: 'Capitalized tag is not an imported component',
   PF4025: '<head> block inside the root layout body',
+  PF4026: 'Invalid client:* directive',
   PF5001: 'Forbidden <script> in zero-JS mode',
   PF5002: 'Asset not found',
   PF5003: 'Client chunk missing from manifest',

@@ -111,6 +111,9 @@ export interface RenderCtx {
   used: Set<string>;
   depth: number;
   segments: boolean;
+  islands: number;
+  /** modulepreload hrefs for client:load islands only */
+  preloads: Set<string>;
 }
 
 export interface Bindings {
@@ -153,12 +156,20 @@ export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<
   return '';
 }
 
+const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'click']);
+
+function componentBaseName(file: string): string {
+  const b = file.slice(Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\')) + 1);
+  return b.replace(/\.(deshi|html)$/i, '');
+}
+
 export async function renderComponent(
   Comp: RenderModule,
   props: Record<string, unknown>,
   slotFns: SlotFns,
   ctx: RenderCtx,
   clientProps?: unknown,
+  strategy?: string,
 ): Promise<string> {
   const meta = Comp.__deshi;
   if (!meta) throw new Error('renderComponent: not a compiled Deshi component');
@@ -166,11 +177,36 @@ export async function renderComponent(
     throw new Error(`PF4002: Component nesting deeper than 50 (${meta.file})`);
   }
   if (meta.css) ctx.css.add(meta.hash);
-  if (meta.client) ctx.clients.add(meta.hash);
   ctx.used.add(meta.file);
+  const island = !!strategy && ISLAND_STRATEGIES.has(strategy);
+  if (island) {
+    if (!meta.client) {
+      throw new Error(
+        `PF4026: client:${strategy} on ${meta.file} but the component has no <script client> block`,
+      );
+    }
+    ctx.clients.add(meta.hash);
+    ctx.islands++;
+    if (ctx.islands === 1) {
+      headPush(ctx, '<style id="deshi-island-css">deshi-island{display:block}</style>');
+    }
+  }
   ctx.depth++;
   try {
-    return await Comp(bindings(ctx, props, slotFns), slotFns, ctx, clientProps === undefined ? undefined : JSON.stringify(clientProps));
+    let cp: string | undefined;
+    if (island) {
+      try {
+        cp = JSON.stringify(clientProps === undefined ? {} : clientProps);
+      } catch {
+        throw new Error('PF4026: client:props must be JSON-serializable');
+      }
+    }
+    const html = await Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp);
+    if (!island || !strategy) return html;
+    const name = componentBaseName(meta.file);
+    const src = `/_deshi/c/${name}.${meta.hash}.js`;
+    if (strategy === 'load') ctx.preloads.add(src);
+    return `<deshi-island data-strategy="${escapeAttr(strategy)}" data-component="${escapeAttr(name)}" data-src="${escapeAttr(src)}">${html}</deshi-island>`;
   } finally {
     ctx.depth--;
   }

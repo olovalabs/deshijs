@@ -24,6 +24,7 @@ import {
   locAt,
   makeExpression,
   parseBraceExpression,
+  takeClientDirectives,
   type TemplateContext,
 } from './expression';
 
@@ -367,14 +368,17 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx): Node[] {
     }
     ctx.usedComponents.add(name);
     const attrs = convertAttrs(el, ctx);
-    const clientIdx = attrs.findIndex((a) => a.kind === 'dynamic' && a.name === 'client:props');
-    let clientProps: Expression | undefined;
-    if (clientIdx >= 0) {
-      clientProps = (attrs[clientIdx] as { expr: Expression }).expr;
-      attrs.splice(clientIdx, 1);
-    }
+    const taken = takeClientDirectives(attrs, loc, ctx, name, true);
     const children = convertChildren(rawChildren, 'div', ctx);
-    const comp: Component = { type: 'Component', ident: name, props: attrs, slots: bucketSlots(children, ctx), clientProps, loc };
+    const comp: Component = {
+      type: 'Component',
+      ident: name,
+      props: taken.attrs,
+      slots: bucketSlots(children, ctx),
+      clientProps: taken.clientProps,
+      clientStrategy: taken.clientStrategy,
+      loc,
+    };
     return [comp];
   }
 
@@ -405,6 +409,7 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx): Node[] {
   }
 
   const attrs = convertAttrs(el, ctx);
+  takeClientDirectives(attrs, loc, ctx, name, false);
   const wasRootBody = ctx.inRootBody;
   if (ctx.document && lower === 'body') ctx.inRootBody = true;
   const children = VOID.has(lower) ? [] : convertChildren(rawChildren, lower, ctx);

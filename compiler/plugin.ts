@@ -6,6 +6,7 @@ import { compile } from './index';
 import { scopedCssUrl } from './css';
 import { build as buildSite, buildToDisk } from './build';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
+import { ISLANDS_RUNTIME } from './islands';
 
 // Virtual per-file CSS served through Vite's pipeline (postcss, HMR):
 // codegen emits `import "/_deshi/<hash>.css"` per CSS-having file (React-style),
@@ -56,6 +57,9 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       if (id.includes('_deshi/router') || id === '/_deshi/router.4f1a9c2e.js') {
         return '\0virtual:_deshi/router.js';
       }
+      if (id === '/_deshi/islands.js' || id.endsWith('/_deshi/islands.js')) {
+        return '\0virtual:_deshi/islands.js';
+      }
       // Per-file CSS (ends in .css so vite:css transforms it).
       if (/^\/_deshi\/[^/]+\.css$/.test(id.split('?')[0]) || id.split('?')[0].startsWith('/_deshi/c/')) {
         return id;
@@ -71,6 +75,9 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       }
       if (id === '\0virtual:_deshi/router.js') {
         return CLIENT_ROUTER_SCRIPT;
+      }
+      if (id === '\0virtual:_deshi/islands.js') {
+        return ISLANDS_RUNTIME;
       }
       {
         const clean = id.split('?')[0];
@@ -123,6 +130,12 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           res.statusCode = 200;
           res.end(CLIENT_ROUTER_SCRIPT);
+          return;
+        }
+        if (url === '/_deshi/islands.js') {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          res.statusCode = 200;
+          res.end(ISLANDS_RUNTIME);
           return;
         }
 

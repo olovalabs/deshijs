@@ -7,6 +7,7 @@ import {
   fail,
   offsetToLineCol,
   type Attr,
+  type ClientStrategy,
   type Component,
   type Element,
   type Expression,
@@ -139,6 +140,72 @@ function convertJsxAttr(a: AnyNode, ctx: TemplateContext): Attr {
   fail('PF1002', `Unsupported attribute value for "${name}"`, ctx.file, ctx.source, a.start);
 }
 
+const CLIENT_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'click']);
+
+export function takeClientDirectives(
+  attrs: Attr[],
+  loc: Loc,
+  ctx: TemplateContext,
+  tagName: string,
+  isComponent: boolean,
+): { attrs: Attr[]; clientStrategy?: ClientStrategy; clientProps?: Expression } {
+  let clientStrategy: ClientStrategy | undefined;
+  let clientProps: Expression | undefined;
+  const rest: Attr[] = [];
+  for (const a of attrs) {
+    const name =
+      a.kind === 'static' || a.kind === 'boolean' || a.kind === 'dynamic' ? a.name : '';
+    if (!name.startsWith('client:')) {
+      rest.push(a);
+      continue;
+    }
+    if (!isComponent) {
+      fail(
+        'PF4026',
+        `client:* directives can only be used on Deshi components, not <${tagName}>`,
+        ctx.file,
+        ctx.source,
+        loc.start,
+      );
+    }
+    const dir = name.slice('client:'.length);
+    if (dir === 'props') {
+      if (a.kind !== 'dynamic') {
+        fail('PF4026', 'client:props requires an expression value: client:props={{ ... }}', ctx.file, ctx.source, loc.start);
+      }
+      if (clientProps) {
+        fail('PF4026', 'Duplicate client:props on one component usage', ctx.file, ctx.source, loc.start);
+      }
+      clientProps = a.expr;
+      continue;
+    }
+    if (CLIENT_STRATEGIES.has(dir)) {
+      if (a.kind !== 'boolean') {
+        fail(
+          'PF4026',
+          `Directive client:${dir} must not have a value (use client:${dir} not client:${dir}="...")`,
+          ctx.file,
+          ctx.source,
+          loc.start,
+        );
+      }
+      if (clientStrategy) {
+        fail(
+          'PF4026',
+          `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`,
+          ctx.file,
+          ctx.source,
+          loc.start,
+        );
+      }
+      clientStrategy = dir as ClientStrategy;
+      continue;
+    }
+    fail('PF4026', `Unknown client:* directive "client:${dir}"`, ctx.file, ctx.source, loc.start);
+  }
+  return { attrs: rest, clientStrategy, clientProps };
+}
+
 export function checkAttrName(name: string, offset: number, ctx: TemplateContext): void {
   if (name === 'className' || name === 'htmlFor') {
     fail(
@@ -231,18 +298,14 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
       );
     }
     ctx.usedComponents.add(name);
-    const clientIdx = attrs.findIndex((a: Attr) => a.kind === 'dynamic' && a.name === 'client:props');
-    let clientProps: Expression | undefined;
-    if (clientIdx >= 0) {
-      clientProps = (attrs[clientIdx] as { expr: Expression }).expr;
-      attrs.splice(clientIdx, 1);
-    }
+    const taken = takeClientDirectives(attrs, loc, ctx, name, true);
     const comp: Component = {
       type: 'Component',
       ident: name,
-      props: attrs,
+      props: taken.attrs,
       slots: bucketSlots(children, ctx),
-      clientProps,
+      clientProps: taken.clientProps,
+      clientStrategy: taken.clientStrategy,
       loc,
     };
     return [comp];
@@ -255,6 +318,7 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
     return [{ type: 'Slot', name: nameAttr?.value || 'default', fallback: children, loc }];
   }
 
+  takeClientDirectives(attrs, loc, ctx, name, false);
   const setHtml = attrs.find((a: Attr) => a.kind === 'setHtml');
   if (setHtml && children.length) {
     fail('PF4023', 'An element with set:html must not have children', ctx.file, ctx.source, node.start);

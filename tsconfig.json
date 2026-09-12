@@ -27,6 +27,7 @@
   },
   "include": [
     "src",
-    "compiler"
+    "compiler",
+    "compiler/client-directives.d.ts"
   ]
 }

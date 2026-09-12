@@ -221,6 +221,7 @@ export function astToJson(node: Node | Node[]): unknown {
         ident: node.ident,
         props: node.props.map(attrToJson),
         ...(node.clientProps ? { clientProps: node.clientProps.raw } : {}),
+        ...(node.clientStrategy ? { clientStrategy: node.clientStrategy } : {}),
         slots: Object.fromEntries(Object.entries(node.slots).map(([k, v]) => [k, astToJson(v)])),
       };
     case 'Slot':

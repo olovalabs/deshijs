@@ -7,6 +7,7 @@ import { transformSync } from 'esbuild';
 import { compile, type CompileResult } from './index';
 import { scopedCssUrl } from './css';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
+import { ISLANDS_RUNTIME } from './islands';
 import { formatHtml, minifyHtml } from './html';
 import { ACORN_OPTIONS, JsxParser } from './expression';
 import {
@@ -331,13 +332,14 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       used: new Set(),
       depth: 0,
       segments: opts.router,
+      islands: 0,
+      preloads: new Set<string>(),
     };
     const run = async (i: number): Promise<string> => {
       const file = chain[i];
       const mod = await loadRender(file);
       ctx.used.add(file);
       if (mod.__deshi.css) ctx.css.add(mod.__deshi.hash);
-      if (mod.__deshi.client) ctx.clients.add(mod.__deshi.hash);
       const slotFns: SlotFns = {};
       if (i < chain.length - 1) {
         slotFns.default = async () => {
@@ -370,26 +372,19 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       head += `<style>${cssText}</style>`;
       previewHead += `<style>${cssText}</style>`;
     }
+    for (const href of ctx.preloads) {
+      head += `<link rel="modulepreload" href="${href}">`;
+    }
     if (opts.router) {
       const tags = `<script type="application/json" id="deshi-routes">${JSON.stringify(compileTable(routes, routeChunks))}</script><script type="module" src="/_deshi/router.4f1a9c2e.js"></script>`;
       head += tags;
     }
 
-    // client bootstrap (only when the render tree contained <script client>)
-    const ctxJson = JSON.stringify({ params, url: ctx.url.href, pattern });
     let tail = '';
     let previewTail = '';
-    if (ctx.clients.size && !opts.router) {
-      const list = [...ctx.clients];
-      const imports = list.map((h, i) => `import m${i} from ${JSON.stringify(clientByHash[h].chunk)};`).join('\n');
-      const mountAll = `const ctx = ${ctxJson};\nfor (const [h, m] of [${list.map((h, i) => `[${JSON.stringify(h)}, m${i}]`).join(', ')}]) for (const el of document.querySelectorAll('[data-deshi-c="' + h + '"]')) m(el, { ...ctx, props: JSON.parse(el.getAttribute('data-deshi-props') || '{}') });`;
-      tail = `<script type="module">\n${imports}\n${mountAll}\n</script>`;
-      const inlined = list.map((h, i) => `function m${i}(root, ctx) {\n${clientByHash[h].body}\n}`).join('\n');
-      previewTail = `<script type="module">\n${inlined}\n${mountAll}\n</script>`;
-    } else if (ctx.clients.size && opts.router) {
-      const list = [...ctx.clients];
-      const inlined = list.map((h, i) => `function m${i}(root, ctx) {\n${clientByHash[h].body}\n}`).join('\n');
-      previewTail = `<script type="module">\n${inlined}\nconst ctx = ${ctxJson};\nfor (const [h, m] of [${list.map((h, i) => `[${JSON.stringify(h)}, m${i}]`).join(', ')}]) for (const el of document.querySelectorAll('[data-deshi-c="' + h + '"]')) m(el, { ...ctx, props: JSON.parse(el.getAttribute('data-deshi-props') || '{}') });\n</script>`;
+    if (ctx.islands > 0) {
+      tail = `<script type="module" src="/_deshi/islands.js"></script>`;
+      previewTail = `<script type="module" src="/_deshi/islands.js"></script>`;
     }
     previewTail += PREVIEW_NAV_SCRIPT;
 
@@ -522,7 +517,12 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       }
     }
   }
-  for (const c of Object.values(clientByHash)) out.push({ path: c.chunk.slice(1), content: c.code, kind: 'js' });
+  const usedClient = new Set<string>();
+  for (const p of pages) for (const h of p.clients) usedClient.add(h);
+  for (const [h, c] of Object.entries(clientByHash)) {
+    if (usedClient.has(h)) out.push({ path: c.chunk.slice(1), content: c.code, kind: 'js' });
+  }
+  if (usedClient.size) out.push({ path: '_deshi/islands.js', content: ISLANDS_RUNTIME, kind: 'js' });
   if (opts.router) out.push({ path: '_deshi/router.4f1a9c2e.js', content: CLIENT_ROUTER_SCRIPT, kind: 'js' });
 
   if (opts.output === 'page') {

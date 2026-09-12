@@ -109,8 +109,14 @@ function genElement(el: Element, em: Em, g: G): void {
   } else {
     const entries = attrEntries(el.attrs, g);
     if (el.scoped) entries.push(`${JSON.stringify(scopeAttribute(g.hash))}: true`);
-    if (el.clientRoot) entries.push(`"data-deshi-c": ${JSON.stringify(g.hash)}`, `"data-deshi-props": $cp`);
-    em.expr(`attrs({ ${entries.join(', ')} })`);
+    const base = `{ ${entries.join(', ')} }`;
+    if (el.clientRoot) {
+      em.expr(
+        `attrs($cp !== undefined ? Object.assign({}, ${base}, { "data-deshi-c": ${JSON.stringify(g.hash)}, "data-deshi-props": $cp }) : ${base})`,
+      );
+    } else {
+      em.expr(`attrs(${base})`);
+    }
   }
   em.str('>');
   if (VOID.has(el.name.toLowerCase())) return;
@@ -147,8 +153,9 @@ function genComponent(c: Component, em: Em, g: G): void {
       return `${JSON.stringify(name)}: async () => ${s.code()}`;
     })
     .join(', ');
-  const cp = c.clientProps ? `, ${genExprCode(c.clientProps, g)}` : '';
-  em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx${cp}))`, true);
+  const cp = c.clientProps ? genExprCode(c.clientProps, g) : 'undefined';
+  const strat = c.clientStrategy ? JSON.stringify(c.clientStrategy) : 'undefined';
+  em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);
 }
 
 function genSlot(s: Slot, em: Em, g: G): void {
