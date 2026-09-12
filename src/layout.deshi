@@ -32,7 +32,7 @@
 
     <footer class="footer">
       <p>&copy; {new Date().getFullYear()} Deshi Framework. Zero client JS.</p>
-      <p>mamaur barir abdar</p>
+      
     </footer>
   </body>
 </html>
@@ -94,7 +94,7 @@
     padding: 1.5rem;
     text-align: center;
     border-top: 1px solid #18181b;
-    color: #71717a;
+    color: #a1a1aa;
     font-size: 0.875rem;
   }
 </style>

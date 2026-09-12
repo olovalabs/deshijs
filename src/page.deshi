@@ -12,7 +12,8 @@
 </script>
 
 <head>
-  <title>Home · Deshi App</title>
+  <title>Home &middot; Deshi App</title>
+  <meta name="description" content="Fast, Zero-JS Static Site Compiler built with AST transforms, native Vite integration, and complete .deshi component support." />
 </head>
 
 <section class="hero">
