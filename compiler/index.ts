@@ -5,6 +5,7 @@ import { parseTemplate, walkNodes } from './template';
 import { analyzeTemplateScope } from './scope';
 import { scopeCss, minifyCss, scopedCssUrl } from './css';
 import { generate } from './codegen';
+import { markdownToDeshi } from './markdown';
 import {
   DeshiError,
   hashString,
@@ -50,11 +51,19 @@ export interface CompileResult {
   script: ScriptInfo;
 }
 
+const compileMemo = new Map<string, CompileResult>();
+
 export function compile(source: string, opts: CompileOptions): CompileResult {
   const file = opts.file;
   const minify = opts.minify ?? true;
+  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${hashString(source)}`;
+  const cached = compileMemo.get(memoKey);
+  if (cached) return cached;
+  if (compileMemo.size > 400) compileMemo.clear();
+
   const diagnostics: Diagnostic[] = [];
   const hash = hashString(file);
+  if (file.endsWith('.md')) source = markdownToDeshi(source);
 
   // 1. block split (parse5 tokenizer)
   const blocks = splitBlocks(source, file);
@@ -148,7 +157,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       }
     : undefined;
 
-  return {
+  const result: CompileResult = {
     code: out.esm,
     evalBody: out.evalBody,
     css: { scoped, global, hash },
@@ -170,6 +179,8 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     ast: root,
     script,
   };
+  compileMemo.set(memoKey, result);
+  return result;
 }
 
 function sourceUsesParams(root: Root): boolean {

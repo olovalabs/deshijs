@@ -23,6 +23,7 @@
           <a href="/about">About</a>
           <a href="/blog">Blog</a>
           <a href="/counter">Counter</a>
+          <a href="/hello">Markdown</a>
         </nav>
       </div>
     </header>

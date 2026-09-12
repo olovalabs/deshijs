@@ -4,7 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { compile } from './index';
 import { scopedCssUrl } from './css';
-import { build as buildSite, buildToDisk } from './build';
+import { build as buildSite, buildToDisk, type BuildResult } from './build';
+import { hashString } from './types';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
 import { ISLANDS_RUNTIME } from './islands';
 
@@ -32,6 +33,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
   const enableRouter = options.router ?? true;
 
   let config: ResolvedConfig | undefined;
+  let cachedBuild: { fp: string; result: BuildResult } | null = null;
 
   return {
     name: 'vite-plugin-deshi',
@@ -93,7 +95,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     },
     async transform(code, id) {
       const cleanId = id.split('?')[0];
-      if (cleanId.endsWith('.deshi')) {
+      if (cleanId.endsWith('.deshi') || cleanId.endsWith('.md')) {
         const result = compile(code, {
           file: cleanId,
           minify: options.minify ?? false,
@@ -120,7 +122,10 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       // .deshi sources live outside Vite's module graph in dev (pages are
       // rendered to HTML strings), so edits would otherwise go unnoticed.
       server.watcher.on('change', (file) => {
-        if (file.endsWith('.deshi')) server.ws.send({ type: 'full-reload' });
+        if (/\.(deshi|html|md|js|ts)$/.test(file)) {
+          cachedBuild = null;
+          server.ws.send({ type: 'full-reload' });
+        }
       });
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split('?')[0] || '/';
@@ -188,7 +193,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
               const rel = base ? `${base}/${item.name}` : item.name;
               if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules' && item.name !== 'compiler') {
                 Object.assign(out, readFilesRecursively(full, rel));
-              } else if (item.isFile() && (item.name.endsWith('.deshi') || item.name.endsWith('.html') || item.name.endsWith('.ts') || item.name.endsWith('.js'))) {
+              } else if (item.isFile() && (item.name.endsWith('.deshi') || item.name.endsWith('.html') || item.name.endsWith('.md') || item.name.endsWith('.ts') || item.name.endsWith('.js'))) {
                 out[`src/${rel}`] = fs.readFileSync(full, 'utf-8');
               }
             }
@@ -196,16 +201,25 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           };
 
           const projectFiles = readFilesRecursively(appDir);
-          const result = await buildSite(
-            { files: projectFiles },
-            {
-              output: 'index',
-              router: enableRouter,
-              css: options.css ?? 'inline',
-              minify: false,
-              appDir: 'src',
-            }
-          );
+          let fp = '';
+          for (const k of Object.keys(projectFiles).sort()) fp += k + '\0' + hashString(projectFiles[k]);
+          fp = hashString(fp);
+          let result: BuildResult;
+          if (cachedBuild && cachedBuild.fp === fp) {
+            result = cachedBuild.result;
+          } else {
+            result = await buildSite(
+              { files: projectFiles },
+              {
+                output: 'index',
+                router: enableRouter,
+                css: options.css ?? 'inline',
+                minify: false,
+                appDir: 'src',
+              }
+            );
+            cachedBuild = { fp, result };
+          }
 
           // Refresh the virtual CSS registry (dev serves per-file CSS through
           // Vite's pipeline) and drop Vite's cached transform for changed files.

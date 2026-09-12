@@ -123,6 +123,8 @@ export function scan(files: string[]): ScanResult {
   const routes: Route[] = [];
   const byPattern = new Map<string, string>();
 
+  const PAGE_INDEX = /^(page|index)\.(deshi|html|md)$/;
+  const RESERVED_FILE = /^(layout|template|not-found)\.(deshi|html|md)$/;
   const hasLayout = (dir: string) => {
     for (const ext of ['deshi', 'html']) {
       const p = dir ? `${dir}/layout.${ext}` : `layout.${ext}`;
@@ -134,23 +136,37 @@ export function scan(files: string[]): ScanResult {
   };
   const rootLayout = hasLayout('');
   if (!rootLayout) diagnostics.push(d('PF2001', 'Missing root layout: layout.deshi is required', 'layout.deshi'));
-  const notFound = set.has('not-found.deshi') ? 'not-found.deshi' : (set.has('not-found.html') ? 'not-found.html' : null);
+  const notFound = set.has('not-found.deshi')
+    ? 'not-found.deshi'
+    : set.has('not-found.html')
+      ? 'not-found.html'
+      : set.has('not-found.md')
+        ? 'not-found.md'
+        : null;
+
+  const isRoutePage = (base: string): boolean => {
+    if (PAGE_INDEX.test(base)) return true;
+    if (RESERVED_FILE.test(base)) return false;
+    if (/\.(md|html)$/.test(base)) return true;
+    if (base.endsWith('.deshi') && !/^[A-Z]/.test(base)) return true;
+    return false;
+  };
 
   for (const file of [...set].sort()) {
     const parts = file.split('/');
     const base = parts[parts.length - 1];
     const dirs = parts.slice(0, -1);
-    if (dirs.some(isPrivate)) continue;
-    if (base === 'default.deshi' || base === 'default.html') {
+    if (dirs.some(isPrivate) || dirs[0] === 'components' || dirs[0] === 'lib' || dirs[0] === 'data') continue;
+    if (base === 'default.deshi' || base === 'default.html' || base === 'default.md') {
       diagnostics.push(d('PF2010', `${file}: parallel routes (${base}) are not supported`, file));
       continue;
     }
-    if (['loading.deshi', 'loading.html', 'error.deshi', 'error.html', 'route.js', 'route.ts', 'middleware.js', 'middleware.ts'].includes(base)) {
+    if (['loading.deshi', 'loading.html', 'loading.md', 'error.deshi', 'error.html', 'error.md', 'route.js', 'route.ts', 'middleware.js', 'middleware.ts'].includes(base)) {
       diagnostics.push(d('PF2011', `${file}: "${base}" has no meaning in a static site and is ignored`, file, 'warning'));
       ignored.push(file);
       continue;
     }
-    if (base !== 'page.deshi' && base !== 'page.html') continue;
+    if (!isRoutePage(base)) continue;
 
     const segments: Segment[] = [];
     let bad = false;
@@ -163,6 +179,15 @@ export function scan(files: string[]): ScanResult {
         break;
       }
       segments.push(seg);
+    }
+    if (!PAGE_INDEX.test(base)) {
+      const stem = base.replace(/\.(deshi|html|md)$/, '');
+      const leaf = parseSegment(stem);
+      if ('error' in leaf) {
+        diagnostics.push(d('PF2005', `${file}: ${leaf.error}`, file));
+        continue;
+      }
+      segments.push(leaf);
     }
     if (bad) continue;
     const catchIdx = segments.findIndex((s) => s.kind === 'catchAll' || s.kind === 'optionalCatchAll');

@@ -218,7 +218,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   const resolve = (spec: string, from: string): string => {
     if (spec.startsWith('~/')) {
       const base = 'src/' + spec.slice(2);
-      for (const cand of [base, base + '.js', base + '.ts', base + '.deshi', base + '.html', base + '/index.js']) if (files[cand] !== undefined) return cand;
+      for (const cand of [base, base + '.js', base + '.ts', base + '.deshi', base + '.html', base + '.md', base + '/index.js']) if (files[cand] !== undefined) return cand;
       return base;
     }
     if (spec.startsWith('./') || spec.startsWith('../')) return joinPath(dirname(from), spec);
@@ -231,14 +231,14 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     if (modules.has(file)) return modules.get(file)!;
     if (loading.has(file)) throw new DeshiError(diag('PF4003', `Import cycle: ${from} → ${file}`, from));
     if (files[file] === undefined) {
-      const code = (file.endsWith('.deshi') || file.endsWith('.html')) ? 'PF4004' : 'PF5002';
+      const code = (file.endsWith('.deshi') || file.endsWith('.html') || file.endsWith('.md')) ? 'PF4004' : 'PF5002';
       throw new DeshiError(diag(code, `Cannot resolve "${spec}" from ${from} (${file} not found)`, from));
     }
     loading.add(file);
     try {
       const $import = (s: string) => importModule(s, file);
       let ns: ModuleNs;
-      if (file.endsWith('.deshi') || file.endsWith('.html')) {
+      if (file.endsWith('.deshi') || file.endsWith('.html') || file.endsWith('.md')) {
         const res = getCompiled(file);
         const fn = new AsyncFunction('$rt', '$import', res.evalBody);
         ns = (await fn(runtime, $import)) as ModuleNs;
@@ -254,7 +254,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   };
 
   const loadRender = async (file: string): Promise<RenderModule> => {
-    const ext = file.endsWith('.deshi') ? '.deshi' : (file.endsWith('.html') ? '.html' : '');
+    const ext = file.endsWith('.deshi') ? '.deshi' : file.endsWith('.html') ? '.html' : file.endsWith('.md') ? '.md' : '';
     const rel = ext ? './' + basename(file) + ext : './' + basename(file);
     const ns = await importModule(rel, dirname(file) + '/x');
     return ns.default as RenderModule;
@@ -268,7 +268,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
 
   // Compile every component/page file up front so that diagnostics cover unused files too.
   for (const f of Object.keys(files)) {
-    if (!f.endsWith('.html') && !f.endsWith('.deshi')) continue;
+    if (!f.endsWith('.html') && !f.endsWith('.deshi') && !f.endsWith('.md')) continue;
     try {
       getCompiled(f);
     } catch (e) {
@@ -425,7 +425,13 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       let urls: Array<{ url: string; params: Record<string, string | string[]> }> = [];
       try {
         if (route.dynamic) {
-          const ext = pageFile.endsWith('.deshi') ? '.deshi' : (pageFile.endsWith('.html') ? '.html' : '');
+          const ext = pageFile.endsWith('.deshi')
+            ? '.deshi'
+            : pageFile.endsWith('.html')
+              ? '.html'
+              : pageFile.endsWith('.md')
+                ? '.md'
+                : '';
           const rel = ext ? './' + basename(pageFile) + ext : './' + basename(pageFile);
           const ns = await importModule(rel, dirname(pageFile) + '/x');
           const gsp = ns.getStaticParams as undefined | (() => unknown);
@@ -626,6 +632,7 @@ export async function buildToDisk(
         item.isFile() &&
         (item.name.endsWith('.deshi') ||
           item.name.endsWith('.html') ||
+          item.name.endsWith('.md') ||
           item.name.endsWith('.ts') ||
           item.name.endsWith('.js'))
       ) {

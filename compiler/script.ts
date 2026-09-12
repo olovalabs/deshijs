@@ -108,7 +108,7 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
     switch (stmt.type) {
       case 'ImportDeclaration': {
         const source = String(stmt.source.value);
-        const isComponent = source.endsWith('.deshi') || source.endsWith('.html');
+        const isComponent = source.endsWith('.deshi') || source.endsWith('.html') || source.endsWith('.md');
         const specifiers: ImportSpec[] = stmt.specifiers.map((s: AnyNode) => ({
           imported:
             s.type === 'ImportDefaultSpecifier' ? 'default'
