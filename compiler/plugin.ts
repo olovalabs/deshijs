@@ -1,4 +1,4 @@
-import type { Plugin, ViteDevServer, ResolvedConfig } from 'vite';
+import type { Plugin, ViteDevServer, PreviewServer, ResolvedConfig } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -188,7 +188,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
             {
               output: 'index',
               router: enableRouter,
-              css: options.css ?? 'extract',
+              css: options.css ?? 'inline',
               minify: false,
               appDir: 'src',
             }
@@ -239,7 +239,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         }
       });
     },
-    configurePreviewServer(server: ViteDevServer) {
+    configurePreviewServer(server: PreviewServer) {
       // vite preview SPA-falls-back extensionless routes to index.html, so
       // /about would serve the home page. Resolve routes from dist/ instead:
       // /about → about/index.html (index mode) / about.html / about/page.html.
@@ -287,7 +287,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         {
           output: 'index',
           router: enableRouter,
-          css: options.css ?? 'extract',
+          css: options.css ?? 'inline',
           minify: options.minify ?? true,
           appDir: options.appDir ?? 'src',
         },
