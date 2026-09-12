@@ -128,7 +128,16 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         }
       });
       server.middlewares.use(async (req, res, next) => {
-        const url = req.url?.split('?')[0] || '/';
+        const rawUrl = req.url || '/';
+        const qIndex = rawUrl.indexOf('?');
+        const url = qIndex === -1 ? rawUrl.split('#')[0] : rawUrl.slice(0, qIndex);
+        const qs = qIndex === -1 ? '' : rawUrl.slice(qIndex);
+        if (url.length > 1 && url.endsWith('/')) {
+          res.statusCode = 308;
+          res.setHeader('Location', url.slice(0, -1) + qs);
+          res.end();
+          return;
+        }
 
         // Serve client SPA router script
         if (url === '/_deshi/router.4f1a9c2e.js') {
@@ -270,12 +279,21 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       // vite preview SPA-falls-back extensionless routes to index.html, so
       // /about would serve the home page. Resolve routes from dist/ instead:
       // /about → about/index.html (index mode) / about.html / about/page.html.
-      server.middlewares.use((req, res, next) => {
-        const url = req.url?.split('?')[0] || '/';
+      const previewHandler = (req: { url?: string }, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (s?: string | Buffer) => void }, next: () => void) => {
+        const rawUrl = req.url || '/';
+        const qIndex = rawUrl.indexOf('?');
+        const url = qIndex === -1 ? rawUrl.split('#')[0] : rawUrl.slice(0, qIndex);
+        const qs = qIndex === -1 ? '' : rawUrl.slice(qIndex);
+        if (url.length > 1 && url.endsWith('/')) {
+          res.statusCode = 308;
+          res.setHeader('Location', url.slice(0, -1) + qs);
+          res.end();
+          return;
+        }
         if (url.includes('.')) return next(); // real files: sirv handles them
         const root = config?.root || process.cwd();
         const base = path.resolve(root, config?.build?.outDir || 'dist');
-        const clean = url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
+        const clean = url;
         for (const cand of [path.join(base, clean, 'index.html'), base + clean + '.html', path.join(base, clean, 'page.html')]) {
           if (!cand.startsWith(base)) continue;
           try {
@@ -301,7 +319,8 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           // no 404 page — fall through to sirv
         }
         next();
-      });
+      };
+      server.middlewares.stack.unshift({ route: '', handle: previewHandler });
     },
     async closeBundle() {
       const root = config?.root || process.cwd();
