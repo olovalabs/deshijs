@@ -24,6 +24,8 @@ export interface CompileOptions {
   /** route pattern of this layout (router mode only) → segment markers */
   segment?: string | null;
   runtimeImport?: string;
+  /** File-stable `/_deshi/<filehash>.css` (dev HMR). Default is content-hashed. */
+  stableCssUrl?: boolean;
 }
 
 export interface CompileMeta {
@@ -56,7 +58,7 @@ const compileMemo = new Map<string, CompileResult>();
 export function compile(source: string, opts: CompileOptions): CompileResult {
   const file = opts.file;
   const minify = opts.minify ?? true;
-  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${hashString(source)}`;
+  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${hashString(source)}`;
   const cached = compileMemo.get(memoKey);
   if (cached) return cached;
   if (compileMemo.size > 400) compileMemo.clear();
@@ -156,7 +158,9 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     isLayout,
     isDocument: root.document,
     segment: opts.segment ?? null,
-    cssUrl: scopedCssUrl(scoped),
+    cssUrl: opts.stableCssUrl
+      ? (scoped || global ? `/_deshi/${hash}.css` : null)
+      : scopedCssUrl(scoped),
     slots: [...slots],
     deps,
     runtimeImport: opts.runtimeImport,

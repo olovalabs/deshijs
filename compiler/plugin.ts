@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { compile } from './index';
-import { scopedCssUrl } from './css';
 import { build as buildSite, buildToDisk, type BuildResult } from './build';
 import { hashString } from './types';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
@@ -40,6 +39,44 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
 
   let config: ResolvedConfig | undefined;
   let cachedBuild: { fp: string; result: BuildResult } | null = null;
+  const lastCompile = new Map<string, { evalBody: string; clientBody: string; css: string; hasCss: boolean; hash: string }>();
+
+  function toPosix(p: string): string {
+    return p.replace(/\\/g, '/');
+  }
+
+  function isDeshiSource(file: string): boolean {
+    return /\.(deshi|md|html)$/.test(file);
+  }
+
+  function cssOnlyChange(
+    prev: { evalBody: string; clientBody: string; css: string; hasCss: boolean } | undefined,
+    next: { evalBody: string; clientBody: string; css: string; hasCss: boolean },
+  ): boolean {
+    if (!prev) return false;
+    if (!prev.hasCss || !next.hasCss) return false;
+    if (prev.evalBody !== next.evalBody) return false;
+    if (prev.clientBody !== next.clientBody) return false;
+    return prev.css !== next.css;
+  }
+
+  function sendCssUpdate(server: ViteDevServer, cssUrl: string, css: string) {
+    deshiCss.set(cssUrl, css);
+    server.moduleGraph.urlToModuleMap.forEach((mod, key) => {
+      if (key === cssUrl || key.startsWith(cssUrl + '?')) server.moduleGraph.invalidateModule(mod);
+    });
+    server.ws.send({
+      type: 'update',
+      updates: [
+        {
+          type: 'css-update',
+          path: cssUrl,
+          acceptedPath: cssUrl,
+          timestamp: Date.now(),
+        },
+      ],
+    });
+  }
 
   // Cached merged config (file + inline options)
   let deshiConfig: any = null;
@@ -67,16 +104,40 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     configResolved(resolvedConfig) {
       config = resolvedConfig;
     },
-    // Astro-like HMR: CSS-only changes hot-update without full reload, .deshi template changes do full-reload
+    // Vite HMR: CSS-only .deshi edits update <link> sheets; template/script edits full-reload.
     async handleHotUpdate(ctx) {
-      if (ctx.file.endsWith('.deshi') || ctx.file.endsWith('.md')) {
-        cachedBuild = null;
-        // invalidate the module that produced the CSS so Vite's pipeline updates
-        // the actual HMR fullReload is done by the watcher below — we just clear cache
-        ctx.server.ws.send({ type: 'full-reload' });
-        return [];
+      if (!isDeshiSource(ctx.file)) return undefined;
+      cachedBuild = null;
+      const root = ctx.server.config.root || process.cwd();
+      const rel = toPosix(path.relative(root, ctx.file));
+      const source = await ctx.read();
+      try {
+        const result = compile(source, {
+          file: rel,
+          minify: false,
+          runtimeImport: virtualRuntimeId,
+          stableCssUrl: true,
+        });
+        const css = `${result.css.scoped}\n${result.css.global}`.trim();
+        const snap = {
+          evalBody: result.evalBody,
+          clientBody: result.client?.body ?? '',
+          css,
+          hasCss: result.meta.hasCss,
+          hash: result.meta.hash,
+        };
+        const prev = lastCompile.get(rel);
+        lastCompile.set(rel, snap);
+        const cssUrl = `/_deshi/${result.meta.hash}.css`;
+        if (cssOnlyChange(prev, snap)) {
+          sendCssUpdate(ctx.server, cssUrl, css);
+          return [];
+        }
+      } catch {
+        // compile error — fall through to full reload so the overlay/page refreshes
       }
-      return undefined;
+      ctx.server.ws.send({ type: 'full-reload' });
+      return [];
     },
     resolveId(id) {
       if (id === virtualEntryId) {
@@ -142,6 +203,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           file: cleanId,
           minify: options.minify ?? false,
           runtimeImport: virtualRuntimeId,
+          stableCssUrl: true,
         });
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         if (errors.length > 0) {
@@ -155,8 +217,8 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         for (const w of warnings) this.warn(`[Deshi ${w.code}] ${w.message} at ${w.file}:${w.line}:${w.column}`);
         // Feed the virtual CSS registry so direct .deshi module imports
         // (React-style island authoring) resolve their side-effect CSS import.
-        const cssUrl = scopedCssUrl(result.css.scoped);
-        if (cssUrl) deshiCss.set(cssUrl, result.css.scoped);
+        const cssUrl = `/_deshi/${result.meta.hash}.css`;
+        if (result.meta.hasCss) deshiCss.set(cssUrl, `${result.css.scoped}\n${result.css.global}`.trim());
         return {
           code: result.code,
           map: null,
@@ -165,14 +227,14 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       return null;
     },
     configureServer(server: ViteDevServer) {
-      // .deshi sources live outside Vite's module graph in dev (pages are
-      // rendered to HTML strings), so edits would otherwise go unnoticed.
-      server.watcher.on('change', (file) => {
-        if (/\.(deshi|html|md|js|ts)$/.test(file)) {
-          cachedBuild = null;
-          server.ws.send({ type: 'full-reload' });
-        }
-      });
+      // Route add/remove is not a CSS patch — rebuild the page graph.
+      const reloadTree = (file: string) => {
+        if (!isDeshiSource(file)) return;
+        cachedBuild = null;
+        server.ws.send({ type: 'full-reload' });
+      };
+      server.watcher.on('add', reloadTree);
+      server.watcher.on('unlink', reloadTree);
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url || '/';
         const qIndex = rawUrl.indexOf('?');
@@ -269,13 +331,24 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
               {
                 output: (dcDev as any).output === 'static' ? 'index' : (dcDev as any).output ?? 'index',
                 router: (dcDev as any).router ?? enableRouter,
-                css: (dcDev as any).css ?? options.css ?? 'inline',
+                // Extract + stable URLs so Vite can HMR styles without a document reload.
+                css: 'extract',
+                stableCssUrl: true,
                 minify: false,
                 appDir: (dcDev as any).appDir ?? 'src',
                 site: (dcDev as any).site,
               } as any
             );
             cachedBuild = { fp, result };
+            for (const [f, res] of Object.entries(result.compiled)) {
+              lastCompile.set(f, {
+                evalBody: res.evalBody,
+                clientBody: res.client?.body ?? '',
+                css: `${res.css.scoped}\n${res.css.global}`.trim(),
+                hasCss: res.meta.hasCss,
+                hash: res.meta.hash,
+              });
+            }
           }
 
           // Refresh the virtual CSS registry (dev serves per-file CSS through

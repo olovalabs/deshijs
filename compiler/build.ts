@@ -47,6 +47,8 @@ export interface BuildOptions {
   site?: string;
   minify?: boolean;
   appDir?: string; // defaults to 'src' (or 'src/app' if present)
+  /** File-stable CSS URLs + per-file (scoped+global) sheets — Vite HMR in dev. */
+  stableCssUrl?: boolean;
 }
 
 export interface PageOutput {
@@ -209,6 +211,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       minify: opts.minify,
       isLayout,
       segment: opts.router && isLayout && rel ? layoutPattern(rel) : null,
+      stableCssUrl: opts.stableCssUrl,
     });
     compiled[file] = res;
     diagnostics.push(...res.diagnostics);
@@ -279,7 +282,12 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   const cssByHash: Record<string, { scoped: string; global: string; file: string; url: string | null }> = {};
   const clientByHash: Record<string, { code: string; body: string; file: string; chunk: string }> = {};
   for (const [f, res] of Object.entries(compiled)) {
-    if (res.meta.hasCss) cssByHash[res.meta.hash] = { scoped: res.css.scoped, global: res.css.global, file: f, url: scopedCssUrl(res.css.scoped) };
+    if (res.meta.hasCss) {
+      const url = opts.stableCssUrl
+        ? `/_deshi/${res.meta.hash}.css`
+        : scopedCssUrl(res.css.scoped);
+      cssByHash[res.meta.hash] = { scoped: res.css.scoped, global: res.css.global, file: f, url };
+    }
     if (res.client) clientByHash[res.meta.hash] = { code: res.client.code, body: res.client.body, file: f, chunk: `/_deshi/c/${basename(f)}.${res.meta.hash}.js` };
   }
 
@@ -361,11 +369,19 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     const cssText = [...ctx.css].map((h) => (cssByHash[h]?.scoped ?? '') + (cssByHash[h]?.global ?? '')).join('');
     let previewHead = head;
     if (opts.css === 'extract' && (globalText || cssText)) {
-      // Global bundle first, then only the scoped files this page uses.
-      if (globalText) head += `<link rel="stylesheet" href="${globalName}">`;
-      for (const h of ctx.css) {
-        const u = cssByHash[h]?.url;
-        if (u) head += `<link rel="stylesheet" href="${u}">`;
+      if (opts.stableCssUrl) {
+        // Dev: one <link> per owner (scoped+global) so Vite can css-update in place.
+        for (const h of ctx.css) {
+          const u = cssByHash[h]?.url;
+          if (u) head += `<link rel="stylesheet" href="${u}">`;
+        }
+      } else {
+        // Global bundle first, then only the scoped files this page uses.
+        if (globalText) head += `<link rel="stylesheet" href="${globalName}">`;
+        for (const h of ctx.css) {
+          const u = cssByHash[h]?.url;
+          if (u) head += `<link rel="stylesheet" href="${u}">`;
+        }
       }
       if (cssText) previewHead += `<style>${cssText}</style>`;
     } else if (cssText) {
@@ -508,17 +524,29 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   for (const p of pages) out.push({ path: p.outFile, content: p.html, kind: 'html' });
   const usedCss = new Set<string>();
   if (opts.css === 'extract') {
-    // One shared global bundle + one file per scoped owner actually used.
-    if (globalText) {
-      usedCss.add(globalName);
-      out.push({ path: globalName.slice(1), content: globalText, kind: 'css' });
-    }
-    for (const p of pages) {
-      for (const h of p.css) {
-        const c = cssByHash[h];
-        if (c?.url && !usedCss.has(c.url)) {
-          usedCss.add(c.url);
-          out.push({ path: c.url.slice(1), content: c.scoped, kind: 'css' });
+    if (opts.stableCssUrl) {
+      for (const p of pages) {
+        for (const h of p.css) {
+          const c = cssByHash[h];
+          if (c?.url && !usedCss.has(c.url)) {
+            usedCss.add(c.url);
+            out.push({ path: c.url.slice(1), content: `${c.scoped}\n${c.global}`.trim(), kind: 'css' });
+          }
+        }
+      }
+    } else {
+      // One shared global bundle + one file per scoped owner actually used.
+      if (globalText) {
+        usedCss.add(globalName);
+        out.push({ path: globalName.slice(1), content: globalText, kind: 'css' });
+      }
+      for (const p of pages) {
+        for (const h of p.css) {
+          const c = cssByHash[h];
+          if (c?.url && !usedCss.has(c.url)) {
+            usedCss.add(c.url);
+            out.push({ path: c.url.slice(1), content: c.scoped, kind: 'css' });
+          }
         }
       }
     }
