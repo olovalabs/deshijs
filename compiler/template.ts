@@ -257,19 +257,35 @@ function convertAttrs(el: P5.Element, ctx: ConvCtx): Attr[] {
       attrs.push({ kind: 'spread', expr: ctx.pre.exprs[phName.id] });
       continue;
     }
-    checkAttrName(a.name, loc.start, ctx);
+    // allow Astro-style colon directives without failing checkAttrName for them
+    const allowColon = a.name.includes(':') && (
+      a.name.startsWith('client:') || a.name.startsWith('set:') || a.name === 'class:list' || a.name === 'define:vars' || a.name.startsWith('transition:') || a.name.startsWith('data-') || a.name.startsWith('is:')
+    );
+    if (!allowColon) checkAttrName(a.name, loc.start, ctx);
     const phVal = findPlaceholder(a.value, 0);
     if (phVal && phVal.index === 0 && phVal.end === a.value.length) {
       const expr = ctx.pre.exprs[phVal.id];
       if (a.name === 'set:html') attrs.push({ kind: 'setHtml', expr });
+      else if (a.name === 'set:text') attrs.push({ kind: 'setText', expr });
+      else if (a.name === 'class:list') attrs.push({ kind: 'classList', expr });
+      else if (a.name === 'define:vars') attrs.push({ kind: 'defineVars', expr });
+      else if (a.name.startsWith('transition:')) attrs.push({ kind: 'transition', name: a.name, value: expr });
       else attrs.push({ kind: 'dynamic', name: a.name, expr });
       continue;
     }
     if (phVal) {
+      // class:list and define:vars must be pure expr, already handled; other mixed values error
+      if (a.name === 'class:list' || a.name === 'define:vars' || a.name.startsWith('transition:')) {
+        fail('PF1002', `Attribute "${a.name}" requires a single expression value`, ctx.file, ctx.source, loc.start);
+      }
       fail('PF1002', `Attribute "${a.name}" mixes text and an expression; use a template literal: ${a.name}={\`…\${expr}…\`}`, ctx.file, ctx.source, loc.start);
     }
-    if (a.name === 'set:html') {
-      fail('PF1002', 'set:html requires an expression value: set:html={html}', ctx.file, ctx.source, loc.start);
+    if (a.name === 'set:html' || a.name === 'set:text' || a.name === 'class:list' || a.name === 'define:vars') {
+      fail('PF1002', `${a.name} requires an expression value: ${a.name}={html}`, ctx.file, ctx.source, loc.start);
+    }
+    if (a.name.startsWith('transition:')) {
+      attrs.push({ kind: 'transition', name: a.name, value: a.value });
+      continue;
     }
     if (a.value === '') attrs.push({ kind: 'boolean', name: a.name });
     else attrs.push({ kind: 'static', name: a.name, value: a.value });
@@ -377,6 +393,8 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx): Node[] {
       slots: bucketSlots(children, ctx),
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
+      clientMedia: taken.clientMedia,
+      clientOnly: taken.clientOnly,
       loc,
     };
     return [comp];
@@ -415,9 +433,9 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx): Node[] {
   const children = VOID.has(lower) ? [] : convertChildren(rawChildren, lower, ctx);
   ctx.inRootBody = wasRootBody;
 
-  const setHtml = attrs.find((a) => a.kind === 'setHtml');
+  const setHtml = attrs.find((a) => a.kind === 'setHtml' || a.kind === 'setText');
   if (setHtml && children.some((c) => c.type !== 'Text' || c.value.trim())) {
-    fail('PF4023', 'An element with set:html must not have children', ctx.file, ctx.source, loc.start);
+    fail('PF4023', `An element with ${setHtml.kind === 'setHtml' ? 'set:html' : 'set:text'} must not have children`, ctx.file, ctx.source, loc.start);
   }
   const noScope = lower === 'html' || lower === 'head' || lower === 'body' || lower === 'title' || lower === 'meta' || lower === 'link' || lower === 'script' || lower === 'style';
   const element: Element = {

@@ -434,9 +434,9 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
                 : '';
           const rel = ext ? './' + basename(pageFile) + ext : './' + basename(pageFile);
           const ns = await importModule(rel, dirname(pageFile) + '/x');
-          const gsp = ns.getStaticParams as undefined | (() => unknown);
+          const gsp = (ns.getStaticParams ?? ns.getStaticPaths) as undefined | (() => unknown);
           if (typeof gsp !== 'function') {
-            diagnostics.push(diag('PF3001', `${route.pattern} is a dynamic route: ${pageFile} must export getStaticParams()`, pageFile, 'error', 'export async function getStaticParams() { return [{ slug: "hello" }]; }'));
+            diagnostics.push(diag('PF3001', `${route.pattern} is a dynamic route: ${pageFile} must export getStaticParams() — alias getStaticPaths also accepted (Astro parity)`, pageFile, 'error', 'export async function getStaticParams() { return [{ slug: "hello" }]; }'));
             continue;
           }
           let list: unknown;
@@ -554,6 +554,18 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     const urls = pages.filter((p) => !p.notFound).map((p) => `  <url><loc>${opts.site!.replace(/\/$/, '')}${p.url === '/' ? '/' : p.url}</loc></url>`);
     out.push({ path: 'sitemap.xml', kind: 'text', content: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>` });
     out.push({ path: 'robots.txt', kind: 'text', content: `User-agent: *\nAllow: /\nSitemap: ${opts.site.replace(/\/$/, '')}/sitemap.xml` });
+  }
+  // Astro-like endpoints: if any route file is a bare .js/.ts endpoint, it was compiled as an html page
+  // but with json content-type hint — emit .json beside the html for API compat (e.g. /api/hello → /api/hello.json)
+  for (const r of routes) {
+    if (r.file.endsWith('.js') || r.file.endsWith('.ts')) {
+      const epPages = pages.filter(p=>p.sourceFile.endsWith('.js')||p.sourceFile.endsWith('.ts'));
+      for (const pg of epPages) {
+        // duplicate handling: endpoint pages already emit html; add json mirror
+        const jsonPath = pg.outFile.replace(/\.html$/, '.json');
+        if (!out.some(o=>o.path===jsonPath)) out.push({ path: jsonPath, content: pg.html, kind: 'json' });
+      }
+    }
   }
   for (const f of Object.keys(files)) {
     if (f.startsWith('src/public/')) out.push({ path: f.slice('src/public/'.length), content: files[f], kind: 'text' });

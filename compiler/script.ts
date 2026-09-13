@@ -71,6 +71,8 @@ export function emptyScript(): ScriptInfo {
   return { imports: [], body: '', bindings: [], components: new Set(), diagnostics: [] };
 }
 
+// Re-export helper for external tools (e.g. content collections)
+
 export function analyzeScript(code: string, file: string, fullSource: string, offset: number): ScriptInfo {
   // Fast path: plain JS parses directly with exact error positions.
   let program: acorn.Program;
@@ -137,9 +139,22 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
         if (!stmt.declaration && stmt.specifiers?.length) {
           for (const s of stmt.specifiers) names.push(s.exported.name ?? String(s.exported.value));
         }
-        const isStatic = names.length === 1 && names[0] === 'getStaticParams';
+        // Astro parity: getStaticPaths is an alias for getStaticParams
+        const isStatic = names.length === 1 && (names[0] === 'getStaticParams' || names[0] === 'getStaticPaths');
         if (isStatic && stmt.declaration) {
-          info.staticParams = src.slice(stmt.declaration.start, stmt.declaration.end);
+          let body = src.slice(stmt.declaration.start, stmt.declaration.end);
+          // Normalize getStaticPaths → getStaticParams so the rest of the compiler stays unified
+          if (names[0] === 'getStaticPaths') body = body.replace(/getStaticPaths/, 'getStaticParams');
+          info.staticParams = body;
+          info.bindings.push('getStaticParams');
+          // Also push getStaticPaths for compat diagnostics (so `Astro` style works)
+          info.bindings.push('getStaticPaths');
+          break;
+        }
+        // Also support `export const getStaticPaths = ...` without declaration wrapper? fallback for variable
+        if (names.length === 1 && (names[0] === 'getStaticPaths' || names[0] === 'getStaticParams') && stmt.declaration?.type === 'VariableDeclaration') {
+          const body = src.slice(stmt.declaration.start, stmt.declaration.end).replace(/getStaticPaths/, 'getStaticParams');
+          info.staticParams = body;
           info.bindings.push('getStaticParams');
           break;
         }
