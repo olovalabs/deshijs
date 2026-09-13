@@ -1,4 +1,15 @@
 {
+  // ============ CORE BLOCKS ============
+  "Deshi frontmatter block": {
+    "scope": "html",
+    "prefix": "dfront",
+    "body": [
+      "---",
+      "$0",
+      "---"
+    ],
+    "description": "Deshi component frontmatter (script logic) block"
+  },
   "Deshi script block": {
     "scope": "html",
     "prefix": "dscript",
@@ -8,6 +19,26 @@
       "</script>"
     ],
     "description": "Deshi <script> block"
+  },
+  "Deshi script module": {
+    "scope": "html",
+    "prefix": "dscriptmodule",
+    "body": [
+      "<script type=\"module\">",
+      "  $0",
+      "</script>"
+    ],
+    "description": "Deshi <script type=\"module\"> block"
+  },
+  "Deshi script hoisted": {
+    "scope": "html",
+    "prefix": "dscripthoist",
+    "body": [
+      "<script hoist>",
+      "  $0",
+      "</script>"
+    ],
+    "description": "Deshi hoisted <script> block"
   },
   "Deshi style block": {
     "scope": "html",
@@ -29,28 +60,296 @@
     ],
     "description": "Deshi global style"
   },
+  "Deshi style define:vars": {
+    "scope": "html",
+    "prefix": "dstylevars",
+    "body": [
+      "<style define:vars={{ ${1:varName}: ${2:value} }}>",
+      "  $0",
+      "</style>"
+    ],
+    "description": "Deshi scoped style with define:vars"
+  },
+  // ============ FULL COMPONENT BOILERPLATE ============
+  "Deshi full component": {
+    "scope": "html",
+    "prefix": "dcomponent",
+    "body": [
+      "---",
+      "interface Props {",
+      "  ${1:propName}: ${2:string};",
+      "}",
+      "",
+      "const { ${1:propName} } = Astro.props;",
+      "---",
+      "",
+      "<div>",
+      "  {${1:propName}}",
+      "  $0",
+      "</div>",
+      "",
+      "<style>",
+      "  ",
+      "</style>"
+    ],
+    "description": "Full Deshi component with props, markup, and style"
+  },
+  "Deshi page component": {
+    "scope": "html",
+    "prefix": "dpage",
+    "body": [
+      "---",
+      "import Layout from '${1:../layouts/Layout.astro}';",
+      "---",
+      "",
+      "<Layout title=\"${2:Page Title}\">",
+      "  $0",
+      "</Layout>"
+    ],
+    "description": "Deshi page component using a layout"
+  },
+  "Deshi layout component": {
+    "scope": "html",
+    "prefix": "dlayout",
+    "body": [
+      "---",
+      "interface Props {",
+      "  title: string;",
+      "}",
+      "const { title } = Astro.props;",
+      "---",
+      "",
+      "<!DOCTYPE html>",
+      "<html lang=\"en\">",
+      "  <head>",
+      "    <meta charset=\"UTF-8\" />",
+      "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />",
+      "    <title>{title}</title>",
+      "  </head>",
+      "  <body>",
+      "    <slot />",
+      "    $0",
+      "  </body>",
+      "</html>"
+    ],
+    "description": "Deshi base layout with head/body/slot"
+  },
+  // ============ IMPORTS ============
+  "Deshi import component": {
+    "scope": "html",
+    "prefix": "dimport",
+    "body": [
+      "import ${1:ComponentName} from '${2:../components/ComponentName.astro}';"
+    ],
+    "description": "Import a Deshi component"
+  },
+  "Deshi import type": {
+    "scope": "html",
+    "prefix": "dimporttype",
+    "body": [
+      "import type { ${1:TypeName} } from '${2:../types}';"
+    ],
+    "description": "Import a TypeScript type"
+  },
+  // ============ PROPS ============
+  "Deshi props interface": {
+    "scope": "html",
+    "prefix": "dprops",
+    "body": [
+      "interface Props {",
+      "  ${1:propName}: ${2:string};",
+      "}",
+      "",
+      "const { ${1:propName} } = Astro.props;"
+    ],
+    "description": "Deshi Props interface + destructure"
+  },
+  // ============ CLIENT DIRECTIVES ============
   "Deshi client:load": {
     "scope": "html",
     "prefix": "clientload",
-    "body": ["client:load"],
+    "body": [
+      "client:load"
+    ],
     "description": "Hydrate on load"
   },
   "Deshi client:visible": {
     "scope": "html",
     "prefix": "clientvisible",
-    "body": ["client:visible"],
+    "body": [
+      "client:visible"
+    ],
     "description": "Hydrate when visible"
   },
   "Deshi client:idle": {
     "scope": "html",
     "prefix": "clientidle",
-    "body": ["client:idle"],
+    "body": [
+      "client:idle"
+    ],
     "description": "Hydrate on idle"
   },
+  "Deshi client:media": {
+    "scope": "html",
+    "prefix": "clientmedia",
+    "body": [
+      "client:media={\"${1:(max-width: 768px)}\"}"
+    ],
+    "description": "Hydrate on media query match"
+  },
+  "Deshi client:only": {
+    "scope": "html",
+    "prefix": "clientonly",
+    "body": [
+      "client:only=\"${1:framework}\""
+    ],
+    "description": "Render only on client for given framework"
+  },
+  // ============ SERVER DIRECTIVES ============
+  "Deshi set:html": {
+    "scope": "html",
+    "prefix": "dsethtml",
+    "body": [
+      "set:html={${1:htmlString}}"
+    ],
+    "description": "Inject raw HTML"
+  },
+  "Deshi set:text": {
+    "scope": "html",
+    "prefix": "dsettext",
+    "body": [
+      "set:text={${1:textString}}"
+    ],
+    "description": "Inject raw text"
+  },
+  "Deshi is:raw": {
+    "scope": "html",
+    "prefix": "disraw",
+    "body": [
+      "is:raw"
+    ],
+    "description": "Prevent Deshi from processing this element's children"
+  },
+  // ============ TEMPLATE EXPRESSIONS ============
   "Deshi expression": {
     "scope": "html",
     "prefix": "{",
-    "body": ["{${1:expr}}"],
+    "body": [
+      "{${1:expr}}"
+    ],
     "description": "Deshi template expression"
+  },
+  "Deshi conditional (&&)": {
+    "scope": "html",
+    "prefix": "dif",
+    "body": [
+      "{${1:condition} && (",
+      "  <${2:div}>$0</${2:div}>",
+      ")}"
+    ],
+    "description": "Conditional rendering using &&"
+  },
+  "Deshi ternary": {
+    "scope": "html",
+    "prefix": "dternary",
+    "body": [
+      "{${1:condition} ? (",
+      "  <${2:div}>${3:true content}</${2:div}>",
+      ") : (",
+      "  <${4:div}>${5:false content}</${4:div}>",
+      ")}"
+    ],
+    "description": "Ternary conditional rendering"
+  },
+  "Deshi map loop": {
+    "scope": "html",
+    "prefix": "dmap",
+    "body": [
+      "{${1:items}.map((${2:item}) => (",
+      "  <${3:li}>{${2:item}.${4:property}}</${3:li}>",
+      "))}"
+    ],
+    "description": "Render a list using .map()"
+  },
+  "Deshi fragment": {
+    "scope": "html",
+    "prefix": "dfragment",
+    "body": [
+      "<>",
+      "  $0",
+      "</>"
+    ],
+    "description": "Deshi Fragment shorthand"
+  },
+  "Deshi Fragment component": {
+    "scope": "html",
+    "prefix": "dFragment",
+    "body": [
+      "<Fragment>",
+      "  $0",
+      "</Fragment>"
+    ],
+    "description": "Deshi <Fragment> component"
+  },
+  // ============ SLOTS ============
+  "Deshi default slot": {
+    "scope": "html",
+    "prefix": "dslot",
+    "body": [
+      "<slot />"
+    ],
+    "description": "Default slot"
+  },
+  "Deshi named slot": {
+    "scope": "html",
+    "prefix": "dslotnamed",
+    "body": [
+      "<slot name=\"${1:slotName}\" />"
+    ],
+    "description": "Named slot"
+  },
+  "Deshi slot fallback": {
+    "scope": "html",
+    "prefix": "dslotfallback",
+    "body": [
+      "<slot>",
+      "  ${1:Fallback content}",
+      "</slot>"
+    ],
+    "description": "Slot with fallback content"
+  },
+  // ============ FETCH / DATA ============
+  "Deshi fetch data": {
+    "scope": "html",
+    "prefix": "dfetch",
+    "body": [
+      "const ${1:response} = await fetch('${2:https://api.example.com}');",
+      "const ${3:data} = await ${1:response}.json();"
+    ],
+    "description": "Fetch data in frontmatter"
+  },
+  "Deshi getStaticPaths": {
+    "scope": "html",
+    "prefix": "dgetstaticpaths",
+    "body": [
+      "export async function getStaticPaths() {",
+      "  return [",
+      "    { params: { ${1:slug}: '${2:value}' } },",
+      "  ];",
+      "}"
+    ],
+    "description": "getStaticPaths function"
+  },
+  // ============ META / SEO ============
+  "Deshi meta tags": {
+    "scope": "html",
+    "prefix": "dmeta",
+    "body": [
+      "<meta charset=\"UTF-8\" />",
+      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />",
+      "<meta name=\"description\" content=\"${1:description}\" />",
+      "<title>${2:Page Title}</title>"
+    ],
+    "description": "Standard meta tags"
   }
 }
