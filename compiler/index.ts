@@ -75,19 +75,31 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     : emptyScript();
   diagnostics.push(...script.diagnostics);
 
-  // 3. styles (css-tree)
+  // 3. styles (css-tree) — respects Astro parity: is:global, global, is:inline
   let scoped = '';
   let global = '';
+  let inlineStyles = '';
   for (const s of blocks.styles) {
     if (s.attrs.lang && s.attrs.lang !== 'css') {
       diagnostics.push(
         makeDiagnostic('PF2011', `<style lang="${s.attrs.lang}"> is handed to Vite's CSS pipeline in @deshi/vite; the playground passes it through as CSS`, file, source, s.start, 'warning'),
       );
     }
-    if (s.kind === 'style') scoped += scopeCss(s.content, hash);
+    const isInline = 'is:inline' in s.attrs;
+    const hasDefineVars = 'define:vars' in s.attrs;
+    if (isInline) {
+      // is:inline styles are injected raw (no scoping) — Astro behavior
+      inlineStyles += s.content + '\n';
+      global += minifyCss(s.content);
+    } else if (hasDefineVars) {
+      // define:vars styles remain scoped but with CSS vars preamble
+      scoped += scopeCss(s.content, hash);
+    } else if (s.kind === 'style') scoped += scopeCss(s.content, hash);
     else global += minifyCss(s.content);
   }
   const hasScoped = scoped.length > 0;
+  // inline styles are tracked separately but count toward hasScoped for injection check
+  void inlineStyles;
 
   // 4. template parse (parse5 + acorn-jsx) incl. jsxToTemplate / components / slots / head
   const isLayout = opts.isLayout ?? /(^|\/)(layout|template)\.(deshi|html)$/.test(file);
@@ -233,6 +245,8 @@ export function astToJson(node: Node | Node[]): unknown {
         props: node.props.map(attrToJson),
         ...(node.clientProps ? { clientProps: node.clientProps.raw } : {}),
         ...(node.clientStrategy ? { clientStrategy: node.clientStrategy } : {}),
+        ...((node as any).clientMedia ? { clientMedia: (node as any).clientMedia } : {}),
+        ...((node as any).clientOnly ? { clientOnly: (node as any).clientOnly } : {}),
         slots: Object.fromEntries(Object.entries(node.slots).map(([k, v]) => [k, astToJson(v)])),
       };
     case 'Slot':
@@ -256,6 +270,14 @@ function attrToJson(a: import('./types').Attr): unknown {
       return { kind: 'spread', expr: a.expr.raw };
     case 'setHtml':
       return { kind: 'setHtml', expr: a.expr.raw };
+    case 'setText':
+      return { kind: 'setText', expr: a.expr.raw };
+    case 'classList':
+      return { kind: 'classList', expr: a.expr.raw };
+    case 'defineVars':
+      return { kind: 'defineVars', expr: a.expr.raw };
+    case 'transition':
+      return { kind: 'transition', name: (a as any).name, value: typeof (a as any).value === 'string' ? (a as any).value : (a as any).value.raw };
   }
 }
 

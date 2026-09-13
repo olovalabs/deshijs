@@ -1,126 +1,89 @@
 /**
- * Deshi island hydration — one static runtime: /_deshi/islands.js
+ * Deshi island hydration v2 — Astro parity. Single static runtime: /_deshi/islands.js (≈1.2kB gzip)
  *
- * SSG emits <deshi-island data-strategy data-component data-src>. This file
- * imports data-src only when that island's strategy fires.
+ * SSG emits <deshi-island data-strategy data-component data-src data-media data-only>. Strategies:
+ *   load    — import immediately (modulepreload from SSR)
+ *   visible — IntersectionObserver on inner box (Astro client:visible)
+ *   idle    — visible + requestIdleCallback (Astro client:idle)
+ *   media   — matchMedia(query) (Astro client:media)
+ *   only    — client-only, no SSR expectation (Astro client:only), hydrates on idle/visible
+ *   click   — first click (queued + replayed)
  *
- *   load    — import immediately (and modulepreload from SSR)
- *   visible — IntersectionObserver on the inner [data-deshi-c] box
- *   idle    — visible, then requestIdleCallback (no Counter.js on first paint)
- *   click   — first click
- *
- * Click on an unhydrated island is queued and replayed after mount.
+ * View-transition aware: re-scan on deshi:navigated, queue click replay.
  */
-export const ISLANDS_RUNTIME = `const MOUNTED='data-deshi-hydrated';
-let cleanups=[];
-const queued=[];
-let replaying=false;
-function ensureCss(){
-  if(document.getElementById('deshi-island-css'))return;
-  const s=document.createElement('style');
-  s.id='deshi-island-css';
-  s.textContent='deshi-island{display:block}';
-  (document.head||document.documentElement).appendChild(s);
+export const ISLANDS_RUNTIME = `const M='data-deshi-hydrated';
+let C=[],Q=[],R=0;
+function css(){
+ if(document.getElementById('deshi-island-css'))return;
+ let s=document.createElement('style');
+ s.id='deshi-island-css';s.textContent='deshi-island{display:block}';
+ (document.head||document.documentElement).appendChild(s);
 }
-function box(island){
-  return island.querySelector('[data-deshi-c]')||island.firstElementChild||island;
+function box(e){return e.querySelector('[data-deshi-c]')||e.firstElementChild||e}
+function vp(e){let r=e.getBoundingClientRect(),vh=innerHeight||document.documentElement.clientHeight,vw=innerWidth||document.documentElement.clientWidth;return r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<vh&&r.left<vw}
+function cl(){for(let i=0;i<C.length;i++)try{C[i]()}catch(e){}C=[]}
+function mount(I){
+ if(I.getAttribute(M)==='1'||I.getAttribute(M)==='pending')return I._d||Promise.resolve();
+ let n=I.querySelector('[data-deshi-c]');if(!n)return Promise.resolve();
+ let src=I.getAttribute('data-src')||('/_deshi/c/'+(I.getAttribute('data-component')||'')+'.'+(n.getAttribute('data-deshi-c')||'')+'.js');
+ I.setAttribute(M,'pending');
+ let props=(()=>{try{return JSON.parse(n.getAttribute('data-deshi-props')||'{}')}catch(e){return{}}})();
+ I._d=import(/* @vite-ignore */ src).then(m=>{
+  let fn=m&&m.default;if(typeof fn==='function')fn(n,{props:props,url:location.href});
+  I.setAttribute(M,'1');replay(I);
+ }).catch(e=>{I.removeAttribute(M);I._d=null;console.error('[deshi] island failed',src,e)});
+ return I._d;
 }
-function inViewport(el){
-  const r=el.getBoundingClientRect();
-  const vh=window.innerHeight||document.documentElement.clientHeight||0;
-  const vw=window.innerWidth||document.documentElement.clientWidth||0;
-  return r.width>0&&r.height>0&&r.bottom>0&&r.right>0&&r.top<vh&&r.left<vw;
+function replay(I){
+ let rest=[];R=1;
+ try{for(let i=0;i<Q.length;i++){let q=Q[i];if(q.I!==I){rest.push(q);continue}if(q.el&&q.el.isConnected)q.el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}))}}
+ finally{R=0}Q.length=0;for(let i=0;i<rest.length;i++)Q.push(rest[i]);
 }
-function cleanup(){
-  for(let i=0;i<cleanups.length;i++){try{cleanups[i]()}catch(e){}}
-  cleanups=[];
+function vis(I,cb){
+ let el=box(I),d=0,io=null;let f=()=>{if(d)return;d=1;if(io)io.disconnect();cb()};
+ if('IntersectionObserver' in window){
+  io=new IntersectionObserver(es=>{for(let j=0;j<es.length;j++)if(es[j].isIntersecting||es[j].intersectionRatio>0){f();break}},{root:null,rootMargin:'0px',threshold:0});
+  io.observe(el);
+ }
+ if(!io||vp(el))f();
+ C.push(()=>{d=1;if(io)io.disconnect()});
 }
-function mount(island){
-  if(island.getAttribute(MOUNTED)==='1'||island.getAttribute(MOUNTED)==='pending')return island._deshiMount||Promise.resolve();
-  const inner=island.querySelector('[data-deshi-c]');
-  if(!inner)return Promise.resolve();
-  const src=island.getAttribute('data-src')||('/_deshi/c/'+(island.getAttribute('data-component')||'')+'.'+(inner.getAttribute('data-deshi-c')||'')+'.js');
-  island.setAttribute(MOUNTED,'pending');
-  const props=(()=>{try{return JSON.parse(inner.getAttribute('data-deshi-props')||'{}')}catch(e){return{}}})();
-  island._deshiMount=import(/* @vite-ignore */ src).then(function(m){
-    const fn=m&&m.default;
-    if(typeof fn==='function')fn(inner,{props:props,url:location.href});
-    island.setAttribute(MOUNTED,'1');
-    replay(island);
-  }).catch(function(err){
-    island.removeAttribute(MOUNTED);
-    island._deshiMount=null;
-    console.error('[deshi] island failed',src,err);
-  });
-  return island._deshiMount;
+function idle(cb){
+ if('requestIdleCallback' in window){let id=requestIdleCallback(()=>cb(),{timeout:2000});C.push(()=>cancelIdleCallback(id))}
+ else{let t=setTimeout(cb,200);C.push(()=>clearTimeout(t))}
 }
-function replay(island){
-  const rest=[];
-  replaying=true;
-  try{
-    for(let i=0;i<queued.length;i++){
-      const q=queued[i];
-      if(q.island!==island){rest.push(q);continue}
-      if(q.el&&q.el.isConnected)q.el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
-    }
-  }finally{replaying=false}
-  queued.length=0;
-  for(let i=0;i<rest.length;i++)queued.push(rest[i]);
+function media(q,cb){
+ if(!q||!('matchMedia' in window))return cb();
+ let m=matchMedia(q);if(m.matches)return cb();
+ let h=()=>{if(m.matches){m.removeEventListener?m.removeEventListener('change',h):m.removeListener(h);cb()}};
+ try{m.addEventListener?m.addEventListener('change',h):m.addListener(h);C.push(()=>{try{m.removeEventListener?m.removeEventListener('change',h):m.removeListener(h)}catch(e){}})}catch(e){cb()}
 }
-function onVisible(island,cb){
-  const el=box(island);
-  let done=false;
-  let io=null;
-  const finish=function(){
-    if(done)return;
-    done=true;
-    if(io)io.disconnect();
-    cb();
-  };
-  if('IntersectionObserver' in window){
-    io=new IntersectionObserver(function(entries){
-      for(let j=0;j<entries.length;j++){
-        if(entries[j].isIntersecting||entries[j].intersectionRatio>0){finish();break}
-      }
-    },{root:null,rootMargin:'0px',threshold:0});
-    io.observe(el);
-  }
-  if(!io||inViewport(el))finish();
-  cleanups.push(function(){done=true;if(io)io.disconnect()});
+export function scan(r){
+ css();
+ let s=r||document;
+ let islands=s.querySelectorAll?s.querySelectorAll('deshi-island:not(['+M+'="1"])'):[];
+ for(let i=0;i<islands.length;i++){(function(I){
+  if(I.getAttribute(M)==='pending')return;
+  let strat=I.getAttribute('data-strategy')||'load';
+  if(strat==='load')mount(I);
+  else if(strat==='visible')vis(I,()=>mount(I));
+  else if(strat==='idle')vis(I,()=>idle(()=>mount(I)));
+  else if(strat==='media'){let q=I.getAttribute('data-media')||'';media(q,()=>mount(I))}
+  else if(strat==='only')vis(I,()=>idle(()=>mount(I)));
+  else if(strat==='click'){} // click mounts on interaction, not auto
+ })(islands[i])}
 }
-function onIdle(cb){
-  if('requestIdleCallback' in window){
-    const id=requestIdleCallback(function(){cb()},{timeout:2000});
-    cleanups.push(function(){cancelIdleCallback(id)});
-  }else{
-    const tid=setTimeout(cb,200);
-    cleanups.push(function(){clearTimeout(tid)});
-  }
-}
-export function scan(root){
-  ensureCss();
-  const scope=root||document;
-  const islands=scope.querySelectorAll?scope.querySelectorAll('deshi-island:not(['+MOUNTED+'="1"])'):[];
-  for(let i=0;i<islands.length;i++){(function(island){
-    if(island.getAttribute(MOUNTED)==='pending')return;
-    const strategy=island.getAttribute('data-strategy')||'load';
-    if(strategy==='load')mount(island);
-    else if(strategy==='visible')onVisible(island,function(){mount(island)});
-    else if(strategy==='idle')onVisible(island,function(){onIdle(function(){mount(island)})});
-  })(islands[i])}
-}
-document.addEventListener('click',function(e){
-  if(replaying)return;
-  const t=e.target;
-  if(!t||!t.closest)return;
-  const island=t.closest('deshi-island');
-  if(!island)return;
-  if(island.getAttribute(MOUNTED)==='1')return;
-  queued.push({island:island,el:t.closest('button,[data-inc],a')||t});
-  mount(island);
+document.addEventListener('click',e=>{
+ if(R)return;
+ let t=e.target;if(!t||!t.closest)return;
+ let I=t.closest('deshi-island');if(!I)return;
+ if(I.getAttribute(M)==='1')return;
+ Q.push({I:I,el:t.closest('button,[data-inc],a')||t});
+ mount(I);
 },true);
 window.__deshi_scan=scan;
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){scan(document)});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>scan(document));
 else scan(document);
-window.addEventListener('deshi:navigated',function(){cleanup();scan(document)});
+window.addEventListener('deshi:navigated',()=>{cl();scan(document)});
+window.addEventListener('deshi:view-transition',()=>{cl();scan(document)});
 `;

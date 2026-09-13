@@ -87,7 +87,21 @@ function attrEntries(attrs: Attr[], g: G): string[] {
         out.push(`...${genExprCode(a.expr, g)}`);
         break;
       case 'setHtml':
+      case 'setText':
         break;
+      case 'classList':
+        out.push(`${JSON.stringify('class')}: cls(${genExprCode(a.expr, g)})`);
+        break;
+      case 'defineVars': {
+        // define:vars is handled on <style> blocks, not as element attr — skip here
+        break;
+      }
+      case 'transition': {
+        const v = typeof a.value === 'string' ? JSON.stringify(a.value) : genExprCode(a.value as any, g);
+        if (typeof a.value === 'string' && a.value === '') out.push(`${JSON.stringify(a.name)}: true`);
+        else out.push(`${JSON.stringify(a.name)}: ${v}`);
+        break;
+      }
     }
   }
   return out;
@@ -98,16 +112,27 @@ function genElement(el: Element, em: Em, g: G): void {
     genDocHead(el, em, g);
     return;
   }
+  // Handle define:vars — inject CSS variable style attribute (Astro parity)
+  const defineVars = el.attrs.find((a) => a.kind === 'defineVars') as { expr: Expression } | undefined;
   em.str('<' + el.name);
-  const dyn = el.attrs.some((a) => a.kind === 'dynamic' || a.kind === 'spread') || el.clientRoot;
+  // include class:list and transition in dyn detection
+  const dyn = el.attrs.some((a) => a.kind === 'dynamic' || a.kind === 'spread' || a.kind === 'classList' || a.kind === 'transition' || a.kind === 'defineVars') || el.clientRoot;
   if (!dyn) {
     for (const a of el.attrs) {
       if (a.kind === 'static') em.str(` ${a.name}="${escapeAttr(a.value)}"`);
       else if (a.kind === 'boolean') em.str(` ${a.name}`);
+      else if (a.kind === 'transition' && typeof a.value === 'string') {
+        if (a.value === '') em.str(` ${a.name}`);
+        else em.str(` ${a.name}="${escapeAttr(a.value)}"`);
+      }
     }
     if (el.scoped) em.str(' ' + scopeAttribute(g.hash));
   } else {
     const entries = attrEntries(el.attrs, g);
+    // define:vars produces style variables: style="--x:val;..."
+    if (defineVars) {
+      entries.push(`style: sty(Object.entries(${genExprCode(defineVars.expr, g)}).map(([k,v])=> '--'+k+':'+v).join(';'))`);
+    }
     if (el.scoped) entries.push(`${JSON.stringify(scopeAttribute(g.hash))}: true`);
     const base = `{ ${entries.join(', ')} }`;
     if (el.clientRoot) {
@@ -121,7 +146,9 @@ function genElement(el: Element, em: Em, g: G): void {
   em.str('>');
   if (VOID.has(el.name.toLowerCase())) return;
   const setHtml = el.attrs.find((a) => a.kind === 'setHtml') as { expr: Expression } | undefined;
+  const setText = el.attrs.find((a) => a.kind === 'setText') as { expr: Expression } | undefined;
   if (setHtml) em.expr(`(await unsafe(${genExprCode(setHtml.expr, g)}))`, true);
+  else if (setText) em.expr(`(await esc(${genExprCode(setText.expr, g)}))`, true);
   else genNodes(el.children, em, g);
   em.str(`</${el.name}>`);
 }
@@ -155,7 +182,14 @@ function genComponent(c: Component, em: Em, g: G): void {
     .join(', ');
   const cp = c.clientProps ? genExprCode(c.clientProps, g) : 'undefined';
   const strat = c.clientStrategy ? JSON.stringify(c.clientStrategy) : 'undefined';
-  em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);
+  const media = (c as any).clientMedia ? JSON.stringify((c as any).clientMedia) : 'undefined';
+  const only = (c as any).clientOnly ? JSON.stringify((c as any).clientOnly) : 'undefined';
+  // renderComponent signature now includes media/only for islands
+  if ((c as any).clientMedia || (c as any).clientOnly) {
+    em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx, ${cp}, ${strat}, ${media}, ${only}))`, true);
+  } else {
+    em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);
+  }
 }
 
 function genSlot(s: Slot, em: Em, g: G): void {
@@ -257,8 +291,11 @@ export function generate(input: CodegenInput): CodegenOutput {
     : '';
   const heads = g.heads.map((h) => '  ' + h).join('\n');
 
+  // Astro global parity: expose Astro alongside props/params/url/route/env.
+  // Template expressions can use `Astro.props`, `Astro.params`, `Astro.url`, etc.
   const renderFn = [
-    `async function render({ props, slots, params, url, route, env }, $slotFns, $ctx, $cp) {`,
+    `async function render({ props, slots, params, url, route, env, Astro }, $slotFns, $ctx, $cp) {`,
+    `  if (!Astro) { Astro = { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: 'Deshi 1.0.0', slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null }; }`,
     body.trimEnd(),
     heads,
     `  let $o = '';`,
@@ -284,7 +321,7 @@ export function generate(input: CodegenInput): CodegenOutput {
 
   const runtimeSource = input.runtimeImport ?? 'deshi/runtime';
   const esm = [
-    `import { esc, unsafe, attrs, renderComponent, headPush, slot as $slot, raw as $r } from '${runtimeSource}';`,
+    `import { esc, unsafe, attrs, cls, sty, renderComponent, headPush, slot as $slot, raw as $r } from '${runtimeSource}';`,
     // React-style co-located CSS: Vite serves/transforms this (postcss, HMR, bundling).
     // The SSG evaluator ignores it (see evalBody below) and links the emitted file instead.
     ...(input.cssUrl ? [`import ${JSON.stringify(input.cssUrl)};`] : []),
@@ -301,7 +338,7 @@ export function generate(input: CodegenInput): CodegenOutput {
     .join('\n');
 
   const evalBody = [
-    `const { esc, unsafe, attrs, renderComponent, headPush, slot: $slot, raw: $r } = $rt;`,
+    `const { esc, unsafe, attrs, cls, sty, renderComponent, headPush, slot: $slot, raw: $r } = $rt;`,
     ...input.script.imports.map(evalImport),
     sp ?? '',
     renderFn,

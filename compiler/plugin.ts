@@ -8,6 +8,7 @@ import { build as buildSite, buildToDisk, type BuildResult } from './build';
 import { hashString } from './types';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
 import { ISLANDS_RUNTIME } from './islands';
+import { loadConfig, mergeConfig, defaultConfig } from './config';
 
 // Virtual per-file CSS served through Vite's pipeline (postcss, HMR):
 // codegen emits `import "/_deshi/<hash>.css"` per CSS-having file (React-style),
@@ -20,9 +21,14 @@ const __dirname = path.dirname(__filename);
 
 export interface DeshiPluginOptions {
   appDir?: string;
+  site?: string;
+  base?: string;
+  outDir?: string;
+  trailingSlash?: 'never' | 'always' | 'ignore';
   minify?: boolean;
-  router?: boolean;
+  router?: boolean | { prefetch?: boolean };
   css?: 'extract' | 'inline';
+  experimental?: { viewTransitions?: boolean };
 }
 
 export function deshi(options: DeshiPluginOptions = {}): Plugin {
@@ -35,23 +41,52 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
   let config: ResolvedConfig | undefined;
   let cachedBuild: { fp: string; result: BuildResult } | null = null;
 
+  // Cached merged config (file + inline options)
+  let deshiConfig: any = null;
+  async function getDeshiConfig(root: string) {
+    if (deshiConfig) return deshiConfig;
+    const fileCfg = await loadConfig(root);
+    deshiConfig = mergeConfig(mergeConfig(defaultConfig as any, fileCfg), options as any);
+    return deshiConfig;
+  }
+
   return {
     name: 'vite-plugin-deshi',
-    config() {
+    async config(cfg, env) {
+      const root = cfg.root || process.cwd();
+      const dc = await getDeshiConfig(root);
       return {
         build: {
           rollupOptions: {
             input: virtualEntryId,
           },
         },
+        base: dc.base ?? cfg.base,
       };
     },
     configResolved(resolvedConfig) {
       config = resolvedConfig;
     },
+    // Astro-like HMR: CSS-only changes hot-update without full reload, .deshi template changes do full-reload
+    async handleHotUpdate(ctx) {
+      if (ctx.file.endsWith('.deshi') || ctx.file.endsWith('.md')) {
+        cachedBuild = null;
+        // invalidate the module that produced the CSS so Vite's pipeline updates
+        // the actual HMR fullReload is done by the watcher below — we just clear cache
+        ctx.server.ws.send({ type: 'full-reload' });
+        return [];
+      }
+      return undefined;
+    },
     resolveId(id) {
       if (id === virtualEntryId) {
         return resolvedVirtualEntryId;
+      }
+      if (id === 'deshi:content' || id === 'deshi/content') {
+        return '\0virtual:deshi/content';
+      }
+      if (id === 'deshi:config' || id === 'virtual:deshi/config') {
+        return '\0virtual:deshi/config';
       }
       if (id === 'deshi/runtime' || id === virtualRuntimeId) {
         return resolvedVirtualRuntimeId;
@@ -71,6 +106,13 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     async load(id) {
       if (id === resolvedVirtualEntryId) {
         return 'export default {};';
+      }
+      if (id === '\0virtual:deshi/content') {
+        return `export * from '${path.resolve(__dirname, './content').replace(/\\/g, '/')}'; export { getCollection, defineCollection } from '${path.resolve(__dirname, './content').replace(/\\/g, '/')}';`;
+      }
+      if (id === '\0virtual:deshi/config') {
+        const dc = deshiConfig ?? defaultConfig;
+        return `export default ${JSON.stringify(dc)}; export const config = ${JSON.stringify(dc)};`;
       }
       if (id === resolvedVirtualRuntimeId) {
         return `export * from '${path.resolve(__dirname, './runtime').replace(/\\/g, '/')}';`;
@@ -103,10 +145,14 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         });
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         if (errors.length > 0) {
-          throw new Error(
-            errors.map((e) => `[Deshi ${e.code}] ${e.message} at ${e.file}:${e.line}:${e.column}`).join('\n')
-          );
+          const msg = errors.map((e) => `[Deshi ${e.code}] ${e.message} at ${e.file}:${e.line}:${e.column}\n${e.frame}`).join('\n\n');
+          const err: any = new Error(msg);
+          err.frame = errors[0]?.frame;
+          err.loc = { file: errors[0]?.file, line: errors[0]?.line, column: errors[0]?.column };
+          throw err;
         }
+        const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
+        for (const w of warnings) this.warn(`[Deshi ${w.code}] ${w.message} at ${w.file}:${w.line}:${w.column}`);
         // Feed the virtual CSS registry so direct .deshi module imports
         // (React-style island authoring) resolve their side-effect CSS import.
         const cssUrl = scopedCssUrl(result.css.scoped);
@@ -217,15 +263,17 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           if (cachedBuild && cachedBuild.fp === fp) {
             result = cachedBuild.result;
           } else {
+            const dcDev = deshiConfig ?? await getDeshiConfig(root);
             result = await buildSite(
               { files: projectFiles },
               {
-                output: 'index',
-                router: enableRouter,
-                css: options.css ?? 'inline',
+                output: (dcDev as any).output === 'static' ? 'index' : (dcDev as any).output ?? 'index',
+                router: (dcDev as any).router ?? enableRouter,
+                css: (dcDev as any).css ?? options.css ?? 'inline',
                 minify: false,
-                appDir: 'src',
-              }
+                appDir: (dcDev as any).appDir ?? 'src',
+                site: (dcDev as any).site,
+              } as any
             );
             cachedBuild = { fp, result };
           }
@@ -324,19 +372,21 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     },
     async closeBundle() {
       const root = config?.root || process.cwd();
-      const outDir = config?.build?.outDir || 'dist';
+      const dc = await getDeshiConfig(root);
+      const outDir = (dc as any).outDir || config?.build?.outDir || 'dist';
       const fullOutDir = path.resolve(root, outDir);
 
-      // Perform SSG build into dist/
+      // Perform SSG build into dist/ — merges vite config + deshi.config.ts + plugin options
       await buildToDisk(
         root,
         {
-          output: 'index',
-          router: enableRouter,
-          css: options.css ?? 'inline',
-          minify: options.minify ?? true,
-          appDir: options.appDir ?? 'src',
-        },
+          output: (dc as any).output === 'static' ? 'index' : (dc as any).output ?? 'index',
+          router: (dc as any).router ?? enableRouter,
+          css: (dc as any).css ?? options.css ?? 'inline',
+          minify: (dc as any).minify ?? options.minify ?? true,
+          appDir: (dc as any).appDir ?? options.appDir ?? 'src',
+          site: (dc as any).site,
+        } as any,
         outDir
       );
 

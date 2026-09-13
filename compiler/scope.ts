@@ -5,10 +5,14 @@ import { fail, type Expression, type Node } from './types';
 import { patternNames } from './script';
 import { walkNodes } from './template';
 
-export const IMPLICIT_BINDINGS = ['props', 'slots', 'params', 'url', 'route', 'env'];
+export const IMPLICIT_BINDINGS = ['props', 'slots', 'params', 'url', 'route', 'env', 'Astro'];
 export const GLOBALS_WHITELIST = [
   'JSON', 'Math', 'Date', 'Intl', 'Object', 'Array', 'String', 'Number', 'Boolean',
-  'encodeURIComponent', 'decodeURIComponent', 'URL', 'console', 'undefined', 'NaN', 'Infinity',
+  'encodeURIComponent', 'decodeURIComponent', 'URL', 'URLSearchParams',
+  'console', 'undefined', 'NaN', 'Infinity', 'Astro',
+  // Astro-like globals: fetch, Response etc for SSR
+  'fetch', 'Response', 'Request', 'Headers',
+  'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

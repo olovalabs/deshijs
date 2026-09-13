@@ -69,8 +69,23 @@ export function markdownToHtml(md: string): string {
     out.push('<p>' + inline(para.join(' ')) + '</p>');
     para = [];
   };
+  const isTableRow = (l: string) => l.includes('|') && l.trim().startsWith('|') === false ? false : /^\s*\|.*\|\s*$/.test(l) || /^\s*[^|]+\|[^|]+/.test(l);
+  const isTableSep = (l: string) => /^\s*\|?(\s*:?-+:?\s*\|)+(\s*:?-+:?\s*\|?)\s*$/.test(l);
   while (i < lines.length) {
     const line = lines[i];
+    // table: header | sep | rows
+    if (isTableRow(line) && i + 1 < lines.length && isTableSep(lines[i+1])) {
+      flushP();
+      const headerCells = line.split('|').filter(c=>c.trim()).map(c=>c.trim());
+      i+=2;
+      const rows: string[][] = [];
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(lines[i].split('|').filter(c=>c.trim()).map(c=>c.trim()));
+        i++;
+      }
+      out.push('<table><thead><tr>' + headerCells.map(c=>'<th>'+inline(c)+'</th>').join('') + '</tr></thead><tbody>' + rows.map(r=>'<tr>'+r.map(c=>'<td>'+inline(c)+'</td>').join('') + '</tr>').join('') + '</tbody></table>');
+      continue;
+    }
     if (line.startsWith('```')) {
       flushP();
       const lang = escapeHtml(line.slice(3).trim());
@@ -94,7 +109,9 @@ export function markdownToHtml(md: string): string {
     if (hm) {
       flushP();
       const n = hm[1].length;
-      out.push(`<h${n}>${inline(hm[2])}</h${n}>`);
+      const text = hm[2].trim();
+      const id = text.toLowerCase().replace(/[^\w]+/g,'-').replace(/^-|-$/g,'');
+      out.push(`<h${n} id="${escapeHtml(id)}">${inline(text)}</h${n}>`);
       i++;
       continue;
     }
@@ -112,7 +129,10 @@ export function markdownToHtml(md: string): string {
       flushP();
       out.push('<ul>');
       while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
-        out.push('<li>' + inline(lines[i].replace(/^\s*[-*+]\s+/, '')) + '</li>');
+        // task list
+        const m = /^\s*[-*+]\s+\[([ xX])\]\s+/.exec(lines[i]);
+        if (m) out.push('<li><input type="checkbox" disabled'+(m[1].toLowerCase()==='x'?' checked':'')+'> '+ inline(lines[i].replace(m[0], '')) + '</li>');
+        else out.push('<li>' + inline(lines[i].replace(/^\s*[-*+]\s+/, '')) + '</li>');
         i++;
       }
       out.push('</ul>');
@@ -144,27 +164,37 @@ export function markdownToDeshi(source: string): string {
   const { data, body } = parseFrontmatter(source);
   const html = markdownToHtml(body);
   const bindings = Object.entries(data)
+    .filter(([k])=>k!=='layout')
     .map(([k, v]) => `  const ${k} = ${JSON.stringify(v)};`)
     .join('\n');
   const title = typeof data.title === 'string' ? data.title : '';
   const description = typeof data.description === 'string' ? data.description : '';
+  const layout = typeof (data as any).layout === 'string' ? String((data as any).layout) : null;
+  // If frontmatter specifies a layout, import it and wrap
+  const layoutImport = layout ? `  import Layout from '${layout}';\n` : '';
+  const layoutWrapStart = layout ? `<Layout title={title}><article class="deshi-md" set:html={html}></article></Layout>` : `<article class="deshi-md" set:html={html}></article>`;
   return `<script>
-${bindings}
+${layoutImport}${bindings}
   const html = ${JSON.stringify(html)};
 </script>
 ${title || description ? `<head>
   ${title ? `<title>{title}</title>` : ''}
   ${description ? `<meta name="description" content={description} />` : ''}
 </head>` : ''}
-<article class="deshi-md" set:html={html}></article>
+${layout ? layoutWrapStart : `<article class="deshi-md" set:html={html}></article>`}
 <style>
-  .deshi-md { max-width: 720px; }
+  .deshi-md { max-width: 720px; margin: 0 auto; }
   .deshi-md h1 { font-size: 2rem; color: #fafafa; }
   .deshi-md h2 { font-size: 1.4rem; color: #fafafa; margin-top: 1.5rem; }
+  .deshi-md h3 { font-size: 1.15rem; color: #e4e4e7; margin-top: 1.25rem; }
   .deshi-md p, .deshi-md li { color: #a1a1aa; line-height: 1.7; }
-  .deshi-md a { color: #a3e635; }
-  .deshi-md pre { background: #18181b; padding: 1rem; border-radius: 8px; overflow: auto; }
+  .deshi-md a { color: #a3e635; text-decoration: underline; text-underline-offset: 2px; }
+  .deshi-md pre { background: #18181b; padding: 1rem; border-radius: 8px; overflow: auto; border: 1px solid #27272a; }
   .deshi-md code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+  .deshi-md table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+  .deshi-md th, .deshi-md td { border: 1px solid #27272a; padding: 0.5rem 0.75rem; text-align: left; }
+  .deshi-md th { background: #18181b; color: #fafafa; }
+  .deshi-md blockquote { border-left: 3px solid #3f3f46; padding-left: 1rem; margin: 1.5rem 0; color: #a1a1aa; }
 </style>
 `;
 }

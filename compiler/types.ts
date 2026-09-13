@@ -40,7 +40,7 @@ export interface Element {
   /** document-mode <head>: children are lifted into a head contribution */
   isDocHead?: boolean;
 }
-export type ClientStrategy = 'load' | 'visible' | 'idle' | 'click';
+export type ClientStrategy = 'load' | 'visible' | 'idle' | 'click' | 'media' | 'only';
 
 export interface Component {
   type: 'Component';
@@ -48,8 +48,12 @@ export interface Component {
   props: Attr[];
   slots: Record<string, Node[]>;
   clientProps?: Expression;
-  /** Per-usage island strategy from client:load | client:visible | client:idle. */
+  /** Per-usage island strategy — Astro-parity: load, visible, idle, media, only, click. */
   clientStrategy?: ClientStrategy;
+  /** For client:media — the media query string */
+  clientMedia?: string;
+  /** For client:only — framework hint (kept for compat) */
+  clientOnly?: string;
   loc: Loc;
 }
 export interface Text {
@@ -101,7 +105,11 @@ export type Attr =
   | { kind: 'dynamic'; name: string; expr: Expression }
   | { kind: 'boolean'; name: string }
   | { kind: 'spread'; expr: Expression }
-  | { kind: 'setHtml'; expr: Expression };
+  | { kind: 'setHtml'; expr: Expression }
+  | { kind: 'setText'; expr: Expression }
+  | { kind: 'classList'; expr: Expression }
+  | { kind: 'defineVars'; expr: Expression }
+  | { kind: 'transition'; name: string; value: string | Expression };
 
 // ─── Diagnostics ───────────────────────────────────────────────────────────────
 
@@ -149,9 +157,12 @@ export const ERROR_CATALOG: Record<string, string> = {
   PF4024: 'Capitalized tag is not an imported component',
   PF4025: '<head> block inside the root layout body',
   PF4026: 'Invalid client:* directive',
+  PF4027: 'Invalid transition:* directive',
+  PF4028: 'Invalid define:vars',
   PF5001: 'Forbidden <script> in zero-JS mode',
   PF5002: 'Asset not found',
   PF5003: 'Client chunk missing from manifest',
+  PF6001: 'Config error',
 };
 
 export class DeshiError extends Error {

@@ -123,6 +123,15 @@ export interface Bindings {
   url: URL;
   route: { pattern: string; file: string };
   env: Record<string, string>;
+  Astro: {
+    props: Record<string, unknown>;
+    params: Record<string, string | string[]>;
+    url: URL;
+    request: { url: string; headers: Headers };
+    site?: URL;
+    generator: string;
+    slots: Record<string, true>;
+  };
 }
 
 export type SlotFns = Record<string, () => Promise<string>>;
@@ -146,7 +155,16 @@ export interface ComponentMeta {
 export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns: SlotFns): Bindings {
   const slots: Record<string, true> = {};
   for (const k of Object.keys(slotFns)) slots[k] = true;
-  return { props, slots, params: ctx.params, url: ctx.url, route: ctx.route, env: ctx.env };
+  const Astro = {
+    props,
+    params: ctx.params,
+    url: ctx.url,
+    request: { url: ctx.url.href, headers: new Headers() },
+    site: ctx.url ? new URL(ctx.url.origin) : undefined,
+    generator: 'Deshi ' + '1.0.0',
+    slots,
+  };
+  return { props, slots, params: ctx.params, url: ctx.url, route: ctx.route, env: ctx.env, Astro } as Bindings;
 }
 
 export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<string>): Promise<string> {
@@ -156,7 +174,7 @@ export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<
   return '';
 }
 
-const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'click']);
+const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'click', 'media', 'only']);
 
 function componentBaseName(file: string): string {
   const b = file.slice(Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\')) + 1);
@@ -170,6 +188,8 @@ export async function renderComponent(
   ctx: RenderCtx,
   clientProps?: unknown,
   strategy?: string,
+  media?: string,
+  only?: string,
 ): Promise<string> {
   const meta = Comp.__deshi;
   if (!meta) throw new Error('renderComponent: not a compiled Deshi component');
@@ -179,13 +199,21 @@ export async function renderComponent(
   if (meta.css) ctx.css.add(meta.hash);
   ctx.used.add(meta.file);
   const island = !!strategy && ISLAND_STRATEGIES.has(strategy);
-  if (island) {
+  // client:only without <script client> is allowed — it's client-only, skip SSR check
+  const isOnly = strategy === 'only';
+  if (island && !isOnly) {
     if (!meta.client) {
       throw new Error(
         `PF4026: client:${strategy} on ${meta.file} but the component has no <script client> block`,
       );
     }
     ctx.clients.add(meta.hash);
+    ctx.islands++;
+    if (ctx.islands === 1) {
+      headPush(ctx, '<style id="deshi-island-css">deshi-island{display:block}</style>');
+    }
+  } else if (isOnly) {
+    // still counts as island for runtime injection, but no client chunk requirement
     ctx.islands++;
     if (ctx.islands === 1) {
       headPush(ctx, '<style id="deshi-island-css">deshi-island{display:block}</style>');
@@ -206,7 +234,9 @@ export async function renderComponent(
     const name = componentBaseName(meta.file);
     const src = `/_deshi/c/${name}.${meta.hash}.js`;
     if (strategy === 'load') ctx.preloads.add(src);
-    return `<deshi-island data-strategy="${escapeAttr(strategy)}" data-component="${escapeAttr(name)}" data-src="${escapeAttr(src)}">${html}</deshi-island>`;
+    const mediaAttr = media ? ` data-media="${escapeAttr(media)}"` : '';
+    const onlyAttr = only ? ` data-only="${escapeAttr(only)}"` : '';
+    return `<deshi-island data-strategy="${escapeAttr(strategy)}" data-component="${escapeAttr(name)}" data-src="${escapeAttr(src)}"${mediaAttr}${onlyAttr}>${html}</deshi-island>`;
   } finally {
     ctx.depth--;
   }

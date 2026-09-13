@@ -121,11 +121,19 @@ function convertJsxAttr(a: AnyNode, ctx: TemplateContext): Attr {
   }
   const name = jsxName(a.name, ctx);
   checkAttrName(name, a.start, ctx);
-  if (a.value == null) return { kind: 'boolean', name };
-  if (a.value.type === 'Literal') {
-    if (name === 'set:html') {
-      fail('PF1002', 'set:html requires an expression value: set:html={html}', ctx.file, ctx.source, a.start);
+  // Astro/Dishi directives with special kinds
+  if (a.value == null) {
+    if (name === 'set:html' || name === 'set:text' || name === 'class:list' || name === 'define:vars') {
+      fail('PF1002', `${name} requires an expression value: ${name}={...}`, ctx.file, ctx.source, a.start);
     }
+    if (name.startsWith('transition:')) return { kind: 'transition', name, value: '' };
+    return { kind: 'boolean', name };
+  }
+  if (a.value.type === 'Literal') {
+    if (name === 'set:html' || name === 'set:text' || name === 'class:list' || name === 'define:vars') {
+      fail('PF1002', `${name} requires an expression value: ${name}={value}`, ctx.file, ctx.source, a.start);
+    }
+    if (name.startsWith('transition:')) return { kind: 'transition', name, value: String(a.value.value) };
     return { kind: 'static', name, value: String(a.value.value) };
   }
   if (a.value.type === 'JSXExpressionContainer') {
@@ -134,13 +142,17 @@ function convertJsxAttr(a: AnyNode, ctx: TemplateContext): Attr {
     }
     const expr = makeExpression(a.value.expression, ctx);
     if (name === 'set:html') return { kind: 'setHtml', expr };
+    if (name === 'set:text') return { kind: 'setText', expr };
+    if (name === 'class:list') return { kind: 'classList', expr };
+    if (name === 'define:vars') return { kind: 'defineVars', expr };
+    if (name.startsWith('transition:')) return { kind: 'transition', name, value: expr };
     return { kind: 'dynamic', name, expr };
   }
   // <a title=<b/> /> — JSX element as attribute value
   fail('PF1002', `Unsupported attribute value for "${name}"`, ctx.file, ctx.source, a.start);
 }
 
-const CLIENT_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'click']);
+const CLIENT_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'click', 'media', 'only']);
 
 export function takeClientDirectives(
   attrs: Attr[],
@@ -148,9 +160,11 @@ export function takeClientDirectives(
   ctx: TemplateContext,
   tagName: string,
   isComponent: boolean,
-): { attrs: Attr[]; clientStrategy?: ClientStrategy; clientProps?: Expression } {
+): { attrs: Attr[]; clientStrategy?: ClientStrategy; clientProps?: Expression; clientMedia?: string; clientOnly?: string } {
   let clientStrategy: ClientStrategy | undefined;
   let clientProps: Expression | undefined;
+  let clientMedia: string | undefined;
+  let clientOnly: string | undefined;
   const rest: Attr[] = [];
   for (const a of attrs) {
     const name =
@@ -179,6 +193,22 @@ export function takeClientDirectives(
       clientProps = a.expr;
       continue;
     }
+    if (dir === 'media') {
+      if (a.kind === 'static') clientMedia = a.value;
+      else if (a.kind === 'dynamic') clientMedia = a.expr.raw;
+      else fail('PF4026', 'client:media requires a value: client:media="(max-width: 600px)"', ctx.file, ctx.source, loc.start);
+      if (clientStrategy) fail('PF4026', `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`, ctx.file, ctx.source, loc.start);
+      clientStrategy = 'media';
+      continue;
+    }
+    if (dir === 'only') {
+      if (a.kind === 'static') clientOnly = a.value;
+      else if (a.kind === 'boolean') clientOnly = 'deshi';
+      else if (a.kind === 'dynamic') clientOnly = String((a.expr as any).raw ?? 'deshi');
+      if (clientStrategy) fail('PF4026', `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`, ctx.file, ctx.source, loc.start);
+      clientStrategy = 'only';
+      continue;
+    }
     if (CLIENT_STRATEGIES.has(dir)) {
       if (a.kind !== 'boolean') {
         fail(
@@ -203,7 +233,7 @@ export function takeClientDirectives(
     }
     fail('PF4026', `Unknown client:* directive "client:${dir}"`, ctx.file, ctx.source, loc.start);
   }
-  return { attrs: rest, clientStrategy, clientProps };
+  return { attrs: rest, clientStrategy, clientProps, clientMedia, clientOnly };
 }
 
 export function checkAttrName(name: string, offset: number, ctx: TemplateContext): void {
@@ -306,6 +336,8 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
       slots: bucketSlots(children, ctx),
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
+      clientMedia: taken.clientMedia,
+      clientOnly: taken.clientOnly,
       loc,
     };
     return [comp];
@@ -319,9 +351,9 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
   }
 
   takeClientDirectives(attrs, loc, ctx, name, false);
-  const setHtml = attrs.find((a: Attr) => a.kind === 'setHtml');
+  const setHtml = attrs.find((a: Attr) => a.kind === 'setHtml' || a.kind === 'setText');
   if (setHtml && children.length) {
-    fail('PF4023', 'An element with set:html must not have children', ctx.file, ctx.source, node.start);
+    fail('PF4023', `An element with ${setHtml.kind === 'setHtml' ? 'set:html' : 'set:text'} must not have children`, ctx.file, ctx.source, node.start);
   }
   const el: Element = {
     type: 'Element',
