@@ -1,0 +1,56 @@
+{
+  "Deshi script block": {
+    "scope": "html",
+    "prefix": "dscript",
+    "body": [
+      "<script>",
+      "  $0",
+      "</script>"
+    ],
+    "description": "Deshi <script> block"
+  },
+  "Deshi style block": {
+    "scope": "html",
+    "prefix": "dstyle",
+    "body": [
+      "<style>",
+      "  $0",
+      "</style>"
+    ],
+    "description": "Deshi scoped <style> block"
+  },
+  "Deshi global style": {
+    "scope": "html",
+    "prefix": "dglobal",
+    "body": [
+      "<style is:global>",
+      "  $0",
+      "</style>"
+    ],
+    "description": "Deshi global style"
+  },
+  "Deshi client:load": {
+    "scope": "html",
+    "prefix": "clientload",
+    "body": ["client:load"],
+    "description": "Hydrate on load"
+  },
+  "Deshi client:visible": {
+    "scope": "html",
+    "prefix": "clientvisible",
+    "body": ["client:visible"],
+    "description": "Hydrate when visible"
+  },
+  "Deshi client:idle": {
+    "scope": "html",
+    "prefix": "clientidle",
+    "body": ["client:idle"],
+    "description": "Hydrate on idle"
+  },
+  "Deshi expression": {
+    "scope": "html",
+    "prefix": "{",
+    "body": ["{${1:expr}}"],
+    "description": "Deshi template expression"
+  }
+}
