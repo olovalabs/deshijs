@@ -7,7 +7,6 @@ import { transformSync } from 'esbuild';
 import { compile, type CompileResult } from './index';
 import { scopedCssUrl } from './css';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
-import { ISLANDS_RUNTIME } from './islands';
 import { formatHtml, minifyHtml } from './html';
 import { ACORN_OPTIONS, JsxParser } from './expression';
 import {
@@ -173,6 +172,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     minify: options.minify ?? true,
     site: options.site,
     appDir: options.appDir,
+    stableCssUrl: options.stableCssUrl,
   };
   const t0 = performance.now();
   resetCache();
@@ -396,13 +396,8 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       head += tags;
     }
 
-    let tail = '';
-    let previewTail = '';
-    if (ctx.islands > 0) {
-      tail = `<script type="module" src="/_deshi/islands.js"></script>`;
-      previewTail = `<script type="module" src="/_deshi/islands.js"></script>`;
-    }
-    previewTail += PREVIEW_NAV_SCRIPT;
+    const tail = '';
+    let previewTail = PREVIEW_NAV_SCRIPT;
 
     const marker = '<!--deshi:head-->';
     const mi = html.indexOf(marker);
@@ -556,7 +551,6 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   for (const [h, c] of Object.entries(clientByHash)) {
     if (usedClient.has(h)) out.push({ path: c.chunk.slice(1), content: c.code, kind: 'js' });
   }
-  if (usedClient.size) out.push({ path: '_deshi/islands.js', content: ISLANDS_RUNTIME, kind: 'js' });
   if (opts.router) out.push({ path: '_deshi/router.4f1a9c2e.js', content: CLIENT_ROUTER_SCRIPT, kind: 'js' });
 
   if (opts.output === 'page') {

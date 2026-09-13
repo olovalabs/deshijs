@@ -1,6 +1,7 @@
 // @deshi/compiler/runtime — helpers imported by every compiled render module.
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
+import { islandInlineScript, stampIslandRoot } from './islands';
 
 export class Raw {
   constructor(public html: string) {}
@@ -209,15 +210,8 @@ export async function renderComponent(
     }
     ctx.clients.add(meta.hash);
     ctx.islands++;
-    if (ctx.islands === 1) {
-      headPush(ctx, '<style id="deshi-island-css">deshi-island{display:block}</style>');
-    }
   } else if (isOnly) {
-    // still counts as island for runtime injection, but no client chunk requirement
     ctx.islands++;
-    if (ctx.islands === 1) {
-      headPush(ctx, '<style id="deshi-island-css">deshi-island{display:block}</style>');
-    }
   }
   ctx.depth++;
   try {
@@ -229,14 +223,16 @@ export async function renderComponent(
         throw new Error('PF4026: client:props must be JSON-serializable');
       }
     }
-    const html = await Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp);
+    let html = await Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp);
     if (!island || !strategy) return html;
     const name = componentBaseName(meta.file);
     const src = `/_deshi/c/${name}.${meta.hash}.js`;
-    if (strategy === 'load') ctx.preloads.add(src);
-    const mediaAttr = media ? ` data-media="${escapeAttr(media)}"` : '';
-    const onlyAttr = only ? ` data-only="${escapeAttr(only)}"` : '';
-    return `<deshi-island data-strategy="${escapeAttr(strategy)}" data-component="${escapeAttr(name)}" data-src="${escapeAttr(src)}"${mediaAttr}${onlyAttr}>${html}</deshi-island>`;
+    if (strategy === 'load' || strategy === 'only') ctx.preloads.add(src);
+    const nid = `d-${meta.hash}-${ctx.islands}`;
+    if (isOnly && !html.trim()) {
+      html = `<div data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}"></div>`;
+    }
+    return stampIslandRoot(html, nid) + islandInlineScript(nid, src, strategy, media);
   } finally {
     ctx.depth--;
   }

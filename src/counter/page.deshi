@@ -12,9 +12,9 @@
   <h1>Counter islands</h1>
   <p class="lede">
     Opening this route does <strong>not</strong> download <code>Counter.js</code>
-    (same as Astro when you skip <code>client:load</code>). You should only see
-    the tiny <code>islands.js</code> runtime. Component JS loads when that island
-    is needed.
+    until an island hydrates (same as Astro). There is no shared
+    <code>islands.js</code> — each island inlines its own boot and
+    <code>import()</code>s only its chunk.
   </p>
 
   <section class="island">
