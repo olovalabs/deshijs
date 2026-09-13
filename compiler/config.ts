@@ -113,7 +113,26 @@ export async function loadConfig(root: string): Promise<DeshiConfig> {
       const cfg: DeshiConfig = mod.default ?? mod;
       if (cfg && typeof cfg === 'object') return cfg;
     } catch {
-      // fall through to defaults — diagnostics are surfaced by the plugin
+      try {
+        const esbuild = await import('esbuild');
+        const res = await esbuild.build({
+          entryPoints: [full],
+          bundle: true,
+          platform: 'node',
+          format: 'esm',
+          write: false,
+          packages: 'external',
+        });
+        const code = res.outputFiles[0]?.text;
+        if (code) {
+          const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+          const mod = await import(dataUrl);
+          const cfg: DeshiConfig = mod.default ?? mod;
+          if (cfg && typeof cfg === 'object') return cfg;
+        }
+      } catch {
+        // fall through to defaults — diagnostics are surfaced by the plugin
+      }
     }
   }
   return {};
