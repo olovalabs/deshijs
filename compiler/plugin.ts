@@ -233,15 +233,23 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         const qIndex = rawUrl.indexOf('?');
         const url = qIndex === -1 ? rawUrl.split('#')[0] : rawUrl.slice(0, qIndex);
         const qs = qIndex === -1 ? '' : rawUrl.slice(qIndex);
-        if (url.length > 1 && url.endsWith('/')) {
+        // Collapse `//` and decode defensively so route matching sees one
+        // canonical path (prevents `/about//` vs `/about` double evaluation).
+        let cleanUrl = url.replace(/\/{2,}/g, '/');
+        try {
+          cleanUrl = decodeURI(cleanUrl);
+        } catch {
+          /* keep raw — downstream match() handles it as-is */
+        }
+        if (cleanUrl.length > 1 && cleanUrl.endsWith('/')) {
           res.statusCode = 308;
-          res.setHeader('Location', url.slice(0, -1) + qs);
+          res.setHeader('Location', cleanUrl.slice(0, -1) + qs);
           res.end();
           return;
         }
 
         // Serve client SPA router script
-        if (url === '/_deshi/router.4f1a9c2e.js') {
+        if (cleanUrl === '/_deshi/router.4f1a9c2e.js') {
           res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           res.statusCode = 200;
           res.end(CLIENT_ROUTER_SCRIPT);
@@ -251,16 +259,16 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         // as text/css so <link> stylesheets apply. Vite's default JS-module
         // form only works for JS `import`s, so request `?direct` internally —
         // page markup stays identical between dev and prod.
-        if (url.startsWith('/_deshi/c/') && deshiClientJs.has(url)) {
+        if (cleanUrl.startsWith('/_deshi/c/') && deshiClientJs.has(cleanUrl)) {
           res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           res.statusCode = 200;
-          res.end(deshiClientJs.get(url)!);
+          res.end(deshiClientJs.get(cleanUrl)!);
           return;
         }
 
-        if (/^\/_deshi\/[^/]+\.css$/.test(url)) {
+        if (/^\/_deshi\/[^/]+\.css$/.test(cleanUrl)) {
           try {
-            const t = await server.transformRequest(url + '?direct');
+            const t = await server.transformRequest(cleanUrl + '?direct');
             if (t && typeof t.code === 'string') {
               res.setHeader('Content-Type', 'text/css; charset=utf-8');
               res.statusCode = 200;
@@ -270,7 +278,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           } catch {
             // fall through to the raw registry below
           }
-          const raw = deshiCss.get(url);
+          const raw = deshiCss.get(cleanUrl);
           if (raw !== undefined) {
             res.setHeader('Content-Type', 'text/css; charset=utf-8');
             res.statusCode = 200;
@@ -280,7 +288,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           return next();
         }
 
-        if (url.startsWith('/@') || url.startsWith('/node_modules') || (url.includes('.') && !url.endsWith('.html'))) {
+        if (cleanUrl.startsWith('/@') || cleanUrl.startsWith('/node_modules') || (cleanUrl.includes('.') && !cleanUrl.endsWith('.html'))) {
           return next();
         }
 
@@ -391,16 +399,30 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         const qIndex = rawUrl.indexOf('?');
         const url = qIndex === -1 ? rawUrl.split('#')[0] : rawUrl.slice(0, qIndex);
         const qs = qIndex === -1 ? '' : rawUrl.slice(qIndex);
-        if (url.length > 1 && url.endsWith('/')) {
+        // Defensive: never let `/%2e%2e/...` or NUL bytes escape `base`.
+        let clean = url;
+        try {
+          clean = decodeURI(clean);
+        } catch {
+          res.statusCode = 400;
+          res.end('Bad Request');
+          return;
+        }
+        if (clean.includes('\0') || /(^|\/)\.\.(\/|$)/.test(clean)) {
+          res.statusCode = 400;
+          res.end('Bad Request');
+          return;
+        }
+        clean = clean.replace(/\/{2,}/g, '/');
+        if (clean.length > 1 && clean.endsWith('/')) {
           res.statusCode = 308;
-          res.setHeader('Location', url.slice(0, -1) + qs);
+          res.setHeader('Location', clean.slice(0, -1) + qs);
           res.end();
           return;
         }
-        if (url.includes('.')) return next(); // real files: sirv handles them
+        if (clean.includes('.')) return next(); // real files: sirv handles them
         const root = config?.root || process.cwd();
         const base = path.resolve(root, config?.build?.outDir || 'dist');
-        const clean = url;
         for (const cand of [path.join(base, clean, 'index.html'), base + clean + '.html', path.join(base, clean, 'page.html')]) {
           if (!cand.startsWith(base)) continue;
           try {

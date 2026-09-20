@@ -79,7 +79,7 @@ function splitBlocksInternal(source: string, file: string, frontmatter: { conten
   const stack: string[] = [];
   let pending: Pending | null = null;
   let sawHtml = false;
-  let tokenizer!: Tokenizer;
+  let tokenizer: Tokenizer | null = null;
 
   const finishBlock = (endTagStart: number, endTagEnd: number) => {
     if (!pending) return;
@@ -121,11 +121,11 @@ function splitBlocksInternal(source: string, file: string, frontmatter: { conten
         const attrs: Record<string, string> = {};
         for (const a of t.attrs) attrs[a.name] = a.value;
         pending = { name, attrs, start: loc.startOffset, contentStart: loc.endOffset };
-        tokenizer.state = name === 'script' ? TokenizerMode.SCRIPT_DATA : TokenizerMode.RAWTEXT;
+        tokenizer!.state = name === 'script' ? TokenizerMode.SCRIPT_DATA : TokenizerMode.RAWTEXT;
         return;
       }
-      if (RAW.has(name)) tokenizer.state = name === 'script' ? TokenizerMode.SCRIPT_DATA : TokenizerMode.RAWTEXT;
-      else if (RCDATA.has(name)) tokenizer.state = TokenizerMode.RCDATA;
+      if (RAW.has(name)) tokenizer!.state = name === 'script' ? TokenizerMode.SCRIPT_DATA : TokenizerMode.RAWTEXT;
+      else if (RCDATA.has(name)) tokenizer!.state = TokenizerMode.RCDATA;
       if (!VOID.has(name) && !t.selfClosing) stack.push(name);
     },
     onEndTag(t: Token.TagToken) {
@@ -175,13 +175,14 @@ function splitBlocksInternal(source: string, file: string, frontmatter: { conten
 
   // Blank out lifted ranges while preserving every newline so that all offsets,
   // lines and columns of the remaining template still point into the original file.
-  let template = source;
-  for (const r of ranges) {
-    const chunk = source.slice(r.start, r.end);
-    let blank = '';
-    for (let i = 0; i < chunk.length; i++) blank += chunk[i] === '\n' ? '\n' : ' ';
-    template = template.slice(0, r.start) + blank + template.slice(r.end);
+  // Single pass: sort ranges, then walk once — O(n), not O(n·ranges).
+  const chars = source.split('');
+  for (const r of [...ranges].sort((a, b) => a.start - b.start)) {
+    for (let k = Math.max(0, r.start); k < Math.min(chars.length, r.end); k++) {
+      if (chars[k] !== '\n') chars[k] = ' ';
+    }
   }
+  const template = chars.join('');
 
   return { script, client, styles, template, diagnostics, sawHtml };
 }

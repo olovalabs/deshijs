@@ -204,7 +204,7 @@ export function takeClientDirectives(
     if (dir === 'only') {
       if (a.kind === 'static') clientOnly = a.value;
       else if (a.kind === 'boolean') clientOnly = 'deshi';
-      else if (a.kind === 'dynamic') clientOnly = String((a.expr as any).raw ?? 'deshi');
+      else if (a.kind === 'dynamic') clientOnly = a.expr.raw || 'deshi';
       if (clientStrategy) fail('PF4026', `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`, ctx.file, ctx.source, loc.start);
       clientStrategy = 'only';
       continue;
@@ -263,6 +263,11 @@ function jsxTextValue(raw: string): string {
 }
 
 export function isComponentName(name: string): boolean {
+  // Uppercase-first covers `Card` and namespaced `UI.Card`; hyphens are
+  // custom *elements* (`my-widget`), never components. JSX already guarantees
+  // a non-empty name, but guard anyway so "" can never classify as a component.
+  if (!name) return false;
+  if (name.includes('-')) return false;
   const c = name.charCodeAt(0);
   return c >= 65 && c <= 90;
 }

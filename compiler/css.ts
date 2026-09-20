@@ -77,21 +77,41 @@ function scopeSelector(selector: Selector, hash: string): void {
 }
 
 export function scopeCss(css: string, hash: string): string {
-  const ast = parse(css, { positions: false, parseValue: false, parseAtrulePrelude: true });
-  walk(ast, {
-    visit: 'Rule',
-    enter(this: WalkContext, node: Rule) {
-      const atrule = this.atrule;
-      if (atrule && /keyframes$/i.test(atrule.name)) return;
-      if (node.prelude.type !== 'SelectorList') return;
-      node.prelude.children.forEach((sel) => {
-        if (sel.type === 'Selector') scopeSelector(sel, hash);
-      });
-    },
-  });
-  return generate(ast);
+  let ast: ReturnType<typeof parse>;
+  try {
+    ast = parse(css, {
+      positions: false,
+      parseValue: false,
+      parseAtrulePrelude: false,
+      onParseError: () => {},
+    } as Parameters<typeof parse>[1]);
+  } catch {
+    // Invalid CSS must not kill the build — leave it untouched so the
+    // browser / Vite pipeline can report it with a proper location.
+    return css;
+  }
+  try {
+    walk(ast, {
+      visit: 'Rule',
+      enter(this: WalkContext, node: Rule) {
+        const atrule = this.atrule;
+        if (atrule && /keyframes$/i.test(atrule.name)) return;
+        if (node.prelude.type !== 'SelectorList') return;
+        node.prelude.children.forEach((sel) => {
+          if (sel.type === 'Selector') scopeSelector(sel, hash);
+        });
+      },
+    });
+    return generate(ast);
+  } catch {
+    return css;
+  }
 }
 
 export function minifyCss(css: string): string {
-  return generate(parse(css, { positions: false }));
+  try {
+    return generate(parse(css, { positions: false }));
+  } catch {
+    return css.trim();
+  }
 }

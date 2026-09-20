@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "sync-icon": "node .vscode/sync-icon.js"
+    "sync-icon": "node .vscode/sync-icon.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@types/css-tree": "^3.2.0",
@@ -20,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^22.19.17",
     "typescript": "^7.0.2",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "vitest": "^5.0.1"
   }
 }

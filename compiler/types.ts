@@ -258,15 +258,13 @@ export function fail(
   throw new DeshiError(makeDiagnostic(code, message, file, source, offset, 'error', hint));
 }
 
-/** FNV-1a based 8-hex-char hash (the Node build uses sha256(relPath).slice(0, 8)). */
+/** FNV-1a 32-bit hash rendered as 8 hex chars. Used for scoped-style attributes,
+ * CSS URLs and the compile memo key — it only needs to be stable, not secure. */
 export function hashString(input: string): string {
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
+  let h = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
-    const c = input.charCodeAt(i);
-    h1 ^= c;
-    h1 = Math.imul(h1, 0x01000193) >>> 0;
-    h2 = (h2 + c * 31 + ((h2 << 5) | (h2 >>> 27))) >>> 0;
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
   }
-  return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).slice(0, 8);
+  return (h >>> 0).toString(16).padStart(8, '0');
 }

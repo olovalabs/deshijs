@@ -82,32 +82,43 @@ export const defaultConfig: Required<Pick<DeshiConfig, 'output' | 'trailingSlash
   experimental: { viewTransitions: false, contentCollections: true },
 };
 
-/** Shallow merge — enough for a vite plugin; deep-merges `build` + `experimental`. */
+/** Shallow merge — enough for a vite plugin; deep-merges `build`, `experimental`, `markdown` and `vite`. */
 export function mergeConfig(base: DeshiConfig, patch: DeshiConfig): DeshiConfig {
+  const mergedVite =
+    base.vite && patch.vite && typeof base.vite === 'object' && typeof patch.vite === 'object'
+      ? { ...(base.vite as Record<string, unknown>), ...(patch.vite as Record<string, unknown>) }
+      : (patch.vite ?? base.vite);
   return {
     ...base,
     ...patch,
     build: { ...base.build, ...patch.build },
-    experimental: { ...base.experimental, ...patch.experimental } as any,
-    markdown: { ...base.markdown, ...patch.markdown } as any,
+    experimental: { ...base.experimental, ...patch.experimental } as DeshiConfig['experimental'],
+    markdown: { ...base.markdown, ...patch.markdown } as DeshiConfig['markdown'],
+    vite: mergedVite,
   };
 }
 
-/** Normalize `output` that still uses the old `"page"|"index"` vocabulary. */
-export function normalizeOutput(output: DeshiConfig['output']): 'static' | 'page' | 'index' {
-  if (output === 'page' || output === 'index') return output;
+/** Normalize `output` — accepts the legacy `"page"|"index"` vocabulary. */
+export function normalizeOutput(output: DeshiConfig['output']): 'static' | 'hybrid' | 'server' | 'page' | 'index' {
+  if (output === 'page' || output === 'index' || output === 'hybrid' || output === 'server') return output;
   return 'static';
 }
 
-/** Load `deshi.config.*` if present — best-effort, never throws. */
+/** Load `deshi.config.*` if present — best-effort, never throws.
+ * Uses dynamic `import()` so it works in ESM with no `require` hack and no
+ * top-level `await import('fs')` churn. `.ts` configs are bundled via esbuild. */
 export async function loadConfig(root: string): Promise<DeshiConfig> {
-  const fs = await import('fs');
-  const path = await import('path');
-  const url = await import('url');
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const url = await import('node:url');
   const candidates = ['deshi.config.ts', 'deshi.config.js', 'deshi.config.mjs', 'deshi.config.cjs'];
   for (const name of candidates) {
     const full = path.resolve(root, name);
-    if (!fs.existsSync(full)) continue;
+    try {
+      if (!fs.existsSync(full)) continue;
+    } catch {
+      continue;
+    }
     try {
       const mod = await import(url.pathToFileURL(full).href);
       const cfg: DeshiConfig = mod.default ?? mod;
@@ -123,7 +134,7 @@ export async function loadConfig(root: string): Promise<DeshiConfig> {
           write: false,
           packages: 'external',
         });
-        const code = res.outputFiles[0]?.text;
+        const code = res.outputFiles?.[0]?.text;
         if (code) {
           const dataUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
           const mod = await import(dataUrl);

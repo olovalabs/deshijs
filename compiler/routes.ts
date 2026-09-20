@@ -30,7 +30,8 @@ export interface ScanResult {
 }
 
 const KIND_PRIORITY: Record<SegmentKind, number> = { static: 0, dynamic: 1, catchAll: 2, optionalCatchAll: 3 };
-const VALID_NAME = /^[A-Za-z_$][\w$-]*$/;
+// Route param names must be valid JS identifiers — they become `params.<name>` bindings.
+const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function d(code: string, message: string, file: string, severity: 'error' | 'warning' = 'error'): Diagnostic {
   return { code, message, file, line: 1, column: 1, frame: '', severity };
@@ -195,6 +196,13 @@ export function scan(files: string[]): ScanResult {
       diagnostics.push(d('PF2005', `${file}: catch-all segments must be the last segment`, file));
       continue;
     }
+    // Duplicate param names would silently overwrite each other in `params`.
+    const seenParams = new Set<string>();
+    const dup = segments.find((s) => s.kind !== 'static' && (seenParams.has(s.value) || (seenParams.add(s.value), false)));
+    if (dup) {
+      diagnostics.push(d('PF2005', `${file}: duplicate route param "${(dup as Segment).value}"`, file));
+      continue;
+    }
 
     const pattern = patternOf(segments);
     const other = byPattern.get(pattern);
@@ -236,6 +244,11 @@ export function normalizePath(pathname: string): string {
   } catch {
     /* keep as-is */
   }
+  // Strip query + hash defensively — callers pass pathnames, but a full URL
+  // must never produce a distinct cache key / missed route.
+  const q = p.search(/[?#]/);
+  if (q !== -1) p = p.slice(0, q);
+  if (!p.startsWith('/')) p = '/' + p;
   if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
   if (p.endsWith('/index.html')) p = p.slice(0, -'/index.html'.length) || '/';
   if (p.endsWith('/page.html')) p = p.slice(0, -'/page.html'.length) || '/';
@@ -282,11 +295,15 @@ export function buildUrl(route: Route, params: Record<string, string | string[]>
     if (s.kind === 'static') parts.push(s.value);
     else {
       const v = params[s.value];
-      if (s.kind === 'dynamic') parts.push(encodeURIComponent(String(v)));
-      else {
+      if (s.kind === 'dynamic') {
+        if (v == null || (Array.isArray(v) ? v.length !== 1 : String(v).includes('/'))) {
+          throw new Error(`Param "${s.value}" must be a single path segment`);
+        }
+        parts.push(encodeURIComponent(String(Array.isArray(v) ? v[0] : v)));
+      } else {
         const arr = Array.isArray(v) ? v : v == null ? [] : [String(v)];
         if (!arr.length && s.kind === 'catchAll') throw new Error(`Catch-all "${s.value}" needs at least one segment`);
-        parts.push(...arr.map((x) => encodeURIComponent(x)));
+        parts.push(...arr.flatMap((x) => String(x).split('/')).map((x) => encodeURIComponent(x)));
       }
     }
   }

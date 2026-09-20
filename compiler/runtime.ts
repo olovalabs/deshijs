@@ -1,7 +1,7 @@
 // @deshi/compiler/runtime — helpers imported by every compiled render module.
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
-import { islandInlineScript, stampIslandRoot } from './islands';
+import { islandInlineScript, stampIslandRoot, type IslandStrategy } from './islands';
 
 export class Raw {
   constructor(public html: string) {}
@@ -13,21 +13,11 @@ export class Raw {
 export const raw = (s: unknown): Raw => new Raw(s == null ? '' : String(s));
 
 export function escapeHtml(s: string): string {
-  let out = '';
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    out += c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c;
-  }
-  return out;
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export function escapeAttr(s: string): string {
-  let out = '';
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    out += c === '&' ? '&amp;' : c === '"' ? '&quot;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c;
-  }
-  return out;
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** Escape an interpolated value for text position. Raw / arrays / promises aware. */
@@ -78,19 +68,19 @@ export function sty(v: unknown): string {
 }
 
 export function attrs(obj: Record<string, unknown>): string {
-  let out = '';
+  const parts: string[] = [];
   for (const [k, raw] of Object.entries(obj)) {
     let v = raw;
     if (k === 'class') v = cls(v) || false;
     else if (k === 'style') v = sty(v) || false;
     if (v === false || v == null) continue;
     if (v === true) {
-      out += ' ' + k;
+      parts.push(' ' + k);
       continue;
     }
-    out += ` ${k}="${escapeAttr(String(v))}"`;
+    parts.push(` ${k}="${escapeAttr(String(v))}"`);
   }
-  return out;
+  return parts.join('');
 }
 
 // ─── render context ────────────────────────────────────────────────────────────
@@ -188,7 +178,7 @@ export async function renderComponent(
   slotFns: SlotFns,
   ctx: RenderCtx,
   clientProps?: unknown,
-  strategy?: string,
+  strategy?: IslandStrategy | string,
   media?: string,
   only?: string,
 ): Promise<string> {
@@ -232,7 +222,7 @@ export async function renderComponent(
     if (isOnly && !html.trim()) {
       html = `<div data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}"></div>`;
     }
-    return stampIslandRoot(html, nid) + islandInlineScript(nid, src, strategy, media);
+    return stampIslandRoot(html, nid) + islandInlineScript(nid, src, strategy as IslandStrategy, media);
   } finally {
     ctx.depth--;
   }
@@ -314,7 +304,14 @@ export function cache<A extends unknown[], R>(fn: (...args: A) => R): (...args: 
       store.clear();
       epoch = cacheEpoch;
     }
-    const key = JSON.stringify(args);
+    // JSON.stringify throws on circular args and collides on `undefined` vs
+    // missing — fall back to a non-cached call instead of crashing the build.
+    let key: string;
+    try {
+      key = JSON.stringify(args) ?? 'null';
+    } catch {
+      return fn(...args);
+    }
     if (store.has(key)) return store.get(key) as R;
     const v = fn(...args);
     store.set(key, v);

@@ -122,8 +122,9 @@ export function analyzeExpression(expr: Expression, known: Set<string>, file: st
       return;
     }
     if (node.type === 'VariableDeclarator') {
-      const scope = scopes[scopes.length - 1] ?? new Set<string>();
-      walkPattern(node.id, scope);
+      const scope = scopes[scopes.length - 1];
+      if (scope) walkPattern(node.id, scope);
+      // init is evaluated before the binding is visible (TDZ semantics)
       walk(node.init, node, 'init');
       return;
     }

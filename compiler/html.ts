@@ -6,7 +6,11 @@
  */
 export function formatHtml(html: string): string {
   const protectedBlocks: string[] = [];
-  const placeholder = (i: number) => `___DESHI_BLOCK_${i}___`;
+  // Random nonce per call — deterministic placeholders (`___DESHI_BLOCK_0___`)
+  // could collide with literal user content and corrupt output.
+  const nonce = Math.random().toString(36).slice(2);
+  const placeholder = (i: number): string => `___DESHI_FMT_${nonce}_${i}___`;
+  const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // Protect pre, code, textarea, script, and style blocks
   let processed = html.replace(
@@ -97,7 +101,7 @@ export function formatHtml(html: string): string {
   for (let i = 0; i < protectedBlocks.length; i++) {
     const ph = placeholder(i);
     const content = protectedBlocks[i];
-    const regex = new RegExp(`^([ \t]*)${ph}`, 'm');
+    const regex = new RegExp(`^([ \t]*)${escapeRe(ph)}`, 'm');
     const match = formatted.match(regex);
     if (match) {
       const pad = match[1];
@@ -105,9 +109,9 @@ export function formatHtml(html: string): string {
         .split('\n')
         .map((l, idx) => (idx === 0 ? l : pad + l))
         .join('\n');
-      formatted = formatted.replace(match[0], pad + indented);
+      formatted = formatted.replace(match[0], () => pad + indented);
     } else {
-      formatted = formatted.replace(ph, content);
+      formatted = formatted.split(ph).join(content);
     }
   }
 
@@ -120,7 +124,10 @@ export function formatHtml(html: string): string {
  */
 export function minifyHtml(html: string): string {
   const preserved: string[] = [];
-  const placeholder = (i: number) => `___PRESERVED_${i}___`;
+  // Collision-proof placeholders: include a random-per-call nonce + index so
+  // user content containing `___PRESERVED_0___` can never be clobbered.
+  const nonce = Math.random().toString(36).slice(2);
+  const placeholder = (i: number): string => `___DESHI_MIN_${nonce}_${i}___`;
 
   // Protect pre and textarea
   let out = html.replace(/<(pre|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi, (m) => {
@@ -145,9 +152,9 @@ export function minifyHtml(html: string): string {
   // Collapse redundant whitespace in text
   out = out.replace(/\s{2,}/g, ' ');
 
-  // Restore preserved blocks
+  // Restore preserved blocks (split/join = replace-all, function-safe for `$` in content)
   for (let i = 0; i < preserved.length; i++) {
-    out = out.replace(placeholder(i), preserved[i]);
+    out = out.split(placeholder(i)).join(preserved[i]);
   }
 
   return out.trim();

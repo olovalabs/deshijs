@@ -54,18 +54,34 @@ export interface CompileResult {
 }
 
 const compileMemo = new Map<string, CompileResult>();
+const MAX_COMPILE_MEMO = 400;
+
+/** Test hook — clears the module-global compile cache. */
+export function __clearCompileMemoForTests(): void {
+  compileMemo.clear();
+}
 
 export function compile(source: string, opts: CompileOptions): CompileResult {
   const file = opts.file;
   const minify = opts.minify ?? true;
-  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${hashString(source)}`;
+  // NB: cache key uses the *post-markdown* source so `.md` frontmatter edits
+  // invalidate correctly even when the file path + flags are unchanged.
+  const effectiveSource = file.endsWith('.md') ? markdownToDeshi(source) : source;
+  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${hashString(effectiveSource)}`;
   const cached = compileMemo.get(memoKey);
-  if (cached) return cached;
-  if (compileMemo.size > 400) compileMemo.clear();
+  if (cached) {
+    return {
+      ...cached,
+      meta: { ...cached.meta },
+      css: { ...cached.css },
+      diagnostics: [...cached.diagnostics],
+    };
+  }
+  if (compileMemo.size >= MAX_COMPILE_MEMO) compileMemo.clear();
 
   const diagnostics: Diagnostic[] = [];
   const hash = hashString(file);
-  if (file.endsWith('.md')) source = markdownToDeshi(source);
+  source = effectiveSource;
 
   // 1. block split (parse5 tokenizer)
   const blocks = splitBlocks(source, file);
@@ -100,7 +116,6 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     else global += minifyCss(s.content);
   }
   const hasScoped = scoped.length > 0;
-  // inline styles are tracked separately but count toward hasScoped for injection check
   void inlineStyles;
 
   // 4. template parse (parse5 + acorn-jsx) incl. jsxToTemplate / components / slots / head

@@ -69,8 +69,15 @@ export function markdownToHtml(md: string): string {
     out.push('<p>' + inline(para.join(' ')) + '</p>');
     para = [];
   };
-  const isTableRow = (l: string) => l.includes('|') && l.trim().startsWith('|') === false ? false : /^\s*\|.*\|\s*$/.test(l) || /^\s*[^|]+\|[^|]+/.test(l);
-  const isTableSep = (l: string) => /^\s*\|?(\s*:?-+:?\s*\|)+(\s*:?-+:?\s*\|?)\s*$/.test(l);
+  const isTableRow = (l: string): boolean => /^\s*\|.*\|\s*$/.test(l) || /^\s*[^|\s][^|]*\|/.test(l);
+  // Separator row: every pipe-separated cell must be dashes/colons
+  // (`| --- |`, `|:--|--:|`, `--- | ---`). Cell-based check so single-column
+  // tables (`| h |` / `| --- |` / `| c |`) work — the old regex required 2+ cells.
+  const isTableSep = (l: string): boolean => {
+    if (!l.includes('|') || !l.includes('-')) return false;
+    const cells = l.trim().replace(/^\||\|$/g, '').split('|');
+    return cells.length > 0 && cells.every((c) => /^\s*:?-+:?\s*$/.test(c));
+  };
   while (i < lines.length) {
     const line = lines[i];
     // table: header | sep | rows

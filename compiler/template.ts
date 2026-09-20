@@ -60,6 +60,24 @@ function placeholder(i: number): string {
   return `${PLACEHOLDER}${i}__`;
 }
 
+/** True when the `{` at `bracePos` sits inside a `"…"` / `'…'` quoted run
+ * that started after `tagStart` (i.e. inside an attribute value). Scans back
+ * to the enclosing `<`, tracking quote state — cheap (tags are short). */
+function inQuotedAttr(src: string, bracePos: number): boolean {
+  const lt = src.lastIndexOf('<', bracePos);
+  if (lt === -1) return false;
+  let quote: string | null = null;
+  for (let k = lt; k < bracePos; k++) {
+    const c = src[k];
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    }
+  }
+  return quote !== null;
+}
+
 function pretokenize(src: string, ctx: TemplateContext): Pretokenized {
   let out = '';
   const exprs: Expression[] = [];
@@ -142,7 +160,12 @@ function pretokenize(src: string, ctx: TemplateContext): Pretokenized {
             const stop = end === -1 ? src.length : end + 1;
             out += src.slice(i, stop);
             i = stop;
-          } else if (ch === '{') {
+          } else if (ch === '{' && !inQuotedAttr(src, i)) {
+            // A raw `{` inside `attr="…"` quoted text is NOT an expression —
+            // it is passed through to parse5/convertAttrs, which raises the
+            // PF1002 "mixed text + expression" diagnostic. Only a `{` in
+            // tag structure position (attr name / unquoted value / spread)
+            // starts a real expression here.
             out += expression(i, src.startsWith('{...', i));
             // advance i to after the closing brace: recover from the map
             i = map[map.length - 1][1];
@@ -196,11 +219,20 @@ function pretokenize(src: string, ctx: TemplateContext): Pretokenized {
     i++;
   }
 
+  const sortedMap = [...map].sort((a, b) => a[0] - b[0]);
   const toOrig = (p: number): number => {
+    // binary search: map grows with every expression/char, linear scan was O(n²)
+    let lo = 0;
+    let hi = sortedMap.length - 1;
     let base: [number, number] = [0, 0];
-    for (const m of map) {
-      if (m[0] <= p) base = m;
-      else break;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (sortedMap[mid][0] <= p) {
+        base = sortedMap[mid];
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
     }
     return base[1] + (p - base[0]);
   };
