@@ -1,0 +1,29 @@
+<script>
+  import Header from '../components/Header.deshi';
+  import Sidebar from '../components/Sidebar.deshi';
+
+  const brand = props.brand || "Deshi";
+</script>
+
+<!-- STANDALONE 2-COLUMN WIDE ARTICLE / GUIDE LAYOUT -->
+<div class="min-h-screen flex flex-col w-full">
+  <!-- Mobile Sidebar Checkbox Toggle Controller (0 JS) -->
+  <input type="checkbox" id="mobile-sidebar-toggle" class="peer hidden" />
+
+  <!-- Backdrop overlay for mobile sidebar drawer (0 JS) -->
+  <label for="mobile-sidebar-toggle" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden peer-checked:block lg:hidden cursor-pointer"></label>
+
+  <Header brand={brand} />
+
+  <!-- 2-COLUMN WIDE ARTICLE BODY -->
+  <div class="flex-1 flex w-full">
+    <Sidebar brand={brand} />
+
+    <!-- CENTER EXPANDED CONTENT -->
+    <main class="flex-1 min-w-0 w-full px-4 sm:px-8 py-8 flex justify-center">
+      <div class="w-full max-w-4xl mx-auto">
+        <slot />
+      </div>
+    </main>
+  </div>
+</div>

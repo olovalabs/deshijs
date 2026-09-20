@@ -7,16 +7,19 @@
   "packageManager": "bun@1.4.0",
   "workspaces": [
     "packages/*",
-    "examples/*"
+    "examples/*",
+    "docs"
   ],
   "trustedDependencies": [
     "esbuild"
   ],
   "scripts": {
-    "build": "bun run --filter deshijs build && bun run --filter deshi-playground build",
+    "build": "bun run --filter deshijs build && bun run --filter deshi-playground build && bun run --filter deshi-docs build",
     "build:compiler": "bun run --filter deshijs build",
     "dev": "bun run build:compiler && bun run --filter deshi-playground dev",
+    "dev:docs": "bun run build:compiler && bun run --filter deshi-docs dev",
     "preview": "bun run --filter deshi-playground preview",
+    "preview:docs": "bun run --filter deshi-docs preview",
     "test": "bun run --filter deshijs test",
     "test:watch": "bun run --filter deshijs test:watch",
     "typecheck": "bun run --filter deshijs typecheck && bun run --filter deshi-playground typecheck"

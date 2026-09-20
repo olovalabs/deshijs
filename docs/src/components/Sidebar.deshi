@@ -1,0 +1,133 @@
+<script>
+  const brand = props.brand || "Deshi Docs";
+  const active = props.active || "";
+</script>
+
+<!-- LEFT SIDEBAR (Pinned to Left Edge, w-64, 0 JS) -->
+<aside class="fixed inset-y-0 left-0 z-50 w-64 bg-[#0c0d10] border-r border-[#1c1d22] overflow-y-auto px-4 py-4 scrollbar-thin transition-transform duration-300 ease-in-out -translate-x-full peer-checked:translate-x-0 lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14 lg:bg-[#0c0d10]/60 shrink-0">
+  
+  <!-- Mobile Drawer Close Header (0 JS) -->
+  <div class="flex items-center justify-between mb-3 pb-3 border-b border-[#1c1d22] lg:hidden">
+    <div class="flex items-center gap-2">
+      <img src="/deshi.svg" alt="Deshi Logo" class="w-5 h-5 shrink-0 object-contain" />
+      <span class="text-xs font-bold text-white font-sans">{brand}</span>
+    </div>
+    <label for="mobile-sidebar-toggle" class="p-1.5 text-zinc-400 hover:text-white rounded-md hover:bg-[#1c1d22] cursor-pointer" aria-label="Close sidebar">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </label>
+  </div>
+
+  <!-- Quick Search indicator in sidebar -->
+  <div class="mb-4">
+    <a href="/docs" class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[#14151a] hover:bg-[#1b1d22] border border-[#23242c] text-zinc-300 transition text-xs group">
+      <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+      <span class="font-medium text-white">Deshijs Compiler</span>
+      <span class="ml-auto text-[10px] text-zinc-500 font-mono">v1.0</span>
+    </a>
+  </div>
+
+  <!-- Nav Tree -->
+  <nav class="space-y-4 text-xs font-sans">
+
+    <!-- 1. GETTING STARTED GROUP -->
+    <div>
+      <div class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        Getting Started
+      </div>
+      <div class="space-y-0.5">
+        <a href="/docs" class={active === 'overview' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Overview & Quickstart
+        </a>
+        <a href="/docs/architecture" class={active === 'architecture' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Architecture & Pipeline
+        </a>
+        <a href="/docs/vite-plugin" class={active === 'vite-plugin' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Vite Plugin & Dev Server
+        </a>
+      </div>
+    </div>
+
+    <!-- 2. CORE CONCEPTS GROUP -->
+    <div>
+      <div class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        Core Concepts
+      </div>
+      <div class="space-y-0.5">
+        <a href="/docs/template-syntax" class={active === 'template-syntax' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Template Syntax & AST
+        </a>
+        <a href="/docs/islands" class={active === 'islands' ? "flex items-center justify-between px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          <span>Islands & client:*</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-primary/20 text-primary font-mono font-semibold">0JS</span>
+        </a>
+        <a href="/docs/directives" class={active === 'directives' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Directives & Astro Parity
+        </a>
+        <a href="/docs/styling" class={active === 'styling' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Scoped Styling & CSS
+        </a>
+      </div>
+    </div>
+
+    <!-- 3. ROUTING & DATA GROUP -->
+    <div>
+      <div class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        Routing & Data
+      </div>
+      <div class="space-y-0.5">
+        <a href="/docs/routing" class={active === 'routing' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          File-Based Routing
+        </a>
+        <a href="/docs/static-params" class={active === 'static-params' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Static Params & Paths
+        </a>
+        <a href="/docs/content-collections" class={active === 'content-collections' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Content Collections
+        </a>
+        <a href="/docs/markdown" class={active === 'markdown' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Markdown Engine & GFM
+        </a>
+      </div>
+    </div>
+
+    <!-- 4. CLIENT & RUNTIME GROUP -->
+    <div>
+      <div class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        Client & Runtime
+      </div>
+      <div class="space-y-0.5">
+        <a href="/docs/client-router" class={active === 'client-router' ? "flex items-center justify-between px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          <span>Client Router & SPA</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-blue-950/80 text-blue-400 border border-blue-800/40 font-mono">1KB</span>
+        </a>
+        <a href="/docs/runtime-api" class={active === 'runtime-api' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          Runtime API & Astro.*
+        </a>
+        <a href="/docs/config" class={active === 'config' ? "block px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "block px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          deshi.config.ts Reference
+        </a>
+      </div>
+    </div>
+
+    <!-- 5. REFERENCE GROUP -->
+    <div>
+      <div class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+        Reference
+      </div>
+      <div class="space-y-0.5">
+        <a href="/docs/api-reference" class={active === 'api-reference' ? "flex items-center justify-between px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          <span>Programmatic API</span>
+          <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-950/80 text-purple-300 border border-purple-800/40">API</span>
+        </a>
+        <a href="/docs/error-catalog" class={active === 'error-catalog' ? "flex items-center justify-between px-2.5 py-1.5 rounded-md bg-[#1f2026] text-white font-medium border border-[#2d2f38]" : "flex items-center justify-between px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-[#16171b] transition"}>
+          <span>Diagnostic Catalog</span>
+          <span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800/40 font-mono">PF*</span>
+        </a>
+      </div>
+    </div>
+
+  </nav>
+</aside>

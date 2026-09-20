@@ -1,0 +1,77 @@
+<script>
+  const title = props.title || "On this page";
+  const items = props.items || [
+    { href: "#overview", label: "Overview" },
+  ];
+</script>
+
+<!-- RIGHT SIDEBAR: "ON THIS PAGE" (Pinned to Right Edge, w-60) -->
+<aside class="hidden xl:block w-60 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto px-5 py-8 border-l border-[#1c1d22]/40 scrollbar-thin">
+  <div class="space-y-6">
+    <div>
+      <h2 class="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        <span>{title}</span>
+      </h2>
+      
+      <!-- TOC link tree (Dynamically updated for .md headings) -->
+      <ul id="toc-list" class="space-y-1 text-xs border-l border-[#202128]">
+        {items.map((item) => (
+          <li>
+            <a href={item.href} class="block -ml-[1px] pl-3 py-1 border-l-2 border-transparent text-zinc-400 hover:text-white hover:border-primary transition">
+              {item.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div class="pt-4 border-t border-[#1c1d22]/60 text-[11px] text-zinc-500 space-y-2">
+      <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="flex items-center gap-2 hover:text-zinc-300 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+        <span>Edit this page on GitHub</span>
+      </a>
+      <a href="#top" class="flex items-center gap-2 hover:text-zinc-300 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+        <span>Back to top</span>
+      </a>
+    </div>
+  </div>
+</aside>
+
+<!-- Auto-generate Table of Contents from headings on page load and client navigation -->
+<script client>
+  (() => {
+    function refreshToc() {
+      const list = document.getElementById('toc-list');
+      const headings = document.querySelectorAll('main h2[id], main h3[id]');
+      if (!list || headings.length === 0) return;
+      list.innerHTML = '';
+      headings.forEach((h) => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = '#' + h.id;
+        a.textContent = h.textContent.replace(/^#\s*/, '');
+        const isH3 = h.tagName.toLowerCase() === 'h3';
+        a.className = isH3
+          ? 'block pl-5 py-0.5 text-zinc-500 hover:text-zinc-200 text-[11px] transition'
+          : 'block -ml-[1px] pl-3 py-1 border-l-2 border-transparent text-zinc-400 hover:text-white hover:border-primary transition text-xs';
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+    }
+    refreshToc();
+    window.addEventListener('deshi:navigated', refreshToc);
+  })();
+</script>
