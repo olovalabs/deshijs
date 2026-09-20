@@ -1,4 +1,4 @@
-// @deshi/routes — file-system route scanning, route tree, matcher.
+// deshi routes — file-system route scanning, route tree, matcher.
 // The matcher is shared verbatim by the dev server, the build and the client router.
 import type { Diagnostic } from './types';
 

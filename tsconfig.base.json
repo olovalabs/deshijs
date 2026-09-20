@@ -9,25 +9,12 @@
     ],
     "module": "ESNext",
     "skipLibCheck": true,
-    "types": [
-      "node"
-    ],
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
-  },
-  "include": [
-    "src",
-    "compiler",
-    "compiler/client-directives.d.ts"
-  ]
+  }
 }

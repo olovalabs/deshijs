@@ -1,4 +1,4 @@
-import { defineConfig } from './compiler/config';
+import { defineConfig } from 'deshi/config';
 
 export default defineConfig({
   site: 'https://deshi.example.com',

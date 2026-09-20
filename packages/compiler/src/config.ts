@@ -132,7 +132,23 @@ export async function loadConfig(root: string): Promise<DeshiConfig> {
           platform: 'node',
           format: 'esm',
           write: false,
-          packages: 'external',
+          // The bundle is re-imported from a `data:` URL, which cannot resolve
+          // bare specifiers — so `deshi/*` (e.g. defineConfig) is inlined while
+          // every other package stays external.
+          plugins: [
+            {
+              name: 'deshi-config-externals',
+              setup(build) {
+                build.onResolve({ filter: /.*/ }, (args) => {
+                  const spec = args.path;
+                  const isPath = spec.startsWith('.') || spec.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(spec);
+                  if (isPath) return;
+                  if (spec === 'deshi' || spec.startsWith('deshi/')) return;
+                  return { path: spec, external: true };
+                });
+              },
+            },
+          ],
         });
         const code = res.outputFiles?.[0]?.text;
         if (code) {

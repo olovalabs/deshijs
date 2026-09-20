@@ -1,4 +1,4 @@
-// @deshi/compiler — compile(source, options) => { code, css, client, meta, diagnostics }
+// deshi — compile(source, options) => { code, css, client, meta, diagnostics }
 import { splitBlocks } from './blocks';
 import { analyzeScript, emptyScript, type ScriptInfo } from './script';
 import { parseTemplate, walkNodes } from './template';
@@ -100,7 +100,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   for (const s of blocks.styles) {
     if (s.attrs.lang && s.attrs.lang !== 'css') {
       diagnostics.push(
-        makeDiagnostic('PF2011', `<style lang="${s.attrs.lang}"> is handed to Vite's CSS pipeline in @deshi/vite; the playground passes it through as CSS`, file, source, s.start, 'warning'),
+        makeDiagnostic('PF2011', `<style lang="${s.attrs.lang}"> is handed to Vite's CSS pipeline in deshi/vite; the playground passes it through as CSS`, file, source, s.start, 'warning'),
       );
     }
     const isInline = 'is:inline' in s.attrs;

@@ -1,4 +1,4 @@
-// In-browser equivalent of the @deshi/vite build orchestration (§6.3 / §6.5):
+// In-browser equivalent of the deshi/vite build orchestration (§6.3 / §6.5):
 // compile every .html, evaluate render modules, enumerate URLs, render each URL,
 // merge <head>, inject CSS / client bootstrap, write the output tree + manifest,
 // and enforce the zero-JS gate.
@@ -685,6 +685,7 @@ export async function buildToDisk(
       css: options.css ?? 'inline',
       minify: options.minify ?? true,
       appDir,
+      site: options.site,
     }
   );
 

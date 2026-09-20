@@ -1,4 +1,4 @@
-// @deshi/compiler/runtime — helpers imported by every compiled render module.
+// deshi/runtime — helpers imported by every compiled render module.
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { islandInlineScript, stampIslandRoot, type IslandStrategy } from './islands';

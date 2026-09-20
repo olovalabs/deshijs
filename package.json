@@ -1,29 +1,27 @@
 {
-  "name": "deshi-app",
+  "name": "deshi-monorepo",
   "version": "1.0.0",
-  "description": "Static site framework for .deshi files",
+  "private": true,
+  "description": "Deshi monorepo — the publishable `deshi` compiler package and an example site that consumes it.",
   "type": "module",
+  "packageManager": "bun@1.4.0",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "trustedDependencies": [
+    "esbuild"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "sync-icon": "node .vscode/sync-icon.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "build": "bun run --filter deshi build && bun run --filter deshi-playground build",
+    "build:compiler": "bun run --filter deshi build",
+    "dev": "bun run build:compiler && bun run --filter deshi-playground dev",
+    "preview": "bun run --filter deshi-playground preview",
+    "test": "bun run --filter deshi test",
+    "test:watch": "bun run --filter deshi test:watch",
+    "typecheck": "bun run --filter deshi typecheck && bun run --filter deshi-playground typecheck"
   },
-  "dependencies": {
-    "@types/css-tree": "^3.2.0",
-    "acorn": "^8.18.0",
-    "acorn-jsx": "^5.3.2",
-    "css-tree": "^3.2.1",
-    "esbuild": "^0.28.2",
-    "parse5": "^8.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22.19.17",
-    "typescript": "^7.0.2",
-    "vite": "^7.3.2",
-    "vitest": "^5.0.1"
+  "engines": {
+    "node": ">=18"
   }
 }
