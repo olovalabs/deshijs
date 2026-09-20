@@ -33,6 +33,7 @@ import {
   type SlotFns,
 } from './runtime';
 import { DeshiError, type Diagnostic } from './types';
+import { buildReactSite, isReactProject } from './react-build';
 
 export interface Project {
   /** file path (project-relative, e.g. "src/app/page.html") → source */
@@ -165,6 +166,12 @@ function jsModuleBody(source: string, file: string): string {
 }
 
 export async function build(project: Project, options: BuildOptions = {}): Promise<BuildResult> {
+  // TSX is the primary authoring mode. It renders React on the server/build
+  // only; browser JavaScript is emitted exclusively for *.client.tsx islands.
+  if (isReactProject(project.files, options.appDir)) {
+    return buildReactSite(project, options);
+  }
+
   const opts = {
     output: options.output ?? ('index' as const),
     router: options.router ?? true,
@@ -667,6 +674,9 @@ export async function buildToDisk(
         (item.name.endsWith('.deshi') ||
           item.name.endsWith('.html') ||
           item.name.endsWith('.md') ||
+          item.name.endsWith('.tsx') ||
+          item.name.endsWith('.jsx') ||
+          item.name.endsWith('.css') ||
           item.name.endsWith('.ts') ||
           item.name.endsWith('.js'))
       ) {
@@ -685,6 +695,8 @@ export async function buildToDisk(
       css: options.css ?? 'inline',
       minify: options.minify ?? true,
       appDir,
+      site: options.site,
+      stableCssUrl: options.stableCssUrl,
     }
   );
 

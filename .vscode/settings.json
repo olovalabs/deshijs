@@ -1,58 +1,15 @@
 {
-  "files.associations": {
-    "*.deshi": "html"
-  },
-  "[html]": {
-    "editor.quickSuggestions": {
-      "other": true,
-      "comments": false,
-      "strings": true
-    },
-    "editor.suggest.insertMode": "replace",
-    "editor.linkedEditing": true,
-    "editor.autoClosingBrackets": "always",
-    "editor.autoClosingQuotes": "always",
-    "editor.autoClosingTags": true,
-    "editor.tabCompletion": "on",
-    "editor.snippetSuggestions": "inline",
-    "editor.wordBasedSuggestions": "matchingDocuments"
-  },
-  "html.autoClosingTags": true,
-  "html.hover.documentation": true,
-  "html.hover.references": true,
-  "html.suggest.html5": true,
-  "html.validate.scripts": true,
-  "html.validate.styles": true,
-  "html.format.enable": true,
-  "html.format.templating": true,
-  "html.mirrorCursorOnMatchingTag": true,
-  "css.validate": true,
-  "javascript.validate.enable": true,
-  "javascript.suggest.enabled": true,
-  "javascript.suggest.autoImports": true,
-  "emmet.includeLanguages": {
-    "html": "html"
-  },
-  "emmet.triggerExpansionOnTab": true,
-  "emmet.showSuggestionsAsSnippets": true,
-  "emmet.syntaxProfiles": {
-    "html": {
-      "self_closing_tag": true
-    }
-  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.importModuleSpecifierEnding": "minimal",
+  "typescript.suggest.autoImports": true,
   "editor.linkedEditing": true,
   "editor.quickSuggestions": {
     "other": true,
     "comments": false,
     "strings": true
   },
-  "workbench.iconTheme": "vscode-icons",
-  "vsicons.customIconFolderPath": ".vscode",
-  "vsicons.associations.files": [
-    {
-      "icon": "deshi",
-      "extensions": ["deshi"],
-      "format": "svg"
-    }
-  ]
+  "emmet.includeLanguages": {
+    "typescriptreact": "html"
+  },
+  "emmet.triggerExpansionOnTab": true
 }

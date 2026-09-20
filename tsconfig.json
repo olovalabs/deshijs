@@ -8,6 +8,8 @@
       "DOM.Iterable"
     ],
     "module": "ESNext",
+    "jsx": "react-jsx",
+    "allowJs": true,
     "skipLibCheck": true,
     "types": [
       "node"

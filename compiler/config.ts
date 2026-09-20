@@ -68,7 +68,7 @@ export const defaultConfig: Required<Pick<DeshiConfig, 'output' | 'trailingSlash
   trailingSlash: 'ignore',
   appDir: 'src',
   outDir: 'dist',
-  router: true,
+  router: false,
   css: 'inline',
   minify: true,
   site: undefined as unknown as string,

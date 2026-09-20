@@ -45,7 +45,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
   }
 
   function isDeshiSource(file: string): boolean {
-    return /\.(deshi|md|html)$/.test(file);
+    return /\.(deshi|md|html|tsx|jsx|ts|js|css)$/.test(file);
   }
 
   function cssOnlyChange(
@@ -155,7 +155,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         return '\0virtual:_deshi/router.js';
       }
       // Per-file CSS (ends in .css so vite:css transforms it).
-      if (/^\/_deshi\/[^/]+\.css$/.test(id.split('?')[0]) || id.split('?')[0].startsWith('/_deshi/c/')) {
+      if (/^\/_deshi\/[^/]+\.css$/.test(id.split('?')[0]) || id.split('?')[0].startsWith('/_deshi/islands/') || id.split('?')[0].startsWith('/_deshi/c/')) {
         return id;
       }
       return null;
@@ -183,7 +183,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           const css = deshiCss.get(clean);
           if (css !== undefined) return css;
         }
-        if (clean.startsWith('/_deshi/c/') && deshiClientJs.has(clean)) {
+        if ((clean.startsWith('/_deshi/c/') || clean.startsWith('/_deshi/islands/')) && deshiClientJs.has(clean)) {
           return deshiClientJs.get(clean)!;
         }
       }
@@ -251,7 +251,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         // as text/css so <link> stylesheets apply. Vite's default JS-module
         // form only works for JS `import`s, so request `?direct` internally —
         // page markup stays identical between dev and prod.
-        if (url.startsWith('/_deshi/c/') && deshiClientJs.has(url)) {
+        if ((url.startsWith('/_deshi/c/') || url.startsWith('/_deshi/islands/')) && deshiClientJs.has(url)) {
           res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
           res.statusCode = 200;
           res.end(deshiClientJs.get(url)!);
@@ -296,8 +296,8 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
               const rel = base ? `${base}/${item.name}` : item.name;
               if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules' && item.name !== 'compiler') {
                 Object.assign(out, readFilesRecursively(full, rel));
-              } else if (item.isFile() && (item.name.endsWith('.deshi') || item.name.endsWith('.html') || item.name.endsWith('.md') || item.name.endsWith('.ts') || item.name.endsWith('.js'))) {
-                out[`src/${rel}`] = fs.readFileSync(full, 'utf-8');
+              } else if (item.isFile() && /\.(deshi|html|md|tsx|jsx|ts|js|css)$/.test(item.name)) {
+                out[`${options.appDir ?? 'src'}/${rel}`] = fs.readFileSync(full, 'utf-8');
               }
             }
             return out;
@@ -337,11 +337,28 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
             }
           }
 
+          if (!result.ok) {
+            const details = result.diagnostics
+              .filter((item) => item.severity === 'error')
+              .map((item) => `[Deshi ${item.code}] ${item.message} (${item.file}:${item.line}:${item.column})`)
+              .join('\n');
+            throw new Error(details || 'Deshi static render failed.');
+          }
+
           // Refresh the virtual CSS registry (dev serves per-file CSS through
           // Vite's pipeline) and drop Vite's cached transform for changed files.
           for (const f of result.files) {
-            if (f.kind === 'js' && ('/' + f.path).startsWith('/_deshi/c/')) {
-              deshiClientJs.set('/' + f.path, f.content);
+            if (
+              f.kind === 'js' &&
+              (('/' + f.path).startsWith('/_deshi/c/') || ('/' + f.path).startsWith('/_deshi/islands/'))
+            ) {
+              const islandUrl = '/' + f.path;
+              if (deshiClientJs.get(islandUrl) !== f.content) {
+                deshiClientJs.set(islandUrl, f.content);
+                server.moduleGraph.urlToModuleMap.forEach((mod, key) => {
+                  if (key === islandUrl || key.startsWith(islandUrl + '?')) server.moduleGraph.invalidateModule(mod);
+                });
+              }
             }
             if (f.kind !== 'css') continue;
             const url = '/' + f.path;
@@ -436,7 +453,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       const fullOutDir = path.resolve(root, outDir);
 
       // Perform SSG build into dist/ — merges vite config + deshi.config.ts + plugin options
-      await buildToDisk(
+      const result = await buildToDisk(
         root,
         {
           output: (dc as any).output === 'static' ? 'index' : (dc as any).output ?? 'index',
@@ -448,6 +465,13 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         } as any,
         outDir
       );
+      if (!result.ok) {
+        const details = result.diagnostics
+          .filter((item) => item.severity === 'error')
+          .map((item) => `[Deshi ${item.code}] ${item.message} (${item.file}:${item.line}:${item.column})`)
+          .join('\n');
+        throw new Error(`Static generation failed:\n${details}`);
+      }
 
       // Clean up any virtual entry JS chunk from rollup
       if (fs.existsSync(fullOutDir)) {

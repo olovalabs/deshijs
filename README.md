@@ -1,31 +1,94 @@
-# Deshi Framework
+# Deshi
 
-A compiler-based SSG (Static Site Generation) framework for `.deshi` files, inspired by Astro.
+A static-first React framework: author pages and components in **TypeScript + JSX**, render them to HTML at build time, and ship browser JavaScript only for explicit client islands.
 
-## Structure
+## The model
 
-```text
-├── compiler/          # Full compiler & Vite plugin (independent from your app)
-├── src/               # Your application routes ONLY
-│   ├── layout.deshi   # Main entry point layout
-│   └── page.deshi     # Root ("/") route page
-├── dist/              # Pure static SSG output after build
-│   └── index.html     # Zero-JS static HTML
-├── vite.config.ts     # Vite configuration powered by deshi()
-└── package.json
+- `*.tsx` — server/static React components. They run in development and at build time; React is not shipped to the browser.
+- `*.client.tsx` — interactive React islands. Each island is bundled separately and loaded only on a page that renders it.
+- `page.tsx` and `layout.tsx` — file-based routes and layouts.
+- Production output — static HTML, CSS, and only the island chunks actually used.
+
+This is React authoring, not a client-rendered React SPA by default.
+
+## Example
+
+A static page is an ordinary React component:
+
+```tsx
+// src/page.tsx
+export default function Page() {
+  return (
+    <main>
+      <title>Home</title>
+      <h1>This is rendered to HTML</h1>
+    </main>
+  );
+}
 ```
 
-## Workflows
+Interactive behavior goes in a separate file:
 
-### 1. In Development (`npm run dev`)
-- Starts the Vite development server.
-- The server runtime middleware intercepts route requests and compiles `.deshi` files on the fly into HTML with live HMR.
+```tsx
+// src/components/Counter.client.tsx
+'use client';
 
-### 2. In Production (`npm run build`)
-- Runs the AST compiler and SSG build.
-- Compiles `src/layout.deshi` and `src/page.deshi`.
-- Emits pure static HTML into `dist/index.html` (like Astro).
-- Ships **0 bytes of client JS**.
+import { useState } from 'react';
 
-### 3. Preview Production Build (`npm run preview`)
-- Serves the static `dist/` directory locally.
+export default function Counter({ initialCount = 0, client = 'load' }) {
+  const [count, setCount] = useState(initialCount);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+Use it from a server page and choose when it hydrates:
+
+```tsx
+import Counter from './components/Counter.client';
+
+export default function Page() {
+  return <Counter client="visible" initialCount={0} />;
+}
+```
+
+Supported strategies are `load`, `visible`, `idle`, `click`, `media`, and `only`. For `media`, also pass a `media` query prop.
+
+## File-based routing
+
+```text
+src/
+├── layout.tsx                 # Required root document layout
+├── page.tsx                   # /
+├── not-found.tsx              # /404
+├── about/page.tsx             # /about
+├── blog/layout.tsx            # Nested layout
+├── blog/page.tsx              # /blog
+├── blog/[slug]/page.tsx       # Dynamic static routes
+└── components/
+    ├── Card.tsx               # Static/server component
+    └── Counter.client.tsx     # Browser island
+```
+
+Dynamic routes export their build-time params:
+
+```tsx
+export async function getStaticParams() {
+  return [{ slug: 'hello' }, { slug: 'tsx' }];
+}
+
+export default function Article({ params }: { params: { slug: string } }) {
+  return <h1>{params.slug}</h1>;
+}
+```
+
+## Commands
+
+```bash
+npm install
+npm run dev       # Vite development server
+npm run build     # Static production build in dist/
+npm run preview   # Preview dist/
+npm run typecheck
+```
+
+With the router disabled (the default), a page containing only regular `.tsx` components has no `<script>` and no React runtime. A `.client.tsx` import creates a clear server/client boundary and emits an island chunk only when rendered.
