@@ -8,6 +8,7 @@ JS with `client:*` directives.
 - **Native Vite integration** — `.deshi` files are transformed by the plugin, so
   HMR, `src/public/` assets, and CSS all flow through Vite.
 - **Scoped CSS** with no runtime — `<style>` blocks are scoped at compile time.
+- **Markdown & MDX support** (`.md`, `.mdx`) — first-class routing with frontmatter bindings, GFM, Shiki build-time syntax highlighting, and native `.deshi` component & island embedding.
 
 ## Install
 
@@ -88,13 +89,15 @@ The directive types are types-only. Opt in with a triple-slash reference:
 
 ```text
 src/
-├── layout.deshi          # root layout (wraps every route)
-├── page.deshi            # "/" route
-├── not-found.deshi       # 404
-├── about/page.deshi      # /about
+├── layout.deshi            # root layout (wraps every route)
+├── page.deshi              # "/" route
+├── not-found.deshi         # 404
+├── about/page.deshi        # /about
+├── docs/overview.md        # /docs/overview (Markdown with GFM & Shiki)
+├── guide/page.mdx          # /guide (MDX with components & islands)
 ├── blog/[slug]/page.deshi  # dynamic route (needs getStaticParams())
 ├── components/Counter.deshi
-└── public/               # copied verbatim to dist/ (favicon, robots.txt, ...)
+└── public/                 # copied verbatim to dist/ (favicon, robots.txt, ...)
 ```
 
 A `.deshi` file is a template plus optional block-level tags:
@@ -126,6 +129,51 @@ A `.deshi` file is a template plus optional block-level tags:
   `client:click`, `client:media="(max-width: 600px)"`, `client:only`.
 - Attribute directives: `set:html`, `set:text`, `class:list`, `define:vars`,
   `transition:*`.
+
+## Markdown & MDX Support
+
+Deshijs natively supports `.md` and `.mdx` files alongside `.deshi` routes with zero-config file-system routing.
+
+### Markdown (`.md`)
+
+- **YAML Frontmatter**: Parsed at build time into bindings (`title`, `description`, `frontmatter.*`).
+- **GitHub Flavored Markdown (GFM)**: Built-in tables, task lists, and auto-slugged heading IDs.
+- **Build-Time Highlighting (Shiki)**: Code fences are highlighted at build time — zero JavaScript shipped to the client.
+- **Custom Layouts**: Wrap your content in a layout via frontmatter (`layout: "../layouts/ArticleLayout.deshi"`).
+
+### MDX (`.mdx`)
+
+`.mdx` brings full component interactivity to Markdown documents:
+
+- **Embed `.deshi` Components**: Import and render components directly inside Markdown content.
+- **Interactive Client Islands**: Use `client:*` hydration directives (`client:visible`, `client:load`, etc.) inside `.mdx`.
+- **Dynamic Expressions**: Embed JS expressions `{frontmatter.title}` directly in markup.
+- **Dynamic Routing**: Export `getStaticParams()` from `.mdx` files for data-driven routes.
+
+```mdx
+---
+title: Getting Started with Deshijs
+description: Quickstart guide
+layout: ../layouts/GuideLayout.deshi
+---
+
+import Counter from '../components/Counter.deshi';
+import Callout from '../components/Callout.deshi';
+
+# {frontmatter.title}
+
+Welcome to Deshijs! Interactive islands work seamlessly in MDX:
+
+<Counter client:visible client:props={{ start: 0 }} />
+
+<Callout type="tip">
+  This is a static component rendered directly inside MDX.
+</Callout>
+
+export async function getStaticParams() {
+  return [{ slug: 'intro' }, { slug: 'advanced' }];
+}
+```
 
 ## Programmatic API
 
