@@ -1,4 +1,4 @@
-# deshi
+# deshijs
 
 Compiler and [Vite](https://vite.dev) plugin for `.deshi` — a Zero-JS static
 site generator. Compiles routes to plain static HTML; islands opt into client
@@ -12,7 +12,9 @@ JS with `client:*` directives.
 ## Install
 
 ```bash
-bun add deshi vite
+bun add deshijs vite
+# or
+npm install deshijs vite
 ```
 
 `vite` is an optional peer dependency — it's only needed if you use the plugin.
@@ -22,7 +24,7 @@ bun add deshi vite
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
-import deshi from 'deshi/vite';
+import deshi from 'deshijs/vite';
 
 export default defineConfig({
   plugins: [deshi({ router: true })],
@@ -32,7 +34,7 @@ export default defineConfig({
 
 ```ts
 // deshi.config.ts
-import { defineConfig } from 'deshi/config';
+import { defineConfig } from 'deshijs/config';
 
 export default defineConfig({
   site: 'https://example.com',

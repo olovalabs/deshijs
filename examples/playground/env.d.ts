@@ -1,1 +1,1 @@
-/// <reference types="deshi/client-directives" />
+/// <reference types="deshijs/client-directives" />

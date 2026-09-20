@@ -143,7 +143,7 @@ export async function loadConfig(root: string): Promise<DeshiConfig> {
                   const spec = args.path;
                   const isPath = spec.startsWith('.') || spec.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(spec);
                   if (isPath) return;
-                  if (spec === 'deshi' || spec.startsWith('deshi/')) return;
+                  if (spec === 'deshi' || spec.startsWith('deshi/') || spec === 'deshijs' || spec.startsWith('deshijs/')) return;
                   return { path: spec, external: true };
                 });
               },

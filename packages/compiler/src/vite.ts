@@ -146,13 +146,13 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
       if (id === virtualEntryId) {
         return resolvedVirtualEntryId;
       }
-      if (id === 'deshi:content' || id === 'deshi/content') {
+      if (id === 'deshi:content' || id === 'deshi/content' || id === 'deshijs:content' || id === 'deshijs/content') {
         return '\0virtual:deshi/content';
       }
-      if (id === 'deshi:config' || id === 'virtual:deshi/config') {
+      if (id === 'deshi:config' || id === 'virtual:deshi/config' || id === 'deshijs:config' || id === 'virtual:deshijs/config') {
         return '\0virtual:deshi/config';
       }
-      if (id === 'deshi/runtime' || id === virtualRuntimeId) {
+      if (id === 'deshi/runtime' || id === 'deshijs/runtime' || id === virtualRuntimeId || id === 'virtual:deshijs/runtime') {
         return resolvedVirtualRuntimeId;
       }
       if (id.includes('_deshi/router') || id === '/_deshi/router.4f1a9c2e.js') {

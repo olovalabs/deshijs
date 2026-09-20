@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import deshi from "deshi/vite";
+import deshi from "deshijs/vite";
 
 export default defineConfig({
   plugins: [deshi({ router: true })],

@@ -1,6 +1,6 @@
 {
-  "name": "deshi",
-  "version": "0.1.0",
+  "name": "deshijs",
+  "version": "3.0.0",
   "description": "Compiler and Vite plugin for .deshi — a zero-JS static site framework.",
   "type": "module",
   "license": "MIT",
