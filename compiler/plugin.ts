@@ -98,6 +98,10 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           },
         },
         base: dc.base ?? cfg.base,
+        // Astro parity: src/public/ is served at / and copied to dist/.
+        // Without this, /favicon.ico falls through to the SPA fallback
+        // and downloads "/" HTML on every page (browser auto-requests it).
+        publicDir: cfg.publicDir ?? 'src/public',
       };
     },
     configResolved(resolvedConfig) {
@@ -244,6 +248,37 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
         if (cleanUrl.length > 1 && cleanUrl.endsWith('/')) {
           res.statusCode = 308;
           res.setHeader('Location', cleanUrl.slice(0, -1) + qs);
+          res.end();
+          return;
+        }
+
+        // Never let the SPA fallback answer favicon requests with HTML.
+        // Browsers auto-request /favicon.ico on every navigation when no
+        // <link rel="icon"> exists — that HTML-blob download is the bug.
+        if (cleanUrl === '/favicon.ico' || cleanUrl === '/favicon.svg') {
+          const root = server.config.root || process.cwd();
+          for (const cand of [
+            path.join(root, 'src/public/favicon.svg'),
+            path.join(root, 'src/public/favicon.ico'),
+            path.join(root, 'public/favicon.svg'),
+            path.join(root, 'public/favicon.ico'),
+          ]) {
+            try {
+              if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
+                const isSvg = cand.endsWith('.svg');
+                res.setHeader('Content-Type', isSvg ? 'image/svg+xml' : 'image/x-icon');
+                res.setHeader('Cache-Control', 'public, max-age=86400');
+                res.statusCode = 200;
+                res.end(fs.readFileSync(cand));
+                return;
+              }
+            } catch {
+              // try next candidate
+            }
+          }
+          // No file on disk — 204 stops the browser retrying + stops the
+          // HTML fallback from being parsed as an icon on every page.
+          res.statusCode = 204;
           res.end();
           return;
         }
@@ -414,6 +449,28 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           return;
         }
         clean = clean.replace(/\/{2,}/g, '/');
+        // Same guard as dev: /favicon.* must never hit the HTML fallback.
+        if (clean === '/favicon.ico' || clean === '/favicon.svg') {
+          const root = config?.root || process.cwd();
+          const outDir = config?.build?.outDir || 'dist';
+          for (const cand of ['favicon.svg', 'favicon.ico']) {
+            try {
+              const f = path.join(path.resolve(root, outDir), cand);
+              if (f.startsWith(path.resolve(root, outDir)) && fs.statSync(f).isFile()) {
+                res.setHeader('Content-Type', cand.endsWith('.svg') ? 'image/svg+xml' : 'image/x-icon');
+                res.setHeader('Cache-Control', 'public, max-age=86400');
+                res.statusCode = 200;
+                res.end(fs.readFileSync(f));
+                return;
+              }
+            } catch {
+              // miss — try next candidate
+            }
+          }
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
         if (clean.length > 1 && clean.endsWith('/')) {
           res.statusCode = 308;
           res.setHeader('Location', clean.slice(0, -1) + qs);

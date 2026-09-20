@@ -4,6 +4,7 @@ const heroColor = "#a3e635";
 const isActive = true;
 const label = "set:text demo — Astro parity";
 ---
+
 <head>
   <title>Demo · Deshi Super-Power</title>
   <meta name="description" content="Deshi Astro parity demo: class:list, define:vars, set:text, client:media, client:only, transition:*" />
