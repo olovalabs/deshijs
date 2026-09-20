@@ -10,8 +10,8 @@ const features = [
     text: 'Server components render at build time. React is not sent to the browser.',
   },
   {
-    title: 'Explicit islands',
-    text: 'Interactive code lives in a separate .client.tsx component and loads only where it is used.',
+    title: 'Compiler islands',
+    text: 'Static .island.tsx markup pairs with a tiny .client.ts DOM controller—no client React.',
   },
   {
     title: 'Vite powered',
@@ -27,8 +27,8 @@ export default function HomePage() {
         <span className="badge">React syntax · zero JS by default</span>
         <h1>Write TSX. Ship HTML.</h1>
         <p className="lead">
-          Deshi renders React components during the build. Client-side React is included only for
-          components you explicitly isolate in a <code>.client.tsx</code> island.
+          Deshi renders React components during the build. Interactive islands load compiler-bundled
+          DOM controllers, so React is never included in browser output.
         </p>
         <div className="hero-actions">
           <a className="button primary" href="/counter">See an island</a>

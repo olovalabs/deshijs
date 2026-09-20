@@ -166,8 +166,8 @@ function jsModuleBody(source: string, file: string): string {
 }
 
 export async function build(project: Project, options: BuildOptions = {}): Promise<BuildResult> {
-  // TSX is the primary authoring mode. It renders React on the server/build
-  // only; browser JavaScript is emitted exclusively for *.client.tsx islands.
+  // TSX is the primary authoring mode. React runs only on the server/build;
+  // browser JavaScript comes from paired *.island.tsx + *.client.ts modules.
   if (isReactProject(project.files, options.appDir)) {
     return buildReactSite(project, options);
   }

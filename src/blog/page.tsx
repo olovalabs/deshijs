@@ -28,7 +28,7 @@ export default function BlogPage() {
         <span className="badge blue">{posts.length} articles</span>
       </div>
       <h1>Engineering &amp; guides</h1>
-      <p className="lead">Static rendering, React islands, compiler architecture, and security deep dives.</p>
+      <p className="lead">Static React rendering, compiler islands, framework-free controllers, and security deep dives.</p>
 
       <div className="post-list">
         {posts.map((post) => (

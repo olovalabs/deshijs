@@ -142,7 +142,7 @@ export function scan(files: string[]): ScanResult {
 
   const isRoutePage = (base: string): boolean => {
     if (PAGE_INDEX.test(base)) return true;
-    if (RESERVED_FILE.test(base) || /\.client\.(tsx|jsx)$/.test(base)) return false;
+    if (RESERVED_FILE.test(base) || /\.(client|island)\.(tsx|jsx|ts|js)$/.test(base)) return false;
     if (/\.(md|html)$/.test(base)) return true;
     if (/\.(tsx|jsx|deshi)$/.test(base) && !/^[A-Z]/.test(base)) return true;
     return false;

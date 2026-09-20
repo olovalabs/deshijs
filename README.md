@@ -1,19 +1,20 @@
 # Deshi
 
-A static-first React framework: author pages and components in **TypeScript + JSX**, render them to HTML at build time, and ship browser JavaScript only for explicit client islands.
+A static-first TSX framework: author pages and components with React syntax, compile them to HTML, and add interactivity through **compiler-driven islands with no client-side React**.
 
 ## The model
 
-- `*.tsx` — server/static React components. They run in development and at build time; React is not shipped to the browser.
-- `*.client.tsx` — interactive React islands. Each island is bundled separately and loaded only on a page that renders it.
+- `*.tsx` — static/server React components. They execute during development and builds only.
+- `*.island.tsx` — the server-rendered HTML view for an interactive island.
+- `*.client.ts` — the paired browser DOM controller. It is bundled independently without React.
 - `page.tsx` and `layout.tsx` — file-based routes and layouts.
-- Production output — static HTML, CSS, and only the island chunks actually used.
+- Production output — static HTML, CSS, and only the small controller chunks actually used.
 
-This is React authoring, not a client-rendered React SPA by default.
+React is an authoring and server-rendering tool here. It is never included in browser bundles.
 
-## Example
+## Static page
 
-A static page is an ordinary React component:
+A page is an ordinary React component:
 
 ```tsx
 // src/page.tsx
@@ -21,35 +22,62 @@ export default function Page() {
   return (
     <main>
       <title>Home</title>
-      <h1>This is rendered to HTML</h1>
+      <h1>This becomes static HTML</h1>
     </main>
   );
 }
 ```
 
-Interactive behavior goes in a separate file:
+## Compiler island
+
+An island consists of two explicit files with the same base name.
+
+First, define its static HTML view:
 
 ```tsx
-// src/components/Counter.client.tsx
-'use client';
-
-import { useState } from 'react';
-
+// src/components/Counter.island.tsx
 export default function Counter({ initialCount = 0, client = 'load' }) {
-  const [count, setCount] = useState(initialCount);
-  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+  return (
+    <div>
+      <output data-count>{initialCount}</output>
+      <button type="button" data-increment>+1</button>
+    </div>
+  );
 }
 ```
 
-Use it from a server page and choose when it hydrates:
+Then define its framework-free browser controller:
+
+```ts
+// src/components/Counter.client.ts
+export default function mount(root: HTMLElement) {
+  const output = root.querySelector<HTMLOutputElement>('[data-count]')!;
+  const button = root.querySelector<HTMLButtonElement>('[data-increment]')!;
+  let count = Number(output.textContent);
+
+  button.addEventListener('click', () => {
+    output.textContent = String(++count);
+  });
+}
+```
+
+Use the server view from a page:
 
 ```tsx
-import Counter from './components/Counter.client';
+import Counter from './components/Counter.island';
 
 export default function Page() {
   return <Counter client="visible" initialCount={0} />;
 }
 ```
+
+The compiler:
+
+1. renders `Counter.island.tsx` to static HTML,
+2. serializes its JSON-safe props,
+3. bundles only `Counter.client.ts`,
+4. loads the controller using the requested strategy, and
+5. calls `mount(root, { props, url })`.
 
 Supported strategies are `load`, `visible`, `idle`, `click`, `media`, and `only`. For `media`, also pass a `media` query prop.
 
@@ -66,7 +94,8 @@ src/
 ├── blog/[slug]/page.tsx       # Dynamic static routes
 └── components/
     ├── Card.tsx               # Static/server component
-    └── Counter.client.tsx     # Browser island
+    ├── Counter.island.tsx     # Static island HTML
+    └── Counter.client.ts      # Browser DOM controller
 ```
 
 Dynamic routes export their build-time params:
@@ -88,7 +117,7 @@ npm install
 npm run dev       # Vite development server
 npm run build     # Static production build in dist/
 npm run preview   # Preview dist/
-npm run typecheck
+npm test          # Typecheck, build, and island behavior test
 ```
 
-With the router disabled (the default), a page containing only regular `.tsx` components has no `<script>` and no React runtime. A `.client.tsx` import creates a clear server/client boundary and emits an island chunk only when rendered.
+With the router disabled (the default), regular pages contain no scripts. Island pages emit only their compiler-generated bootstrap and framework-free client controller—never React or React DOM.

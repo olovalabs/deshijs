@@ -7,7 +7,7 @@ export default defineConfig({
   trailingSlash: 'ignore',
   appDir: 'src',
   outDir: 'dist',
-  // Static HTML by default. Browser JavaScript is emitted only by *.client.tsx islands.
+  // Static HTML by default. Browser JS comes only from compiler island controllers.
   router: false,
   css: 'inline',
   experimental: {

@@ -6,7 +6,7 @@ const builtInPosts: Record<string, { title: string; date: string; readTime: stri
     title: 'Getting Started with Deshi TSX',
     date: 'September 2026',
     readTime: '3 min read',
-    content: '<p>Create <code>layout.tsx</code> and <code>page.tsx</code>, export React components, and run the build. Deshi renders the component tree to static HTML.</p><h2>Add interactivity deliberately</h2><p>Move interactive UI to a separate <code>*.client.tsx</code> file. That file becomes an independently loaded island.</p>',
+    content: '<p>Create <code>layout.tsx</code> and <code>page.tsx</code>, export React components, and run the build. Deshi renders the component tree to static HTML.</p><h2>Add interactivity deliberately</h2><p>Pair a <code>*.island.tsx</code> server view with a <code>*.client.ts</code> DOM controller. The compiler loads that controller independently without shipping React.</p>',
   },
   architecture: {
     title: 'Under the Hood: React SSG and Islands',

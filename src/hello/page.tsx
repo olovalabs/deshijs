@@ -14,7 +14,7 @@ export default function HelloPage() {
           <ul>
             <li>Use TypeScript, JSX, component composition, and familiar React tooling.</li>
             <li>No hydration or application bundle is added to a server page.</li>
-            <li>Interactive features cross an explicit <code>.client.tsx</code> boundary.</li>
+            <li>Interactive features use paired <code>.island.tsx</code> and <code>.client.ts</code> files.</li>
           </ul>
         </div>
         <p><a className="text-link" href="/">← Return home</a></p>

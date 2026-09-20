@@ -1,4 +1,4 @@
-import Counter from '../components/Counter.client';
+import Counter from '../components/Counter.island';
 
 export default function CounterPage() {
   return (
@@ -8,8 +8,8 @@ export default function CounterPage() {
         <span className="badge">Route: /counter</span>
         <h1>Client code stays on an island</h1>
         <p className="lead">
-          This counter is authored as a separate <code>Counter.client.tsx</code> React component.
-          Its browser bundle loads on demand; the page and layout remain static HTML.
+          React renders <code>Counter.island.tsx</code> to static HTML at build time. A separate
+          <code>Counter.client.ts</code> controller adds behavior without shipping React to the browser.
         </p>
 
         <section className="island-card">
@@ -26,8 +26,8 @@ export default function CounterPage() {
             <p>Rendered once during development or the production build.</p>
           </article>
           <article>
-            <strong>Client .client.tsx</strong>
-            <p>Bundled independently and hydrated according to its strategy.</p>
+            <strong>Controller .client.ts</strong>
+            <p>Bundled independently as a tiny DOM controller with no React runtime.</p>
           </article>
         </section>
       </div>

@@ -1,4 +1,4 @@
-import Counter from '../components/Counter.client';
+import Counter from '../components/Counter.island';
 
 export default function DemoPage() {
   return (

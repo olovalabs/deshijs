@@ -1,14 +1,14 @@
 {
   "name": "deshi-app",
   "version": "1.0.0",
-  "description": "Static-first React TSX framework with opt-in client islands",
+  "description": "Static TSX framework with compiler islands and no client React",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:islands": "node tests/island-hydration.mjs",
+    "test:islands": "node tests/island-controller.mjs",
     "test": "npm run typecheck && npm run build && npm run test:islands",
     "sync-icon": "node .vscode/sync-icon.js"
   },

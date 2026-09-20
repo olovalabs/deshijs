@@ -1,9 +1,9 @@
-// React/TSX static renderer.
+// React/TSX static renderer with compiler-driven, framework-free islands.
 //
 // Server .tsx modules are bundled for Node and rendered with ReactDOM's static
-// renderer. React itself never reaches the browser for server components. Files
-// named `*.client.tsx` are replaced by an island proxy in the server bundle and
-// get an independent browser bundle only when an island is used by a page.
+// renderer. React never reaches the browser. A `*.island.tsx` file owns the
+// server-rendered HTML and its paired `*.client.ts` controller owns browser
+// behavior. The compiler connects and bundles the pair as an isolated island.
 import { build as esbuild, type Loader, type Plugin } from 'esbuild';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -32,12 +32,14 @@ interface ServerBundle {
 interface ClientAsset {
   hash: string;
   source: string;
+  controller: string;
   chunk: string;
   code: string;
 }
 
 const require = createRequire(import.meta.url);
-const CLIENT_RE = /\.client\.(?:tsx|jsx)$/;
+const ISLAND_RE = /\.island\.(?:tsx|jsx)$/;
+const CLIENT_CONTROLLER_RE = /\.client\.(?:ts|js)$/;
 const MODULE_EXTENSIONS = ['', '.tsx', '.ts', '.jsx', '.js', '.json', '/index.tsx', '/index.ts', '/index.jsx', '/index.js'];
 
 function posix(value: string): string {
@@ -91,27 +93,36 @@ function resolveProjectFile(files: Record<string, string>, specifier: string, im
   return null;
 }
 
+function clientControllerFor(files: Record<string, string>, island: string): string | null {
+  const stem = island.replace(/\.island\.(tsx|jsx)$/, '');
+  for (const extension of ['.client.ts', '.client.js']) {
+    const candidate = stem + extension;
+    if (Object.prototype.hasOwnProperty.call(files, candidate)) return candidate;
+  }
+  return null;
+}
+
 function islandRuntimeSource(): string {
   // Props stay in an escaped data attribute; executable bootstrap code contains
-  // only compiler-owned island ids, chunk URLs, and hydration strategies.
+  // only compiler-owned island ids, chunk URLs, and loading strategies.
   return `
     import * as React from 'react';
     let current = null;
     export function setIslandState(next) { current = next; }
     function boot(id, chunk, strategy, media) {
       const root = 'const r=document.getElementById(' + JSON.stringify(id) + ');if(!r)return;';
-      const hydrate = 'if(r.dataset.deshiHydrated)return Promise.resolve();r.dataset.deshiHydrated="1";return import(' + JSON.stringify(chunk) + ').then(m=>{let p={};try{p=JSON.parse(r.getAttribute("data-deshi-props")||"{}")}catch(e){}if(m&&typeof m.default==="function")return m.default(r,{props:p,url:location.href})})';
+      const mount = 'if(r.dataset.deshiMounted)return Promise.resolve();r.dataset.deshiMounted="1";return import(' + JSON.stringify(chunk) + ').then(m=>{let p={};try{p=JSON.parse(r.getAttribute("data-deshi-props")||"{}")}catch(e){}if(m&&typeof m.default==="function")return m.default(r,{props:p,url:location.href})})';
       let body;
-      if (strategy === 'visible') body = root + 'const run=()=>{' + hydrate + '};if(!("IntersectionObserver"in window))run();else{const o=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){o.disconnect();run();break}});o.observe(r)}';
-      else if (strategy === 'idle') body = root + 'const run=()=>{' + hydrate + '};const idle=()=>"requestIdleCallback"in window?requestIdleCallback(run,{timeout:2e3}):setTimeout(run,200);if(!("IntersectionObserver"in window))idle();else{const o=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){o.disconnect();idle();break}});o.observe(r)}';
-      else if (strategy === 'media') body = root + 'const run=()=>{' + hydrate + '};const q=' + JSON.stringify(media || '') + ';if(!q||!("matchMedia"in window))run();else{const mq=matchMedia(q);if(mq.matches)run();else mq.addEventListener("change",function h(){if(mq.matches){mq.removeEventListener("change",h);run()}})}';
-      else if (strategy === 'click') body = root + 'r.addEventListener("click",function(e){if(r.dataset.deshiHydrated)return;const t=e.target;(async()=>{' + hydrate + '})().then(()=>{t&&t.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}))})},true)';
-      else body = root + hydrate;
+      if (strategy === 'visible') body = root + 'const run=()=>{' + mount + '};if(!("IntersectionObserver"in window))run();else{const o=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){o.disconnect();run();break}});o.observe(r)}';
+      else if (strategy === 'idle') body = root + 'const run=()=>{' + mount + '};const idle=()=>"requestIdleCallback"in window?requestIdleCallback(run,{timeout:2e3}):setTimeout(run,200);if(!("IntersectionObserver"in window))idle();else{const o=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){o.disconnect();idle();break}});o.observe(r)}';
+      else if (strategy === 'media') body = root + 'const run=()=>{' + mount + '};const q=' + JSON.stringify(media || '') + ';if(!q||!("matchMedia"in window))run();else{const mq=matchMedia(q);if(mq.matches)run();else mq.addEventListener("change",function h(){if(mq.matches){mq.removeEventListener("change",h);run()}})}';
+      else if (strategy === 'click') body = root + 'r.addEventListener("click",function(e){if(r.dataset.deshiMounted)return;const t=e.target;(async()=>{' + mount + '})().then(()=>{t&&t.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}))})},true)';
+      else body = root + mount;
       return '(async()=>{' + body + '})()';
     }
     export function createIsland(Component, source, hash, chunk) {
-      function DeshiReactIsland(allProps) {
-        if (!current) throw new Error('A .client.tsx component can only render inside the Deshi static renderer.');
+      function DeshiCompilerIsland(allProps) {
+        if (!current) throw new Error('A .island.tsx component can only render inside the Deshi static renderer.');
         const props = { ...allProps };
         const rawStrategy = props.client;
         const media = typeof props.media === 'string' ? props.media : '';
@@ -122,7 +133,7 @@ function islandRuntimeSource(): string {
           throw new Error('Unknown island strategy "' + strategy + '" in ' + source);
         }
         if (props.children !== undefined) {
-          throw new Error('Children cannot cross a .client.tsx island boundary; pass JSON-serializable props instead.');
+          throw new Error('Children cannot cross a .island.tsx boundary; pass JSON-serializable props instead.');
         }
         let payload;
         try { payload = JSON.stringify(props); }
@@ -143,8 +154,8 @@ function islandRuntimeSource(): string {
           }),
         );
       }
-      DeshiReactIsland.displayName = 'Island(' + (Component.displayName || Component.name || 'Component') + ')';
-      return DeshiReactIsland;
+      DeshiCompilerIsland.displayName = 'Island(' + (Component.displayName || Component.name || 'Component') + ')';
+      return DeshiCompilerIsland;
     }
   `;
 }
@@ -174,7 +185,7 @@ function projectPlugin(files: Record<string, string>, mode: 'server' | 'client')
         if (args.path.startsWith('deshi:')) return undefined;
         const resolved = resolveProjectFile(files, args.path, args.importer);
         if (resolved) {
-          if (mode === 'server' && CLIENT_RE.test(resolved)) {
+          if (mode === 'server' && ISLAND_RE.test(resolved)) {
             return { path: resolved, namespace: 'deshi-island-proxy' };
           }
           return { path: resolved, namespace: 'deshi-project' };
@@ -203,8 +214,13 @@ function projectPlugin(files: Record<string, string>, mode: 'server' | 'client')
 
       build.onLoad({ filter: /.*/, namespace: 'deshi-island-proxy' }, (args) => {
         const source = posix(args.path);
+        const controller = clientControllerFor(files, source);
+        if (!controller) {
+          throw new Error(`${source} needs a sibling ${basename(source).replace(/\.island$/, '')}.client.ts controller`);
+        }
         const hash = hashString(source);
-        const chunk = `/_deshi/islands/${basename(source)}.${hash}.js`;
+        const name = basename(source).replace(/\.island$/, '');
+        const chunk = `/_deshi/islands/${name}.${hash}.js`;
         return {
           contents: `
             import Component from ${JSON.stringify(`project:${source}`)};
@@ -232,7 +248,7 @@ async function makeServerBundle(files: Record<string, string>, moduleFiles: stri
   const entries = moduleFiles.map((file, index) => `${JSON.stringify(file)}: M${index}`).join(',\n');
   const entry = `
     import * as React from 'react';
-    import { renderToString } from 'react-dom/server';
+    import { renderToStaticMarkup } from 'react-dom/server';
     import { setIslandState } from 'deshi:react-server-runtime';
     ${imports}
     const modules = { ${entries} };
@@ -249,9 +265,9 @@ async function makeServerBundle(files: Record<string, string>, moduleFiles: stri
           tree = React.createElement(layout.default, props, tree);
         }
         return {
-          // Unlike renderToStaticMarkup, renderToString produces markup that
-          // React can hydrate at a *.client.tsx island boundary.
-          html: renderToString(tree),
+          // Islands mount a tiny DOM controller rather than hydrating React, so
+          // the browser receives clean static markup with no React protocol.
+          html: renderToStaticMarkup(tree),
           state: { clients: [...state.clients], preloads: [...state.preloads] },
         };
       } finally {
@@ -285,34 +301,40 @@ async function makeServerBundle(files: Record<string, string>, moduleFiles: stri
 }
 
 async function makeClientAsset(files: Record<string, string>, source: string, minify: boolean): Promise<ClientAsset> {
+  const controller = clientControllerFor(files, source);
+  if (!controller) {
+    throw new Error(`${source} needs a sibling ${basename(source).replace(/\.island$/, '')}.client.ts controller`);
+  }
+  if (!CLIENT_CONTROLLER_RE.test(controller)) {
+    throw new Error(`${controller} must be a plain .client.ts or .client.js module (not React/TSX).`);
+  }
   const hash = hashString(source);
-  const chunk = `/_deshi/islands/${basename(source)}.${hash}.js`;
+  const name = basename(source).replace(/\.island$/, '');
+  const chunk = `/_deshi/islands/${name}.${hash}.js`;
   const entry = `
-    import * as React from 'react';
-    import { createRoot, hydrateRoot } from 'react-dom/client';
-    import Component from ${JSON.stringify(`project:${source}`)};
-    export default function mount(root, context) {
-      const element = React.createElement(Component, context && context.props ? context.props : {});
-      if (root.hasChildNodes()) hydrateRoot(root, element);
-      else createRoot(root).render(element);
+    import * as controller from ${JSON.stringify(`project:${controller}`)};
+    const mount = controller.default || controller.mount;
+    export default function mountIsland(root, context) {
+      if (typeof mount !== 'function') {
+        throw new Error(${JSON.stringify(`${controller} must default-export a mount function.`)});
+      }
+      return mount(root, context);
     }
   `;
   const result = await esbuild({
-    stdin: { contents: entry, loader: 'tsx', resolveDir: process.cwd(), sourcefile: `${basename(source)}.island.tsx` },
+    stdin: { contents: entry, loader: 'ts', resolveDir: process.cwd(), sourcefile: `${name}.island-client.ts` },
     bundle: true,
     platform: 'browser',
     format: 'esm',
     target: 'es2020',
-    jsx: 'automatic',
     write: false,
     minify,
-    define: { 'process.env.NODE_ENV': minify ? '"production"' : '"development"' },
     logLevel: 'silent',
     plugins: [projectPlugin(files, 'client')],
   });
   const code = result.outputFiles.find((file) => file.path.endsWith('.js'))?.text ?? result.outputFiles[0]?.text;
   if (!code) throw new Error(`The island bundle for ${source} was empty.`);
-  return { hash, source, chunk, code };
+  return { hash, source, controller, chunk, code };
 }
 
 function injectHead(html: string, head: string): string {
@@ -369,7 +391,7 @@ export async function buildReactSite(project: Project, options: BuildOptions = {
   const clientAssets = new Map<string, ClientAsset>();
   try {
     server = await makeServerBundle(files, [...moduleFiles]);
-    for (const source of Object.keys(files).filter((file) => CLIENT_RE.test(file))) {
+    for (const source of Object.keys(files).filter((file) => ISLAND_RE.test(file))) {
       const asset = await makeClientAsset(files, source, minify);
       clientAssets.set(asset.hash, asset);
     }
@@ -426,9 +448,9 @@ export async function buildReactSite(project: Project, options: BuildOptions = {
         head += '<script type="module" src="/_deshi/router.4f1a9c2e.js"></script>';
       }
       html = injectHead(html, head);
-      // Reformatting inserts whitespace text nodes and generic HTML minifiers
-      // can rewrite text. Either operation breaks React hydration inside an
-      // island, so preserve React's exact server markup on island pages.
+      // The server view and its client controller share an exact DOM contract.
+      // Preserve island markup so generic formatting/minification cannot insert
+      // text nodes or rewrite content that a controller intentionally targets.
       if (rendered.state.clients.length === 0) {
         html = minify ? minifyHtml(html) : formatHtml(html);
       }
@@ -505,7 +527,7 @@ export async function buildReactSite(project: Project, options: BuildOptions = {
   if (!router) {
     for (const page of pages) {
       if (page.clients.length === 0 && /<script\b/i.test(page.html)) {
-        diagnostics.push(diagnostic('PF5001', `${page.outFile} contains browser JavaScript outside a .client.tsx island.`, page.sourceFile, 'Move browser behavior into a separate *.client.tsx component.'));
+        diagnostics.push(diagnostic('PF5001', `${page.outFile} contains browser JavaScript outside a compiler island.`, page.sourceFile, 'Put static markup in *.island.tsx and browser behavior in its paired *.client.ts controller.'));
       }
     }
   }
@@ -550,7 +572,11 @@ export async function buildReactSite(project: Project, options: BuildOptions = {
         url: page.url, file: page.outFile, params: page.params, clients: page.clients,
       })),
     })),
-    islands: Object.fromEntries([...clientAssets].map(([hash, asset]) => [hash, { source: asset.source, chunk: asset.chunk }])),
+    islands: Object.fromEntries([...clientAssets].map(([hash, asset]) => [hash, {
+      source: asset.source,
+      controller: asset.controller,
+      chunk: asset.chunk,
+    }])),
   };
   out.push({ path: '.deshi/manifest.json', content: JSON.stringify(manifest, null, 2), kind: 'json' });
 

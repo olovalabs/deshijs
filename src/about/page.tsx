@@ -1,7 +1,7 @@
 const stats = [
   { label: 'Server pages', value: '0 KB JS' },
   { label: 'Authoring', value: 'React + TSX' },
-  { label: 'Interactive UI', value: '.client.tsx' },
+  { label: 'Interactive UI', value: 'Compiler islands' },
 ];
 
 export default function AboutPage() {
@@ -28,9 +28,9 @@ export default function AboutPage() {
         <section className="prose-card">
           <h2>The boundary is the file name</h2>
           <p>
-            Use regular <code>.tsx</code> for static server components. When a component needs state,
-            effects, or event handlers, move it to <code>Component.client.tsx</code>. Importing that
-            component creates an isolated, lazily loaded island.
+            Use regular <code>.tsx</code> for static server components. For interactivity, pair a
+            <code>Component.island.tsx</code> server view with a <code>Component.client.ts</code> DOM
+            controller. The compiler creates an isolated, lazily loaded island without client React.
           </p>
         </section>
       </div>
