@@ -9,10 +9,11 @@ The Deshijs compiler compiles `.deshi` and `.md` files into deterministic, async
 
 ## Pipeline Overview
 
-Whenever `compile(source, options)` is invoked in `deshijs`, the source undergoes seven distinct transformation phases:
+Whenever `compile(source, options)` is invoked in `deshijs`, the source is transformed through the stages below (`00` applies to `.md`/`.mdx`; `01`–`04` apply to `.deshi`/`.html`):
 
 | Stage | Module | Responsibility |
 | --- | --- | --- |
+| **00. Document Parse** | `document.ts` | `.md` / `.mdx` are parsed with unified/remark into mdast, then mapped straight to the Deshi AST (no HTML string round-trip). |
 | **01. Block Splitting** | `blocks.ts` | Parse5 Tokenizer lifts `<script>`, `<script client>`, and `<style>` blocks (and `---` frontmatter). |
 | **02. Script Analysis** | `script.ts` | Acorn AST analysis extracts imports, `getStaticParams`, bindings, and erases TS types via esbuild. |
 | **03. CSS Scoping** | `css.ts` | `css-tree` rewrites selectors with deterministic FNV-1a 32-bit hash `[data-deshi-<hash>]`. |
@@ -20,6 +21,29 @@ Whenever `compile(source, options)` is invoked in `deshijs`, the source undergoe
 | **05. Island Detection** | `islands.ts` | Usage-site `client:*` analysis, root element stamping, inline bootstrap emitter. |
 | **06. Scope Validation** | `scope.ts` | Validates all identifiers against script, globals, and implicit scopes (`PF4010`). |
 | **07. ESM Codegen** | `codegen.ts` | Produces ESM render function module string with asynchronous template concatenation. |
+
+Stages 01–04 are bypassed for `.md` / `.mdx`: the document layer (stage 00) already
+produces the Deshi AST, and stages 06–07 (scope + codegen) run unchanged on it.
+File classification (source/route/page/reserved, extensions) lives in
+`filetype.ts` and is shared by `routes.ts`, `build.ts` and `vite.ts`.
+
+---
+
+## Stage 0: Document Parsing (document.ts)
+
+Markdown and MDX never pass through the block splitter or the template parser. The
+unified/remark pipeline builds a **mdast** tree (`remark-parse` + `remark-gfm`, plus
+`remark-mdx` for `.mdx`), and a mapper converts it to Deshi AST nodes:
+
+- Headings, lists, tables, blockquotes, code fences and inline formatting become real
+  `Element` / `Text` nodes (headings get text-derived `id` slugs).
+- `{expressions}` become `Expression` nodes; `<Component>` becomes a `Component` node
+  (validated against imports, so `client:*` islands and `PF4024`/`PF4010` apply).
+- Top-level ESM (`import` / `export`, incl. `getStaticParams`) is lifted into the
+  synthesized `<script>` block and analyzed by the shared Acorn pass.
+
+Because the result is an AST, no regex or HTML string ever touches markdown content,
+and source locations map back to the original document.
 
 ---
 

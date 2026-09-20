@@ -2,6 +2,7 @@
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { islandInlineScript, stampIslandRoot, type IslandStrategy } from './islands';
+import { splitFilename } from './filetype';
 
 export class Raw {
   constructor(public html: string) {}
@@ -168,8 +169,7 @@ export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<
 const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'click', 'media', 'only']);
 
 function componentBaseName(file: string): string {
-  const b = file.slice(Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\')) + 1);
-  return b.replace(/\.(deshi|html)$/i, '');
+  return splitFilename(file).stem;
 }
 
 export async function renderComponent(

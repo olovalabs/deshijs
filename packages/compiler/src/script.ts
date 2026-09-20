@@ -7,6 +7,7 @@ import * as acorn from 'acorn';
 import { transformSync } from 'esbuild';
 import { fail, makeDiagnostic, type Diagnostic } from './types';
 import { ACORN_OPTIONS, JsxParser, isComponentName } from './expression';
+import { isSourceFile } from './filetype';
 
 export interface ImportSpec {
   imported: string; // 'default' | '*' | name
@@ -27,6 +28,8 @@ export interface ScriptInfo {
   bindings: string[];
   components: Set<string>;
   diagnostics: Diagnostic[];
+  /** ESTree body of the analyzed program — for AST-based queries (e.g. usesParams) */
+  programBody: unknown[];
 }
 
 const IGNORED_EXPORTS = new Set(['prerender', 'dynamic', 'revalidate', 'runtime']);
@@ -67,8 +70,23 @@ function declarationNames(decl: AnyNode): string[] {
   return [];
 }
 
+/**
+ * Slice a declaration, renaming its bound identifier via AST offsets.
+ * Used to normalize `getStaticPaths` → `getStaticParams` (Astro parity) without
+ * touching string literals or comments.
+ */
+function sliceDeclarationRenamed(src: string, decl: AnyNode, from: string, to: string): string {
+  let id: AnyNode = null;
+  if (decl.type === 'FunctionDeclaration' || decl.type === 'ClassDeclaration') id = decl.id;
+  else if (decl.type === 'VariableDeclaration') {
+    id = decl.declarations?.find((d: AnyNode) => d.id?.name === from)?.id ?? null;
+  }
+  if (!id || id.name !== from) return src.slice(decl.start, decl.end);
+  return src.slice(decl.start, id.start) + to + src.slice(id.end, decl.end);
+}
+
 export function emptyScript(): ScriptInfo {
-  return { imports: [], body: '', bindings: [], components: new Set(), diagnostics: [] };
+  return { imports: [], body: '', bindings: [], components: new Set(), diagnostics: [], programBody: [] };
 }
 
 // Re-export helper for external tools (e.g. content collections)
@@ -103,6 +121,7 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
   }
 
   const info = emptyScript();
+  info.programBody = program.body as unknown[];
   const bodyParts: string[] = [];
 
   for (const stmt of program.body as AnyNode[]) {
@@ -110,7 +129,7 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
     switch (stmt.type) {
       case 'ImportDeclaration': {
         const source = String(stmt.source.value);
-        const isComponent = source.endsWith('.deshi') || source.endsWith('.html') || source.endsWith('.md');
+        const isComponent = isSourceFile(source);
         const specifiers: ImportSpec[] = stmt.specifiers.map((s: AnyNode) => ({
           imported:
             s.type === 'ImportDefaultSpecifier' ? 'default'
@@ -142,9 +161,7 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
         // Astro parity: getStaticPaths is an alias for getStaticParams
         const isStatic = names.length === 1 && (names[0] === 'getStaticParams' || names[0] === 'getStaticPaths');
         if (isStatic && stmt.declaration) {
-          let body = src.slice(stmt.declaration.start, stmt.declaration.end);
-          // Normalize getStaticPaths → getStaticParams so the rest of the compiler stays unified
-          if (names[0] === 'getStaticPaths') body = body.replace(/getStaticPaths/, 'getStaticParams');
+          const body = sliceDeclarationRenamed(src, stmt.declaration, names[0], 'getStaticParams');
           info.staticParams = body;
           info.bindings.push('getStaticParams');
           // Also push getStaticPaths for compat diagnostics (so `Astro` style works)
@@ -153,8 +170,7 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
         }
         // Also support `export const getStaticPaths = ...` without declaration wrapper? fallback for variable
         if (names.length === 1 && (names[0] === 'getStaticPaths' || names[0] === 'getStaticParams') && stmt.declaration?.type === 'VariableDeclaration') {
-          const body = src.slice(stmt.declaration.start, stmt.declaration.end).replace(/getStaticPaths/, 'getStaticParams');
-          info.staticParams = body;
+          info.staticParams = sliceDeclarationRenamed(src, stmt.declaration, names[0], 'getStaticParams');
           info.bindings.push('getStaticParams');
           break;
         }

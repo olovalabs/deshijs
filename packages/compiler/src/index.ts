@@ -5,7 +5,9 @@ import { parseTemplate, walkNodes } from './template';
 import { analyzeTemplateScope } from './scope';
 import { scopeCss, minifyCss, scopedCssUrl } from './css';
 import { generate } from './codegen';
-import { markdownToDeshi } from './markdown';
+import { compileDocument } from './document';
+import { isDocumentFile, isLayoutPath } from './filetype';
+import { highlightStateToken } from './highlight';
 import {
   DeshiError,
   hashString,
@@ -64,10 +66,8 @@ export function __clearCompileMemoForTests(): void {
 export function compile(source: string, opts: CompileOptions): CompileResult {
   const file = opts.file;
   const minify = opts.minify ?? true;
-  // NB: cache key uses the *post-markdown* source so `.md` frontmatter edits
-  // invalidate correctly even when the file path + flags are unchanged.
-  const effectiveSource = file.endsWith('.md') ? markdownToDeshi(source) : source;
-  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${hashString(effectiveSource)}`;
+  const isMarkdownDoc = isDocumentFile(file);
+  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${highlightStateToken()}\0${hashString(source)}`;
   const cached = compileMemo.get(memoKey);
   if (cached) {
     return {
@@ -81,64 +81,76 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
 
   const diagnostics: Diagnostic[] = [];
   const hash = hashString(file);
-  source = effectiveSource;
+  const isLayout = opts.isLayout ?? isLayoutPath(file);
 
-  // 1. block split (parse5 tokenizer)
-  const blocks = splitBlocks(source, file);
-  diagnostics.push(...blocks.diagnostics);
-
-  // 2. <script> analysis (acorn)
-  const script = blocks.script
-    ? analyzeScript(blocks.script.content, file, source, blocks.script.contentStart)
-    : emptyScript();
-  diagnostics.push(...script.diagnostics);
-
-  // 3. styles (css-tree) — respects Astro parity: is:global, global, is:inline
   let scoped = '';
   let global = '';
-  let inlineStyles = '';
-  for (const s of blocks.styles) {
-    if (s.attrs.lang && s.attrs.lang !== 'css') {
-      diagnostics.push(
-        makeDiagnostic('PF2011', `<style lang="${s.attrs.lang}"> is handed to Vite's CSS pipeline in deshi/vite; the playground passes it through as CSS`, file, source, s.start, 'warning'),
-      );
-    }
-    const isInline = 'is:inline' in s.attrs;
-    const hasDefineVars = 'define:vars' in s.attrs;
-    if (isInline) {
-      // is:inline styles are injected raw (no scoping) — Astro behavior
-      inlineStyles += s.content + '\n';
-      global += minifyCss(s.content);
-    } else if (hasDefineVars) {
-      // define:vars styles remain scoped but with CSS vars preamble
-      scoped += scopeCss(s.content, hash);
-    } else if (s.kind === 'style') scoped += scopeCss(s.content, hash);
-    else global += minifyCss(s.content);
-  }
-  const hasScoped = scoped.length > 0;
-  void inlineStyles;
+  let script: ScriptInfo;
+  let root: Root;
+  let tctx: TemplateContext;
+  let hasClient = false;
+  let blocks: ReturnType<typeof splitBlocks> | undefined;
 
-  // 4. template parse (parse5 + acorn-jsx) incl. jsxToTemplate / components / slots / head
-  const isLayout = opts.isLayout ?? /(^|\/)(layout|template)\.(deshi|html)$/.test(file);
-  const tctx: TemplateContext = {
-    file,
-    source,
-    components: script.components,
-    scoped: hasScoped,
-    usedComponents: new Set(),
-    usedSlots: new Set(),
-  };
-  const { root } = parseTemplate(blocks.template, tctx, { minify, isLayout });
+  if (isMarkdownDoc) {
+    // .md / .mdx — mdast → Deshi AST directly (no HTML string round-trip).
+    const doc = compileDocument(source, file, { minify });
+    script = doc.script;
+    root = doc.root;
+    tctx = doc.ctx;
+    global = doc.globalCss;
+    diagnostics.push(...doc.diagnostics);
+  } else {
+    // 1. block split (parse5 tokenizer)
+    blocks = splitBlocks(source, file);
+    diagnostics.push(...blocks.diagnostics);
 
-  // 5. client roots
-  const hasClient = !!blocks.client;
-  if (hasClient) {
-    if (root.document) {
-      throw new DeshiError(
-        makeDiagnostic('PF1002', '<script client> is not allowed in the root layout; put it in a component', file, source, blocks.client!.start),
-      );
+    // 2. <script> analysis (acorn)
+    script = blocks.script
+      ? analyzeScript(blocks.script.content, file, source, blocks.script.contentStart)
+      : emptyScript();
+    diagnostics.push(...script.diagnostics);
+
+    // 3. styles (css-tree) — respects Astro parity: is:global, global, is:inline
+    for (const s of blocks.styles) {
+      if (s.attrs.lang && s.attrs.lang !== 'css') {
+        diagnostics.push(
+          makeDiagnostic('PF2011', `<style lang="${s.attrs.lang}"> is handed to Vite's CSS pipeline in deshi/vite; the playground passes it through as CSS`, file, source, s.start, 'warning'),
+        );
+      }
+      const isInline = 'is:inline' in s.attrs;
+      const hasDefineVars = 'define:vars' in s.attrs;
+      if (isInline) {
+        // is:inline styles are injected raw (no scoping) — Astro behavior
+        global += minifyCss(s.content);
+      } else if (hasDefineVars) {
+        // define:vars styles remain scoped but with CSS vars preamble
+        scoped += scopeCss(s.content, hash);
+      } else if (s.kind === 'style') scoped += scopeCss(s.content, hash);
+      else global += minifyCss(s.content);
     }
-    for (const n of root.children) if (n.type === 'Element') n.clientRoot = true;
+
+    // 4. template parse (parse5 + acorn-jsx) incl. jsxToTemplate / components / slots / head
+    tctx = {
+      file,
+      source,
+      components: script.components,
+      scoped: scoped.length > 0,
+      usedComponents: new Set(),
+      usedSlots: new Set(),
+    };
+    const parsed = parseTemplate(blocks.template, tctx, { minify, isLayout });
+    root = parsed.root;
+
+    // 5. client roots
+    hasClient = !!blocks.client;
+    if (hasClient) {
+      if (root.document) {
+        throw new DeshiError(
+          makeDiagnostic('PF1002', '<script client> is not allowed in the root layout; put it in a component', file, source, blocks.client!.start),
+        );
+      }
+      for (const n of root.children) if (n.type === 'Element') n.clientRoot = true;
+    }
   }
 
   // 6. scope analysis
@@ -155,12 +167,13 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   for (const c of script.components) {
     if (!tctx.usedComponents.has(c)) {
       const imp = script.imports.find((i) => i.specifiers.some((s) => s.local === c));
+      const at = imp ? (blocks?.script ? blocks.script.contentStart + imp.start : imp.start) : 0;
       diagnostics.push(
-        makeDiagnostic('PF2011', `Component "${c}" is imported but never used`, file, source, imp ? (blocks.script!.contentStart + imp.start) : 0, 'warning'),
+        makeDiagnostic('PF2011', `Component "${c}" is imported but never used`, file, source, at, 'warning'),
       );
     }
   }
-  const usesParams = /\bparams\b/.test(script.body) || root.children.length > 0 && sourceUsesParams(root);
+  const usesParams = scriptUsesParams(script) || (root.children.length > 0 && sourceUsesParams(root));
 
   // 8. codegen
   const out = generate({
@@ -168,7 +181,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     root,
     script,
     hash,
-    hasCss: hasScoped || global.length > 0,
+    hasCss: scoped.length > 0 || global.length > 0,
     hasClient,
     isLayout,
     isDocument: root.document,
@@ -181,7 +194,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     runtimeImport: opts.runtimeImport,
   });
 
-  const client = blocks.client
+  const client = blocks?.client
     ? {
         body: blocks.client.content,
         code: `// \0deshi:client:${file}\nexport default function mount(root, ctx) {\n${indent(blocks.client.content.trim())}\n}\n`,
@@ -201,7 +214,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       slots: [...slots],
       deps,
       hasClient,
-      hasCss: hasScoped || global.length > 0,
+      hasCss: scoped.length > 0 || global.length > 0,
       headBlocks,
       usesParams,
       bindings: script.bindings,
@@ -214,12 +227,30 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   return result;
 }
 
+/** True when an ESTree subtree references the identifier `params`. */
+function astUsesParams(node: unknown): boolean {
+  if (!node || typeof node !== 'object') return false;
+  if (Array.isArray(node)) return node.some(astUsesParams);
+  const n = node as { type?: string; name?: string; [k: string]: unknown };
+  if (typeof n.type !== 'string') return false;
+  if (n.type === 'Identifier' && n.name === 'params') return true;
+  for (const k of Object.keys(n)) {
+    if (k === 'type' || k === 'start' || k === 'end' || k === 'loc') continue;
+    if (astUsesParams(n[k])) return true;
+  }
+  return false;
+}
+
 function sourceUsesParams(root: Root): boolean {
   let found = false;
   walkNodes(root.children, (n) => {
-    if (n.type === 'Expression' && /\bparams\b/.test(n.raw)) found = true;
+    if (n.type === 'Expression' && astUsesParams(n.ast)) found = true;
   });
   return found;
+}
+
+function scriptUsesParams(script: ScriptInfo): boolean {
+  return astUsesParams(script.programBody);
 }
 
 function indent(s: string): string {

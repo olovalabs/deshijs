@@ -33,6 +33,16 @@ import {
   type SlotFns,
 } from './runtime';
 import { DeshiError, type Diagnostic } from './types';
+import { prepareHighlight } from './highlight';
+import {
+  CODE_EXTENSIONS,
+  SOURCE_EXTENSIONS,
+  extname,
+  isCodeFile,
+  isLayoutPath,
+  isSourceFile,
+  splitFilename,
+} from './filetype';
 
 export interface Project {
   /** file path (project-relative, e.g. "src/app/page.html") → source */
@@ -48,6 +58,8 @@ export interface BuildOptions {
   appDir?: string; // defaults to 'src' (or 'src/app' if present)
   /** File-stable CSS URLs + per-file (scoped+global) sheets — Vite HMR in dev. */
   stableCssUrl?: boolean;
+  /** Build-time Shiki highlighting for markdown code fences. Falsy = plain blocks. */
+  highlight?: { theme?: string; langs?: string[] };
 }
 
 export interface PageOutput {
@@ -94,7 +106,7 @@ function dirname(p: string): string {
   return i === -1 ? '' : p.slice(0, i);
 }
 function basename(p: string): string {
-  return p.slice(p.lastIndexOf('/') + 1).replace(/\.[^.]+$/, '');
+  return splitFilename(p).stem;
 }
 function joinPath(dir: string, rel: string): string {
   const parts = dir ? dir.split('/') : [];
@@ -176,6 +188,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   };
   const t0 = performance.now();
   resetCache();
+  if (options.highlight) await prepareHighlight(options.highlight);
   const diagnostics: Diagnostic[] = [];
   const compiled: Record<string, CompileResult> = {};
   const modules = new Map<string, ModuleNs>();
@@ -205,7 +218,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     const source = files[file];
     if (source === undefined) throw new DeshiError(diag('PF4004', `Component file not found: ${file}`, file));
     const rel = file.startsWith(appDir + '/') ? file.slice(appDir.length + 1) : null;
-    const isLayout = rel ? /(^|\/)(layout|template)\.(deshi|html)$/.test(rel) : false;
+    const isLayout = rel ? isLayoutPath(rel) : false;
     const res = compile(source, {
       file,
       minify: opts.minify,
@@ -221,7 +234,13 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   const resolve = (spec: string, from: string): string => {
     if (spec.startsWith('~/')) {
       const base = 'src/' + spec.slice(2);
-      for (const cand of [base, base + '.js', base + '.ts', base + '.deshi', base + '.html', base + '.md', base + '/index.js']) if (files[cand] !== undefined) return cand;
+      const cands = [
+        base,
+        ...CODE_EXTENSIONS.map((e) => `${base}.${e}`),
+        ...SOURCE_EXTENSIONS.map((e) => `${base}.${e}`),
+        `${base}/index.js`,
+      ];
+      for (const cand of cands) if (files[cand] !== undefined) return cand;
       return base;
     }
     if (spec.startsWith('./') || spec.startsWith('../')) return joinPath(dirname(from), spec);
@@ -234,14 +253,14 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     if (modules.has(file)) return modules.get(file)!;
     if (loading.has(file)) throw new DeshiError(diag('PF4003', `Import cycle: ${from} → ${file}`, from));
     if (files[file] === undefined) {
-      const code = (file.endsWith('.deshi') || file.endsWith('.html') || file.endsWith('.md')) ? 'PF4004' : 'PF5002';
+      const code = isSourceFile(file) ? 'PF4004' : 'PF5002';
       throw new DeshiError(diag(code, `Cannot resolve "${spec}" from ${from} (${file} not found)`, from));
     }
     loading.add(file);
     try {
       const $import = (s: string) => importModule(s, file);
       let ns: ModuleNs;
-      if (file.endsWith('.deshi') || file.endsWith('.html') || file.endsWith('.md')) {
+      if (isSourceFile(file)) {
         const res = getCompiled(file);
         const fn = new AsyncFunction('$rt', '$import', res.evalBody);
         ns = (await fn(runtime, $import)) as ModuleNs;
@@ -257,8 +276,8 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   };
 
   const loadRender = async (file: string): Promise<RenderModule> => {
-    const ext = file.endsWith('.deshi') ? '.deshi' : file.endsWith('.html') ? '.html' : file.endsWith('.md') ? '.md' : '';
-    const rel = ext ? './' + basename(file) + ext : './' + basename(file);
+    const ext = isSourceFile(file) ? extname(file) : '';
+    const rel = ext ? `./${basename(file)}.${ext}` : `./${basename(file)}`;
     const ns = await importModule(rel, dirname(file) + '/x');
     return ns.default as RenderModule;
   };
@@ -271,7 +290,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
 
   // Compile every component/page file up front so that diagnostics cover unused files too.
   for (const f of Object.keys(files)) {
-    if (!f.endsWith('.html') && !f.endsWith('.deshi') && !f.endsWith('.md')) continue;
+    if (!isSourceFile(f)) continue;
     try {
       getCompiled(f);
     } catch (e) {
@@ -436,14 +455,8 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       let urls: Array<{ url: string; params: Record<string, string | string[]> }> = [];
       try {
         if (route.dynamic) {
-          const ext = pageFile.endsWith('.deshi')
-            ? '.deshi'
-            : pageFile.endsWith('.html')
-              ? '.html'
-              : pageFile.endsWith('.md')
-                ? '.md'
-                : '';
-          const rel = ext ? './' + basename(pageFile) + ext : './' + basename(pageFile);
+          const ext = isSourceFile(pageFile) ? `.${extname(pageFile)}` : '';
+          const rel = ext ? `./${basename(pageFile)}${ext}` : `./${basename(pageFile)}`;
           const ns = await importModule(rel, dirname(pageFile) + '/x');
           const gsp = (ns.getStaticParams ?? ns.getStaticPaths) as undefined | (() => unknown);
           if (typeof gsp !== 'function') {
@@ -580,8 +593,8 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   // Astro-like endpoints: if any route file is a bare .js/.ts endpoint, it was compiled as an html page
   // but with json content-type hint — emit .json beside the html for API compat (e.g. /api/hello → /api/hello.json)
   for (const r of routes) {
-    if (r.file.endsWith('.js') || r.file.endsWith('.ts')) {
-      const epPages = pages.filter(p=>p.sourceFile.endsWith('.js')||p.sourceFile.endsWith('.ts'));
+    if (isCodeFile(r.file)) {
+      const epPages = pages.filter((p) => isCodeFile(p.sourceFile));
       for (const pg of epPages) {
         // duplicate handling: endpoint pages already emit html; add json mirror
         const jsonPath = pg.outFile.replace(/\.html$/, '.json');
@@ -664,11 +677,7 @@ export async function buildToDisk(
         Object.assign(out, readDirRecursive(full, rel));
       } else if (
         item.isFile() &&
-        (item.name.endsWith('.deshi') ||
-          item.name.endsWith('.html') ||
-          item.name.endsWith('.md') ||
-          item.name.endsWith('.ts') ||
-          item.name.endsWith('.js'))
+        (isSourceFile(item.name) || isCodeFile(item.name))
       ) {
         out[`${appDir}/${rel}`] = fs.readFileSync(full, 'utf-8');
       }
@@ -686,6 +695,7 @@ export async function buildToDisk(
       minify: options.minify ?? true,
       appDir,
       site: options.site,
+      highlight: options.highlight,
     }
   );
 

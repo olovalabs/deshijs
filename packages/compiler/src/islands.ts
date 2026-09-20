@@ -11,19 +11,25 @@
  */
 
 import type { ClientStrategy } from './types';
+import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 
 /** Alias kept at the definition site so `runtime.ts` can type its
  * `strategy` param without a circular *value* import (type-only). */
 export type IslandStrategy = ClientStrategy;
 
 export function stampIslandRoot(html: string, id: string): string {
-  const m = html.match(/^(\s*<[A-Za-z][^\s>/]*)([^>]*?)(\/?>)/);
-  if (!m) return `<div id="${id}" style="display:contents">${html}</div>`;
-  const before = m[1] + m[2];
-  if (/\sid\s*=/i.test(before)) {
-    return html.replace(m[0], () => `${m[1]}${m[2]} data-deshi-i="${id}"${m[3]}`);
+  const frag = parseFragment(html);
+  // Original behavior: only a *leading* element is stamped; leading text means
+  // the island root is ambiguous, so wrap it instead.
+  const first = frag.childNodes.find(
+    (n) => !(n.nodeName === '#text' && !((n as P5.TextNode).value ?? '').trim()),
+  ) as P5.Element | undefined;
+  if (!first || !first.tagName) {
+    return `<div id="${id}" style="display:contents">${html}</div>`;
   }
-  return html.replace(m[0], () => `${m[1]}${m[2]} id="${id}"${m[3]}`);
+  const hasId = first.attrs.some((a) => a.name.toLowerCase() === 'id');
+  first.attrs.push({ name: hasId ? 'data-deshi-i' : 'id', value: id });
+  return frag.childNodes.map((n) => serializeOuter(n)).join('');
 }
 
 function findRoot(id: string): string {

@@ -1,161 +1,120 @@
-// HTML Formatter and Minifier for Deshi Framework
+// HTML formatter and minifier — parse5 AST in, serialized string out.
+// The document/fragment is parsed once, transformed at the tree level
+// (whitespace, inline <style> minification) and serialized, so no regex ever
+// touches markup.
+import { parse, parseFragment, serialize, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
+import { minifyCss } from './css';
 
-/**
- * Pretty-formats HTML for development and runtime inspection.
- * Strips ghost whitespace gaps from lifted blocks and indents cleanly.
- */
-export function formatHtml(html: string): string {
-  const protectedBlocks: string[] = [];
-  // Random nonce per call — deterministic placeholders (`___DESHI_BLOCK_0___`)
-  // could collide with literal user content and corrupt output.
-  const nonce = Math.random().toString(36).slice(2);
-  const placeholder = (i: number): string => `___DESHI_FMT_${nonce}_${i}___`;
-  const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const VOID = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
+  'param', 'source', 'track', 'wbr',
+]);
+// Content whose inner whitespace must never be rewritten.
+const PRESERVE = new Set(['pre', 'textarea', 'script', 'style']);
 
-  // Protect pre, code, textarea, script, and style blocks
-  let processed = html.replace(
-    /<(pre|code|textarea|script|style)\b([^>]*)>([\s\S]*?)<\/\1>/gi,
-    (match, tag, attrs, content) => {
-      if (tag.toLowerCase() === 'style') {
-        const cleanCss = content.trim();
-        const block = `<style${attrs}>\n${cleanCss}\n</style>`;
-        const idx = protectedBlocks.length;
-        protectedBlocks.push(block);
-        return `\n${placeholder(idx)}\n`;
-      }
-      const idx = protectedBlocks.length;
-      protectedBlocks.push(match.trim());
-      return `\n${placeholder(idx)}\n`;
-    }
-  );
-
-  // Filter out completely empty or blank lines
-  const rawLines = processed.split('\n');
-  const cleanTokens: string[] = [];
-  for (const line of rawLines) {
-    const trimmed = line.trim();
-    if (trimmed.length > 0) {
-      cleanTokens.push(trimmed);
-    }
-  }
-
-  // Split adjoining tags on separate lines
-  const splitTags = cleanTokens
-    .join('\n')
-    .replace(/>\s*</g, '>\n<')
-    .split('\n');
-
-  const selfClosing = new Set([
-    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'
-  ]);
-
-  let indentLevel = 0;
-  const indentStr = '  ';
-  const resultLines: string[] = [];
-
-  for (let item of splitTags) {
-    item = item.trim();
-    if (!item) continue;
-
-    // Doctype
-    if (item.toLowerCase().startsWith('<!doctype')) {
-      resultLines.push(item);
-      continue;
-    }
-
-    // Comment (including segment markers)
-    if (item.startsWith('<!--')) {
-      resultLines.push(indentStr.repeat(indentLevel) + item);
-      continue;
-    }
-
-    // Closing tag
-    if (item.startsWith('</')) {
-      indentLevel = Math.max(0, indentLevel - 1);
-      resultLines.push(indentStr.repeat(indentLevel) + item);
-      continue;
-    }
-
-    // Opening tag
-    if (item.startsWith('<')) {
-      const tagMatch = item.match(/^<([a-zA-Z0-9:-]+)/);
-      const tagName = tagMatch ? tagMatch[1].toLowerCase() : '';
-      const isSelfClosing = selfClosing.has(tagName) || item.endsWith('/>');
-      const hasInlineClose = item.includes(`</${tagName}>`);
-
-      resultLines.push(indentStr.repeat(indentLevel) + item);
-
-      if (!isSelfClosing && !hasInlineClose && !item.startsWith('<?')) {
-        indentLevel++;
-      }
-      continue;
-    }
-
-    // Text content
-    resultLines.push(indentStr.repeat(indentLevel) + item);
-  }
-
-  let formatted = resultLines.join('\n');
-
-  // Restore protected blocks with matching indentation
-  for (let i = 0; i < protectedBlocks.length; i++) {
-    const ph = placeholder(i);
-    const content = protectedBlocks[i];
-    const regex = new RegExp(`^([ \t]*)${escapeRe(ph)}`, 'm');
-    const match = formatted.match(regex);
-    if (match) {
-      const pad = match[1];
-      const indented = content
-        .split('\n')
-        .map((l, idx) => (idx === 0 ? l : pad + l))
-        .join('\n');
-      formatted = formatted.replace(match[0], () => pad + indented);
-    } else {
-      formatted = formatted.split(ph).join(content);
-    }
-  }
-
-  return formatted;
+function isDocument(html: string): boolean {
+  const t = html.trimStart();
+  return t.startsWith('<!doctype') || t.startsWith('<!DOCTYPE') || t.startsWith('<html');
 }
 
-/**
- * Minifies HTML for production builds.
- * Collapses whitespace, minifies inline CSS, and optimizes tags.
- */
-export function minifyHtml(html: string): string {
-  const preserved: string[] = [];
-  // Collision-proof placeholders: include a random-per-call nonce + index so
-  // user content containing `___PRESERVED_0___` can never be clobbered.
-  const nonce = Math.random().toString(36).slice(2);
-  const placeholder = (i: number): string => `___DESHI_MIN_${nonce}_${i}___`;
+/** Start tag only (`<tag attrs>`) — serialized by parse5, close tag stripped. */
+function startTag(el: P5.Element): string {
+  const clone = { ...el, childNodes: [], content: undefined } as P5.Element;
+  const full = serializeOuter(clone);
+  if (VOID.has(el.tagName)) return full;
+  return full.slice(0, full.length - `</${el.tagName}>`.length);
+}
 
-  // Protect pre and textarea
-  let out = html.replace(/<(pre|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi, (m) => {
-    const idx = preserved.length;
-    preserved.push(m);
-    return placeholder(idx);
-  });
+function hasElementChild(el: P5.Element): boolean {
+  const kids = el.childNodes ?? [];
+  return kids.some((c) => Boolean((c as P5.Element).tagName));
+}
 
-  // Minify <style> blocks
-  out = out.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (_, attrs, css) => {
-    const minCss = css
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\s+/g, ' ')
-      .replace(/\s*([{}:;,])\s*/g, '$1')
-      .trim();
-    return `<style${attrs}>${minCss}</style>`;
-  });
+// ─── format ──────────────────────────────────────────────────────────────────
 
-  // Collapse inter-tag whitespace
-  out = out.replace(/>\s+</g, '><');
+/** Pretty-format HTML for development: block elements on their own lines. */
+export function formatHtml(html: string): string {
+  // Full documents must be parsed as documents — parseFragment would drop the
+  // <html>/<head>/<body> wrappers and their closing tags.
+  const root = isDocument(html) ? parse(html) : parseFragment(html);
+  const lines: string[] = [];
 
-  // Collapse redundant whitespace in text
-  out = out.replace(/\s{2,}/g, ' ');
+  const emit = (nodes: P5.ChildNode[], depth: number): void => {
+    const pad = '  '.repeat(depth);
+    for (const n of nodes) {
+      if (n.nodeName === '#text') {
+        const t = ((n as P5.TextNode).value ?? '').trim();
+        if (t) lines.push(pad + t);
+        continue;
+      }
+      if (n.nodeName === '#comment') {
+        lines.push(pad + serializeOuter(n));
+        continue;
+      }
+      if (n.nodeName === '#documentType') {
+        lines.push('<!doctype html>');
+        continue;
+      }
+      const el = n as P5.Element;
+      if (PRESERVE.has(el.tagName) || !hasElementChild(el)) {
+        lines.push(pad + serializeOuter(el));
+        continue;
+      }
+      lines.push(pad + startTag(el));
+      emit(el.childNodes, depth + 1);
+      lines.push(pad + `</${el.tagName}>`);
+    }
+  };
 
-  // Restore preserved blocks (split/join = replace-all, function-safe for `$` in content)
-  for (let i = 0; i < preserved.length; i++) {
-    out = out.split(placeholder(i)).join(preserved[i]);
+  emit(root.childNodes as P5.ChildNode[], 0);
+  return lines.join('\n');
+}
+
+// ─── minify ──────────────────────────────────────────────────────────────────
+
+function collapse(node: P5.ParentNode, preserve: boolean): void {
+  const kids = (node as { childNodes?: P5.ChildNode[] }).childNodes;
+  if (!kids) return;
+  const out: P5.ChildNode[] = [];
+  for (const child of kids) {
+    if (child.nodeName === '#text') {
+      const txt = child as P5.TextNode;
+      if (preserve) {
+        out.push(child);
+        continue;
+      }
+      const v = (txt.value ?? '').replace(/\s+/g, ' ');
+      if (!v.trim()) continue; // drop whitespace-only text between markup
+      txt.value = v;
+      out.push(child);
+      continue;
+    }
+    if (child.nodeName === '#comment') {
+      out.push(child);
+      continue;
+    }
+    const el = child as P5.Element;
+    if (el.tagName === 'style') {
+      const styleText = el.childNodes.find((c) => c.nodeName === '#text') as P5.TextNode | undefined;
+      if (styleText) styleText.value = minifyCss(styleText.value ?? '');
+      out.push(child);
+      continue;
+    }
+    collapse(el, preserve || PRESERVE.has(el.tagName));
+    out.push(child);
   }
+  (node as { childNodes: P5.ChildNode[] }).childNodes = out;
+}
 
-  return out.trim();
+/** Minify HTML for production builds. */
+export function minifyHtml(html: string): string {
+  if (isDocument(html)) {
+    const doc = parse(html);
+    collapse(doc, false);
+    // parse5 uppercases the doctype; keep the historical lowercase form.
+    return serialize(doc).replace(/^<!DOCTYPE html>/i, '<!doctype html>');
+  }
+  const frag = parseFragment(html);
+  collapse(frag, false);
+  return serialize(frag);
 }

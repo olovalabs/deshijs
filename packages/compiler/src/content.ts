@@ -9,7 +9,10 @@
 //   };
 //
 // For Deshi v1 we keep the runtime tiny: collections are file-system based
-// (src/content/<collection>/*.{md,deshi}) and validated at build time via the schema.
+// (src/content/<collection>/*.{md,mdx,deshi}) and validated at build time via the schema.
+
+import { parseFrontmatter } from './document';
+import { isSourceFile, splitFilename } from './filetype';
 
 export type CollectionEntry<C = unknown> = {
   id: string;
@@ -54,34 +57,12 @@ export async function loadCollections(root: string, appDir = 'src'): Promise<Rec
     const collPath = path.join(contentDir, collName);
     const entries: CollectionEntry[] = [];
     for (const file of fs.readdirSync(collPath)) {
-      if (!file.endsWith('.md') && !file.endsWith('.deshi') && !file.endsWith('.mdx')) continue;
+      if (!isSourceFile(file)) continue;
       const full = path.join(collPath, file);
       const raw = fs.readFileSync(full, 'utf-8');
-      // naive frontmatter parse fallback to loader; body is everything after
-      const id = file.replace(/\.(md|mdx|deshi)$/, '');
+      const { data, body } = parseFrontmatter(raw);
+      const id = splitFilename(file).stem;
       const slug = id;
-      // try to parse yaml frontmatter quickly
-      let data: Record<string, unknown> = {};
-      let body = raw;
-      if (raw.startsWith('---')) {
-        const nl = raw.indexOf('\n');
-        const end = raw.indexOf('\n---', nl);
-        if (end !== -1) {
-          const fm = raw.slice(nl + 1, end);
-          for (const line of fm.split(/\r?\n/)) {
-            const t = line.trim();
-            if (!t || t.startsWith('#')) continue;
-            const i = t.indexOf(':');
-            if (i <= 0) continue;
-            const key = t.slice(0, i).trim();
-            if (!/^[A-Za-z_][\w]*$/.test(key)) continue;
-            let v: unknown = t.slice(i + 1).trim();
-            if (v === 'true') v = true; else if (v === 'false') v = false; else if ((v as string).startsWith('"') || (v as string).startsWith("'")) v = (v as string).slice(1, -1);
-            data[key] = v;
-          }
-          body = raw.slice(end + 4).replace(/^\r?\n/, '');
-        }
-      }
       entries.push({ id, slug, body, collection: collName, data: data as any, async render() { return { Content: body, headings: [] }; } });
     }
     out[collName] = entries;

@@ -1,0 +1,46 @@
+---
+title: MDX Guide
+description: Author pages and docs as .mdx — markdown plus real Deshi components.
+---
+
+import Card from '../components/Card.deshi';
+
+# MDX Guide
+
+This page is `src/guide/page.mdx`, and it routes to **/guide** exactly like
+`.deshi`, `.html` and `.md` files do. MDX is markdown that can use real Deshi
+components and `{expressions}`.
+
+## Why MDX
+
+- **Inline components** — the `<Card />` below is a real `.deshi` component
+- **Expressions** — this is evaluated at build time: {2 + 2}
+- **Frontmatter bindings** — this page's title is "{title}"
+- **Zero client JS** — unless a component opts in with `client:*`
+
+<Card title="Real component" tag="MDX">
+  <p>Rendered through the same component pipeline as <code>.deshi</code> pages — not injected as a string.</p>
+</Card>
+
+## Code keeps braces literal
+
+Fenced blocks and inline code like `{ router: true }` are never parsed as
+expressions:
+
+```ts
+const config = { router: true, css: 'inline' };
+```
+
+## Routing parity
+
+| Source | URL |
+| --- | --- |
+| `guide/page.mdx` | `/guide` |
+| `guide/getting-started.mdx` | `/guide/getting-started` |
+| `guide/[slug]/page.mdx` | `/guide/hello`, `/guide/world` |
+
+- [x] Markdown + Deshi components in one file
+- [x] Dynamic routes via `getStaticParams()`
+- [ ] Build your own docs site
+
+Continue to [Getting Started](/guide/getting-started).

@@ -10,8 +10,17 @@ export interface DeshiImageConfig {
   remotePatterns?: Array<{ protocol?: string; hostname: string; port?: string; pathname?: string }>;
 }
 
+export interface DeshiShikiConfig {
+  /** Set false to disable build-time syntax highlighting entirely. */
+  enabled?: boolean;
+  /** Shiki theme name (default `github-dark`). */
+  theme?: string;
+  /** Extra language ids to preload (defaults cover common web/markdown languages). */
+  langs?: string[];
+}
+
 export interface DeshiMarkdownConfig {
-  shikiConfig?: { theme?: string; wrap?: boolean };
+  shikiConfig?: DeshiShikiConfig;
   remarkPlugins?: unknown[];
   rehypePlugins?: unknown[];
   gfm?: boolean;

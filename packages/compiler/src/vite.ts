@@ -7,6 +7,8 @@ import { build as buildSite, buildToDisk, type BuildResult } from './build';
 import { hashString } from './types';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
 import { loadConfig, mergeConfig, defaultConfig } from './config';
+import { isCodeFile, isSourceFile } from './filetype';
+import { prepareHighlight } from './highlight';
 
 // Virtual per-file CSS served through Vite's pipeline (postcss, HMR):
 // codegen emits `import "/_deshi/<hash>.css"` per CSS-having file (React-style),
@@ -45,7 +47,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
   }
 
   function isDeshiSource(file: string): boolean {
-    return /\.(deshi|md|html)$/.test(file);
+    return isSourceFile(file);
   }
 
   function cssOnlyChange(
@@ -79,6 +81,8 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
 
   // Cached merged config (file + inline options)
   let deshiConfig: any = null;
+  // Shiki options resolved from config; null = highlighting disabled.
+  let highlightOpts: { theme?: string; langs?: string[] } | null = null;
   async function getDeshiConfig(root: string) {
     if (deshiConfig) return deshiConfig;
     const fileCfg = await loadConfig(root);
@@ -86,11 +90,20 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     return deshiConfig;
   }
 
+  function highlightOptions(dc: any): { theme?: string; langs?: string[] } | null {
+    const s = dc?.markdown?.shikiConfig;
+    if (s && s.enabled === false) return null;
+    return { theme: s?.theme ?? 'github-dark', langs: s?.langs ?? [] };
+  }
+
   return {
     name: 'vite-plugin-deshi',
     async config(cfg, env) {
       const root = cfg.root || process.cwd();
       const dc = await getDeshiConfig(root);
+      // Load Shiki once up front so the synchronous document layer can highlight.
+      highlightOpts = highlightOptions(dc);
+      if (highlightOpts) await prepareHighlight(highlightOpts);
       return {
         build: {
           rollupOptions: {
@@ -195,7 +208,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     },
     async transform(code, id) {
       const cleanId = id.split('?')[0];
-      if (cleanId.endsWith('.deshi') || cleanId.endsWith('.md')) {
+      if (isSourceFile(cleanId)) {
         const result = compile(code, {
           file: cleanId,
           minify: options.minify ?? false,
@@ -339,7 +352,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
               const rel = base ? `${base}/${item.name}` : item.name;
               if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules' && item.name !== 'compiler') {
                 Object.assign(out, readFilesRecursively(full, rel));
-              } else if (item.isFile() && (item.name.endsWith('.deshi') || item.name.endsWith('.html') || item.name.endsWith('.md') || item.name.endsWith('.ts') || item.name.endsWith('.js'))) {
+              } else if (item.isFile() && (isSourceFile(item.name) || isCodeFile(item.name))) {
                 out[`src/${rel}`] = fs.readFileSync(full, 'utf-8');
               }
             }
@@ -366,6 +379,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
                 minify: false,
                 appDir: (dcDev as any).appDir ?? 'src',
                 site: (dcDev as any).site,
+                highlight: highlightOpts ?? undefined,
               } as any
             );
             cachedBuild = { fp, result };
@@ -524,6 +538,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           minify: (dc as any).minify ?? options.minify ?? true,
           appDir: (dc as any).appDir ?? options.appDir ?? 'src',
           site: (dc as any).site,
+          highlight: highlightOpts ?? undefined,
         } as any,
         outDir
       );

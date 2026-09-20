@@ -43,12 +43,41 @@ This is a native markdown page rendered directly by Deshijs!
 
 ## Built-in GFM Features
 
-The built-in parser in `markdown.ts` supports full GitHub Flavored Markdown specifications:
+The remark/GFM pipeline supports full GitHub Flavored Markdown specifications:
 
 1. **Auto-Slugged Heading Anchors**: `## Quick Start` generates `<h2 id="quick-start">Quick Start</h2>` for seamless deep-linking.
 2. **Markdown Tables**: Pipe-delimited markdown tables (`| Col 1 | Col 2 |`) compile into semantic `<table>`, `<thead>`, and `<tbody>`.
 3. **Interactive Task Lists**: `- [x] Done` and `- [ ] Todo` render as disabled checkboxes in styled list items.
 4. **Fenced Code Blocks**: Triple-backtick blocks (```ts) emit syntax highlighting classes (`class="language-ts"`).
+
+---
+
+## Syntax Highlighting (Shiki)
+
+Code fences are highlighted at **build time** with [Shiki](https://shiki.style).
+Only the resulting markup ships — no highlighter ever reaches the browser:
+
+```ts
+const config = { router: true, css: 'inline' };
+```
+
+Configure the theme and extra languages in `deshi.config.ts`:
+
+```ts
+export default defineConfig({
+  markdown: {
+    shikiConfig: {
+      theme: 'github-dark',
+      langs: ['ts', 'rust', 'zig'],
+      enabled: true, // set false to disable highlighting
+    },
+  },
+});
+```
+
+Common web/markdown languages are preloaded. A language that is not loaded, or an
+unlabelled fence, falls back to a plain `<pre><code class="language-x">` block.
+Shiki's output is injected via `set:html`, so it remains part of the static AST.
 
 ---
 
@@ -67,9 +96,50 @@ The layout receives the frontmatter properties as `props` and renders the articl
 
 ---
 
-## Compiler Internals (markdownToDeshi)
+## MDX (`.mdx`)
 
-In `packages/compiler/src/markdown.ts`, markdown files are transformed into native Deshi AST:
-- `parseFrontmatter(source)`: Extracts YAML data and markdown body.
-- `markdownToHtml(body)`: Transforms markdown into HTML strings.
-- `markdownToDeshi(source)`: Emits a synthetic `.deshi` component wrapping the HTML into `<article set:html={html}>` with default typography styles.
+`.mdx` is markdown plus real Deshi template syntax — import and use `.deshi`
+components, embed `{expressions}`, and use top-level ESM (`import` / `export`):
+
+```mdx
+---
+title: Guide
+---
+
+import Card from '../components/Card.deshi';
+
+# Hello {frontmatter.title}
+
+<Card title="Real component">Rendered through the component pipeline.</Card>
+
+export async function getStaticParams() {
+  return [{ slug: 'a' }, { slug: 'b' }];
+}
+```
+
+`.mdx` routes exactly like `.md` (`.deshi`/`.html`/`.md`/`.mdx` all share the
+same file-system routing), and components become genuine AST nodes — so
+`client:*` islands, scope diagnostics and codegen all apply.
+
+---
+
+## Compiler Internals (AST pipeline)
+
+In `packages/compiler/src/document.ts`, `.md` / `.mdx` are parsed with the
+[unified/remark](https://unifiedjs.com) pipeline and mapped straight to the
+Deshi AST:
+
+- `parseFrontmatter(source)` — YAML frontmatter via `remark-frontmatter` + `yaml`.
+- `remark-parse` + `remark-gfm` build a **mdast** tree; `.mdx` also enables
+  `remark-mdx` for JSX, `{expressions}` and ESM.
+- The mdast → Deshi mapper emits real `Element`, `Component`, `Expression` and
+  `Text` nodes with source locations. Nothing is turned into an HTML string and
+  re-parsed, so scope analysis, codegen and diagnostics operate on the AST.
+- Frontmatter becomes `<script>` bindings (one `const` per field plus a
+  `frontmatter` object); `layout:` in frontmatter wraps the article in that
+  component.
+- The `.deshi-md` typography is emitted as unscoped CSS; the article is wrapped
+  in `<article class="deshi-md">`.
+
+> `.md` is plain CommonMark + GFM. `.mdx` adds `remark-mdx`; both share the same
+> routing, layout chain and SSG build as `.deshi`.

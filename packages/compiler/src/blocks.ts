@@ -39,11 +39,22 @@ interface Pending {
   contentStart: number;
 }
 
+/** Index of a leading `---` fence line, or -1. */
+function leadingFenceStart(source: string): number {
+  let i = 0;
+  while (i < source.length && (source[i] === ' ' || source[i] === '\t')) i++;
+  if (!source.startsWith('---', i)) return -1;
+  let j = i + 3;
+  while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
+  if (source[j] === '\n' || (source[j] === '\r' && source[j + 1] === '\n')) return i;
+  return -1;
+}
+
 export function splitBlocks(source: string, file: string): SplitResult {
   // Astro frontmatter alias: leading `---` fenced block is treated as <script>
   // so `---\nimport X from './X.deshi'\n---` works like <script>.
-  if (/^\s*---\s*\r?\n/.test(source)) {
-    const start = source.indexOf('---');
+  if (leadingFenceStart(source) !== -1) {
+    const start = leadingFenceStart(source);
     const nl = source.indexOf('\n', start + 3);
     const second = source.indexOf('\n---', nl);
     if (second !== -1) {
@@ -53,14 +64,8 @@ export function splitBlocks(source: string, file: string): SplitResult {
       const fenceEnd = source.indexOf('\n', endMark + 3);
       const fenceRange = { start, end: fenceEnd === -1 ? source.length : fenceEnd + 1 };
       const content = source.slice(contentStart, contentEnd);
-      // If no <script> exists later, synthesize one
-      if (!/<script[\s>]/i.test(source.slice(fenceRange.end))) {
-        // blank out fence and treat its content as script, then fall through to normal tokenizing for styles
-        const blankedHead = source.slice(0, fenceRange.start).replace(/[^\n]/g, ' ') + source.slice(fenceRange.start, fenceRange.end).replace(/[^\n]/g, ' ').split('').map((c) => (c === '\n' ? '\n' : ' ')).join('') ;
-        void blankedHead;
-      }
-      // We will handle it after tokenizer — if script wasn't found, inject the fence content as script
-      // To preserve offsets, note its position now.
+      // Handled after tokenizing — if no <script> is found, the fence content is
+      // injected as the script block (offsets preserved by noting its position).
       const frontmatterScript = { content, contentStart, start, end: fenceEnd === -1 ? source.length : fenceEnd + 1 };
       const after = splitBlocksInternal(source, file, frontmatterScript);
       if (after) return after;

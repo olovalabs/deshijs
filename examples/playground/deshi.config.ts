@@ -9,6 +9,12 @@ export default defineConfig({
   outDir: 'dist',
   router: true,
   css: 'inline',
+  markdown: {
+    shikiConfig: {
+      theme: 'github-dark',
+      langs: ['ts', 'tsx'],
+    },
+  },
   experimental: {
     viewTransitions: false,
     contentCollections: true,

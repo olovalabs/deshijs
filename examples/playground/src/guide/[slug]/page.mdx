@@ -1,0 +1,20 @@
+---
+description: A dynamic MDX route driven by getStaticParams().
+---
+
+import Card from '../../components/Card.deshi';
+
+export async function getStaticParams() {
+  return [{ slug: 'hello' }, { slug: 'world' }];
+}
+
+# Dynamic MDX: {params.slug}
+
+This file is `src/guide/[slug]/page.mdx` — a **dynamic** route. Deshi calls the
+`getStaticParams()` export above and renders one static page per slug.
+
+<Card title="Current slug" tag="Dynamic">
+  <p>The value of <code>params.slug</code> is <strong>{params.slug}</strong>.</p>
+</Card>
+
+Back to the [MDX guide](/guide).

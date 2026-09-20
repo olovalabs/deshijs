@@ -27,6 +27,7 @@
         <a href="/blog">Blog</a>
         <a href="/counter">Counter</a>
         <a href="/hello">Markdown</a>
+        <a href="/guide">MDX</a>
       </nav>
     </div>
   </header>
