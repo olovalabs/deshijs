@@ -136,7 +136,6 @@ function islandRuntimeSource(): string {
             id,
             'data-deshi-island': hash,
             'data-deshi-props': payload,
-            style: { display: 'contents' },
           }, child),
           React.createElement('script', {
             type: 'module',
@@ -233,7 +232,7 @@ async function makeServerBundle(files: Record<string, string>, moduleFiles: stri
   const entries = moduleFiles.map((file, index) => `${JSON.stringify(file)}: M${index}`).join(',\n');
   const entry = `
     import * as React from 'react';
-    import { renderToStaticMarkup } from 'react-dom/server';
+    import { renderToString } from 'react-dom/server';
     import { setIslandState } from 'deshi:react-server-runtime';
     ${imports}
     const modules = { ${entries} };
@@ -250,7 +249,9 @@ async function makeServerBundle(files: Record<string, string>, moduleFiles: stri
           tree = React.createElement(layout.default, props, tree);
         }
         return {
-          html: renderToStaticMarkup(tree),
+          // Unlike renderToStaticMarkup, renderToString produces markup that
+          // React can hydrate at a *.client.tsx island boundary.
+          html: renderToString(tree),
           state: { clients: [...state.clients], preloads: [...state.preloads] },
         };
       } finally {
@@ -425,7 +426,12 @@ export async function buildReactSite(project: Project, options: BuildOptions = {
         head += '<script type="module" src="/_deshi/router.4f1a9c2e.js"></script>';
       }
       html = injectHead(html, head);
-      html = minify ? minifyHtml(html) : formatHtml(html);
+      // Reformatting inserts whitespace text nodes and generic HTML minifiers
+      // can rewrite text. Either operation breaks React hydration inside an
+      // island, so preserve React's exact server markup on island pages.
+      if (rendered.state.clients.length === 0) {
+        html = minify ? minifyHtml(html) : formatHtml(html);
+      }
       pages.push({
         url,
         pattern: route.pattern,

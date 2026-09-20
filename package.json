@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test:islands": "node tests/island-hydration.mjs",
+    "test": "npm run typecheck && npm run build && npm run test:islands",
     "sync-icon": "node .vscode/sync-icon.js"
   },
   "dependencies": {
@@ -24,6 +26,7 @@
     "@types/node": "^22.19.17",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "jsdom": "^27.4.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.2"
   }

@@ -14,10 +14,10 @@ export default function CounterPage() {
 
         <section className="island-card">
           <div>
-            <span className="eyebrow">Hydration: visible</span>
-            <h2>Only load when scrolled into view</h2>
+            <span className="eyebrow">Hydration: load</span>
+            <h2>Ready as soon as the page loads</h2>
           </div>
-          <Counter client="visible" initialCount={0} step={1} />
+          <Counter client="load" initialCount={0} step={1} />
         </section>
 
         <section className="explanation-grid">
