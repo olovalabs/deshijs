@@ -3,6 +3,8 @@ title: "Islands Architecture & Hydration"
 description: "In-depth guide to Deshijs islands architecture and all 6 client:* hydration directives."
 ---
 
+import Callout from '../components/Callout.deshi';
+
 # Islands Architecture & Hydration
 
 Deshijs ships zero client JavaScript by default. When interactivity is needed, you opt-in at the **usage site** using `client:*` directives.
@@ -77,6 +79,12 @@ A unique Deshi extension: zero JavaScript is downloaded until the user clicks th
 <CanvasGame client:only />
 ```
 Skips server-side rendering entirely. Useful for browser-only libraries like Three.js, Canvas, or WebGL.
+
+<Callout type="warning" title="client:only ships no HTML">
+  Because SSR is skipped, a `client:only` component renders nothing until its
+  JavaScript loads — never rely on it for content that must be in the initial
+  HTML (SEO, above-the-fold text, or a no-JS fallback).
+</Callout>
 
 ---
 

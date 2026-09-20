@@ -5,7 +5,7 @@ description: "In-depth breakdown of the Deshijs 7-stage compiler pipeline and st
 
 # Compiler Architecture & Pipeline
 
-The Deshijs compiler compiles `.deshi` and `.md` files into deterministic, asynchronous ESM render modules. Understanding the 7-stage compilation pipeline helps you write efficient templates and debug diagnostics.
+The Deshijs compiler compiles `.deshi`, `.md` and `.mdx` files into deterministic, asynchronous ESM render modules. Understanding the compilation pipeline helps you write efficient templates and debug diagnostics.
 
 ## Pipeline Overview
 
@@ -62,7 +62,7 @@ Unlike naive regular expression matchers that break on nested code or strings, D
 
 The extracted script is analyzed using **Acorn**. Deshijs accepts full TypeScript: if plain JS parsing succeeds, exact diagnostics are preserved; if TypeScript features (types, interfaces, generics) are present, `esbuild` strips types with `verbatimModuleSyntax`, and Acorn re-parses the stripped AST:
 
-- **Imports Hoisting**: Detects component imports (`.deshi`, `.html`, `.md`) and validates capitalization (`PF4020`).
+- **Imports Hoisting**: Detects component imports (`.deshi`, `.html`, `.md`, `.mdx`) and validates capitalization (`PF4020`).
 - **Exports Validation**: Components only allow `export async function getStaticParams` (or `getStaticPaths`). Other exports trigger `PF4021`.
 - **Top-Level Bindings**: Records all declared identifiers (variables, functions, classes) for template scope checking.
 - **Body Inlining**: Prepares remaining statements for inlining directly into the render function.

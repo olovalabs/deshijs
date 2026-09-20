@@ -3,6 +3,7 @@
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { islandInlineScript, stampIslandRoot, type IslandStrategy } from './islands';
 import { splitFilename } from './filetype';
+import { DESHI_VERSION } from './types';
 
 export class Raw {
   constructor(public html: string) {}
@@ -153,7 +154,7 @@ export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns
     url: ctx.url,
     request: { url: ctx.url.href, headers: new Headers() },
     site: ctx.url ? new URL(ctx.url.origin) : undefined,
-    generator: 'Deshi ' + '1.0.0',
+    generator: 'Deshi ' + DESHI_VERSION,
     slots,
   };
   return { props, slots, params: ctx.params, url: ctx.url, route: ctx.route, env: ctx.env, Astro } as Bindings;

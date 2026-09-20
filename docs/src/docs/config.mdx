@@ -3,6 +3,8 @@ title: "Configuration Reference"
 description: "Complete reference for deshi.config.ts options, schema, defineConfig helper, and configuration loading."
 ---
 
+import Callout from '../components/Callout.deshi';
+
 # Configuration Reference
 
 Configure your Deshijs application via `deshi.config.ts` (or `.js`, `.mjs`). Options follow Astro conventions and merge cleanly with inline Vite options.
@@ -74,6 +76,29 @@ router: {
 ```
 
 Enables the 1KB client router. You can configure hover prefetching or viewport-based prefetching.
+
+---
+
+## Markdown & Syntax Highlighting
+
+Code fences in `.md` / `.mdx` files are highlighted at **build time** with [Shiki](https://shiki.style). Configure the theme and extra languages:
+
+```ts
+markdown: {
+  shikiConfig: {
+    theme: 'github-dark',
+    langs: ['ts', 'rust', 'zig'], // extras on top of the defaults
+    enabled: true,                // set false to disable
+  },
+}
+```
+
+<Callout type="tip" title="Build-time only">
+  Highlighting runs during the build; only the resulting
+  `<span style="color:…">` markup ships to the browser. Common web/markdown
+  languages are preloaded, and unlabelled or unsupported fences fall back to a
+  plain `<pre><code>` block.
+</Callout>
 
 ---
 

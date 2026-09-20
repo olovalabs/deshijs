@@ -5,6 +5,7 @@ import type { Attr, Component, Element, Expression, Node, Root, Slot } from './t
 import type { ImportInfo, ScriptInfo } from './script';
 import { escapeAttr, escapeHtml } from './runtime';
 import { scopeAttribute } from './css';
+import { DESHI_VERSION } from './types';
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
@@ -295,7 +296,7 @@ export function generate(input: CodegenInput): CodegenOutput {
   // Template expressions can use `Astro.props`, `Astro.params`, `Astro.url`, etc.
   const renderFn = [
     `async function render({ props, slots, params, url, route, env, Astro }, $slotFns, $ctx, $cp) {`,
-    `  if (!Astro) { Astro = { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: 'Deshi 1.0.0', slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null }; }`,
+    `  if (!Astro) { Astro = { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: ${JSON.stringify('Deshi ' + DESHI_VERSION)}, slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null }; }`,
     body.trimEnd(),
     heads,
     `  let $o = '';`,

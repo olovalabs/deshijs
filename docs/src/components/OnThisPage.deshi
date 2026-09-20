@@ -22,10 +22,10 @@
       </h2>
       
       <!-- TOC link tree (Dynamically updated for .md headings) -->
-      <ul id="toc-list" class="space-y-1 text-xs border-l border-[#202128]">
+      <ul id="toc-list" class="space-y-1 text-[13px] font-medium border-l border-[#202128]">
         {items.map((item) => (
           <li>
-            <a href={item.href} class="block -ml-[1px] pl-3 py-1 border-l-2 border-transparent text-zinc-400 hover:text-white hover:border-primary transition">
+            <a href={item.href} class="block -ml-[1px] pl-3 py-1 border-l-2 border-transparent text-zinc-300 hover:text-white hover:border-primary transition">
               {item.label}
             </a>
           </li>
@@ -65,8 +65,8 @@
         a.textContent = h.textContent.replace(/^#\s*/, '');
         const isH3 = h.tagName.toLowerCase() === 'h3';
         a.className = isH3
-          ? 'block pl-5 py-0.5 text-zinc-500 hover:text-zinc-200 text-[11px] transition'
-          : 'block -ml-[1px] pl-3 py-1 border-l-2 border-transparent text-zinc-400 hover:text-white hover:border-primary transition text-xs';
+          ? 'block pl-5 py-0.5 text-zinc-500 hover:text-zinc-200 text-xs transition'
+          : 'block -ml-[1px] pl-3 py-1 border-l-2 border-transparent text-zinc-300 hover:text-white hover:border-primary transition';
         li.appendChild(a);
         list.appendChild(li);
       });

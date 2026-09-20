@@ -42,7 +42,7 @@
           Getting Started
         </a>
         <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="inline-flex items-center justify-center bg-[#15161b] hover:bg-[#1d1f25] border border-[#282a33] hover:border-zinc-500 text-zinc-200 hover:text-white font-medium text-sm px-7 py-3 rounded-full transition-all cursor-pointer">
-          Open StackBlitz
+          View on GitHub
         </a>
       </div>
     </div>
@@ -160,7 +160,7 @@
 
             <!-- Version pill -->
             <div class="pt-3 border-t border-[#181920] flex items-center justify-between text-[10px] text-zinc-500 px-1">
-              <span>v1.0.0</span>
+              <span>v3.1.0</span>
               <span class="text-primary flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
                 Ready

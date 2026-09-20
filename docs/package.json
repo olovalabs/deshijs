@@ -12,7 +12,7 @@
     "deshijs": "workspace:*"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/cli": "^4.3.3",
     "tailwindcss": "^4.3.3",
     "vite": "^7.3.2"
   }

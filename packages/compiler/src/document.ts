@@ -30,18 +30,41 @@ import { fail, type Attr, type Diagnostic, type Element, type Expression, type L
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type M = any;
 
-export const DOC_TYPOGRAPHY_CSS = `.deshi-md { max-width: 720px; margin: 0 auto; }
-.deshi-md h1 { font-size: 2rem; color: #fafafa; }
-.deshi-md h2 { font-size: 1.4rem; color: #fafafa; margin-top: 1.5rem; }
-.deshi-md h3 { font-size: 1.15rem; color: #e4e4e7; margin-top: 1.25rem; }
-.deshi-md p, .deshi-md li { color: #a1a1aa; line-height: 1.7; }
-.deshi-md a { color: #a3e635; text-decoration: underline; text-underline-offset: 2px; }
-.deshi-md pre { background: #18181b; padding: 1rem; border-radius: 8px; overflow: auto; border: 1px solid #27272a; }
-.deshi-md code { font-family: ui-monospace, monospace; font-size: 0.9em; }
-.deshi-md table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
-.deshi-md th, .deshi-md td { border: 1px solid #27272a; padding: 0.5rem 0.75rem; text-align: left; }
-.deshi-md th { background: #18181b; color: #fafafa; }
-.deshi-md blockquote { border-left: 3px solid #3f3f46; padding-left: 1rem; margin: 1.5rem 0; color: #a1a1aa; }`;
+// Default markdown/MDX typography. Colours are exposed as `--deshi-*` custom
+// properties (with dark-theme fallbacks) so a site can align them with its own
+// design tokens — e.g. `.deshi-md { --deshi-link: var(--color-primary) }`.
+export const DOC_TYPOGRAPHY_CSS = `.deshi-md { max-width: 720px; margin: 0 auto; color: var(--deshi-text, #a1a1aa); }
+.deshi-md > :first-child { margin-top: 0; }
+.deshi-md h1, .deshi-md h2, .deshi-md h3, .deshi-md h4, .deshi-md h5, .deshi-md h6 { color: var(--deshi-heading, #fafafa); font-weight: 700; line-height: 1.25; margin: 2rem 0 0.75rem; }
+.deshi-md h1 { font-size: 2rem; }
+.deshi-md h2 { font-size: 1.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--deshi-border, #27272a); }
+.deshi-md h3 { font-size: 1.15rem; }
+.deshi-md h4, .deshi-md h5, .deshi-md h6 { font-size: 1rem; }
+.deshi-md p { line-height: 1.75; margin: 0 0 1rem; }
+.deshi-md p:last-child, .deshi-md ul:last-child, .deshi-md ol:last-child, .deshi-md pre:last-child, .deshi-md blockquote:last-child, .deshi-md table:last-child { margin-bottom: 0; }
+.deshi-md strong { color: var(--deshi-strong, #e4e4e7); font-weight: 600; }
+.deshi-md em { font-style: italic; }
+.deshi-md a { color: var(--deshi-link, #a3e635); text-decoration: underline; text-underline-offset: 2px; }
+.deshi-md ul, .deshi-md ol { margin: 0 0 1rem; padding-left: 1.5rem; }
+.deshi-md ul { list-style: disc; }
+.deshi-md ol { list-style: decimal; }
+.deshi-md ul ul { list-style: circle; }
+.deshi-md ul ul ul { list-style: square; }
+.deshi-md li { line-height: 1.75; margin: 0.35rem 0; }
+.deshi-md li > ul, .deshi-md li > ol { margin: 0.35rem 0; }
+.deshi-md li::marker { color: var(--deshi-marker, #52525b); }
+.deshi-md blockquote { border-left: 3px solid var(--deshi-quote-border, #3f3f46); padding-left: 1rem; margin: 1.5rem 0; color: var(--deshi-muted, #a1a1aa); }
+.deshi-md hr { border: 0; border-top: 1px solid var(--deshi-border, #27272a); margin: 2rem 0; }
+.deshi-md img { max-width: 100%; height: auto; border-radius: 8px; }
+.deshi-md pre { background: var(--deshi-pre-bg, #18181b); padding: 1rem; border-radius: 8px; overflow: auto; border: 1px solid var(--deshi-border, #27272a); margin: 0 0 1.25rem; font-size: var(--deshi-code-size, 0.9em); }
+.deshi-md code { font-family: var(--deshi-font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace); }
+.deshi-md pre code { font-size: 1em; }
+.deshi-md :not(pre) > code { font-size: 0.9em; background: var(--deshi-code-bg, #1c1c21); border: 1px solid var(--deshi-border, #27272a); border-radius: 4px; padding: 0.12em 0.38em; color: var(--deshi-code-text, #e4e4e7); }
+.deshi-md table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95em; }
+.deshi-md th, .deshi-md td { border: 1px solid var(--deshi-border, #27272a); padding: 0.5rem 0.75rem; text-align: left; }
+.deshi-md th { background: var(--deshi-th-bg, #18181b); color: var(--deshi-heading, #fafafa); font-weight: 600; }
+.deshi-md input[type="checkbox"] { margin-right: 0.45rem; accent-color: var(--deshi-accent, #a3e635); }
+.deshi-md :is(h1, h2, h3, h4, h5, h6):first-child { margin-top: 0; }`;
 
 export interface DocumentResult {
   root: Root;

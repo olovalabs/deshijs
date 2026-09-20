@@ -1,0 +1,20 @@
+<script>
+  const type = props.type || 'note';
+  const palette = {
+    note: 'border-blue-500/40 bg-blue-950/25 text-blue-300',
+    tip: 'border-primary/40 bg-primary/10 text-primary',
+    warning: 'border-amber-500/40 bg-amber-950/25 text-amber-300',
+    danger: 'border-red-500/40 bg-red-950/25 text-red-300',
+  };
+  const labels = { note: 'Note', tip: 'Tip', warning: 'Warning', danger: 'Caution' };
+  const tone = palette[type] || palette.note;
+  const label = props.title || labels[type] || 'Note';
+</script>
+
+<!-- MDX AUTHORING COMPONENT — used from .mdx docs pages via `import Callout from '../components/Callout.deshi'` -->
+<div class={`my-5 rounded-lg border px-4 py-3 ${tone}`}>
+  <div class="mb-1.5 text-[11px] font-semibold uppercase tracking-wider">{label}</div>
+  <div class="text-sm leading-relaxed">
+    <slot />
+  </div>
+</div>

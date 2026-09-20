@@ -1,4 +1,6 @@
 <script>
+  import SearchPalette from './components/SearchPalette.deshi';
+
   const title = props.title || "Deshi · The 0JS Progressive Web Framework";
 </script>
 
@@ -7,6 +9,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#090a0d" />
   <title>{title}</title>
   <link rel="icon" type="image/svg+xml" href="/deshi.svg" />
   <link rel="stylesheet" href="/tailwind.css" />
@@ -17,15 +21,17 @@
 </head>
 <body class="bg-[#090a0d] text-[#e4e4e7] antialiased min-h-screen flex flex-col font-sans selection:bg-primary/25 selection:text-primary w-full overflow-x-hidden">
   <slot />
+
+  <!-- Global search (client island); the header renders its triggers. -->
+  <SearchPalette client:load />
 </body>
 </html>
 
 <style>
-  :global(html, body) {
-    font-family: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  :global(pre, code) {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Font families come from the Tailwind theme (`--font-sans` / `--font-mono`);
+     only the app-specific pieces live here. */
+  :global(pre, code, kbd, samp) {
+    font-family: var(--font-mono);
   }
   /* Custom thin scrollbar */
   .scrollbar-thin::-webkit-scrollbar {

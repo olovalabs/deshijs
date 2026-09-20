@@ -1,18 +1,26 @@
 ---
-title: "Markdown Engine & GFM"
-description: "Guide to native markdown routing, frontmatter bindings, GFM syntax parsing, and layout wrapping in Deshijs."
+title: "Markdown & MDX"
+description: "Guide to native markdown/MDX routing, frontmatter bindings, GFM parsing, Shiki highlighting, and layout wrapping in Deshijs."
 ---
 
-# Markdown Engine & GFM
+import Callout from '../components/Callout.deshi';
 
-Deshijs provides first-class support for `.md` files. Write markdown directly in your route tree with automatic frontmatter bindings, built-in GitHub Flavored Markdown (GFM) parsing, and seamless layout wrapping.
+# Markdown & MDX
 
-## Markdown File Routing
+Deshijs provides first-class support for `.md` and `.mdx` files. Write markdown directly in your route tree with automatic frontmatter bindings, built-in GitHub Flavored Markdown (GFM) parsing, Shiki syntax highlighting, and seamless layout wrapping. `.mdx` additionally gives you real `.deshi` components and `{expressions}` inside markdown.
 
-Dropping a `.md` file into your `src/` directory instantly creates a static route:
+<Callout type="note" title=".md vs .mdx">
+  `.md` is plain CommonMark + GFM. `.mdx` enables component JSX, `{expressions}`
+  and top-level ESM (`import` / `export`). Both share the same routing, layout
+  chain and SSG build as `.deshi`.
+</Callout>
+
+## Markdown & MDX File Routing
+
+Dropping a `.md` or `.mdx` file into your `src/` directory instantly creates a static route:
 
 - `src/about.md` &rarr; `/about`
-- `src/blog/welcome.md` &rarr; `/blog/welcome`
+- `src/blog/welcome.mdx` &rarr; `/blog/welcome`
 - `src/terms/page.md` &rarr; `/terms`
 
 ---
@@ -87,7 +95,7 @@ Specify a layout component in frontmatter to wrap the compiled article:
 
 ```markdown
 ---
-title: "Announcing Deshijs 1.0"
+title: "Announcing Deshijs 3.1"
 layout: "../layouts/ArticleLayout.deshi"
 ---
 ```

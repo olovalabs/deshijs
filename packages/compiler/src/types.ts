@@ -113,6 +113,9 @@ export type Attr =
 
 // ─── Diagnostics ───────────────────────────────────────────────────────────────
 
+/** Framework version reported via `Astro.generator`. Keep in sync with package.json. */
+export const DESHI_VERSION = '3.1.0';
+
 export type Severity = 'error' | 'warning';
 
 export interface Diagnostic {

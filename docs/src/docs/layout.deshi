@@ -6,11 +6,12 @@
   const brand = props.brand || "Deshi";
 </script>
 
-<!-- Mobile Sidebar Checkbox Toggle Controller (0 JS) -->
-<input type="checkbox" id="mobile-sidebar-toggle" class="peer hidden" />
+<!-- Mobile sidebar toggle (0 JS). `sr-only` keeps it focusable so keyboard users
+     can operate it with Space; the focus ring is styled in src/tailwind.css. -->
+<input type="checkbox" id="mobile-sidebar-toggle" class="peer sr-only" />
 
 <!-- Backdrop overlay for mobile sidebar drawer (0 JS) -->
-<label for="mobile-sidebar-toggle" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden peer-checked:block lg:hidden cursor-pointer"></label>
+<label for="mobile-sidebar-toggle" aria-hidden="true" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden peer-checked:block lg:hidden cursor-pointer"></label>
 
 <!-- Standalone Header Component -->
 <Header brand={brand} />
@@ -18,7 +19,7 @@
 <!-- 3-COLUMN DOCS BODY - 100% FULL WIDTH EDGE-TO-EDGE -->
 <div class="flex-1 flex w-full">
   <!-- Standalone Sidebar Component (Left) -->
-  <Sidebar brand={brand} />
+  <Sidebar brand={brand} client:load />
 
   <!-- CENTER MAIN CONTENT -->
   <main class="flex-1 min-w-0 w-full">

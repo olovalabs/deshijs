@@ -3,9 +3,17 @@ title: Deshijs Compiler & Framework Documentation
 description: Complete documentation for Deshijs, a Zero-JS static site generator and modern compiler with islands architecture.
 ---
 
+import Callout from '../components/Callout.deshi';
+
 # Deshijs Compiler & Framework
 
-Deshijs is a high-performance, Zero-JS static site generator and modern compiler for `.deshi` and `.md` templates. It compiles to pure static HTML by default and hydrates interactive islands on-demand using fine-grained client directives.
+Deshijs is a high-performance, Zero-JS static site generator and modern compiler for `.deshi`, `.mdx` and `.md` templates. It compiles to pure static HTML by default and hydrates interactive islands on-demand using fine-grained client directives.
+
+<Callout type="tip" title="This documentation is MDX">
+  Every page under `/docs` is a `.mdx` file: markdown plus real Deshijs components
+  (like this callout), `{expressions}` and build-time [Shiki](https://shiki.style)
+  syntax highlighting.
+</Callout>
 
 ---
 
@@ -16,7 +24,7 @@ Modern web frameworks often ship megabytes of JavaScript just to render static d
 - **0KB JavaScript by Default**: Pages without interactive islands emit zero client JS. No hydration tax, 100/100 Lighthouse performance.
 - **Instant Vite HMR**: Co-located styles and templates update in under 20ms over WebSockets without losing page state or triggering full refreshes.
 - **Islands Architecture**: Hydrate only what needs interactivity using `client:load`, `client:visible`, `client:idle`, or `client:click`.
-- **First-Class Markdown Support**: Put `.md` files directly in your routes directory. Frontmatter turns into bindings and layouts wrap content seamlessly.
+- **First-Class Markdown & MDX**: Put `.md` / `.mdx` files directly in your routes directory. Frontmatter turns into bindings, layouts wrap content seamlessly, and MDX adds real `.deshi` components, `{expressions}` and build-time Shiki highlighting.
 
 ---
 
@@ -57,8 +65,8 @@ my-deshi-app/
 │   │   └── page.deshi          # Static route ("/about")
 │   ├── docs/
 │   │   ├── layout.deshi        # Nested layout for docs
-│   │   ├── page.md             # Docs overview ("/docs")
-│   │   └── routing.md          # Markdown doc ("/docs/routing")
+│   │   ├── page.mdx            # Docs overview ("/docs")
+│   │   └── routing.mdx         # Markdown/MDX doc ("/docs/routing")
 │   ├── blog/
 │   │   └── [slug]/
 │   │       └── page.deshi      # Dynamic route (uses getStaticParams())
@@ -221,5 +229,5 @@ Explore the full documentation topics:
 - [Directives](/docs/directives) — `set:html`, `set:text`, `class:list`, `define:vars`, and View Transitions.
 - [File-Based Routing](/docs/routing) — Dynamic routes, catch-all segments, and route groups.
 - [Static Params](/docs/static-params) — Generating static paths at build time.
-- [Markdown Support](/docs/markdown) — Frontmatter, tables, heading IDs, and layout injection.
+- [Markdown & MDX](/docs/markdown) — Frontmatter, GFM tables, MDX components, and Shiki highlighting.
 - [Diagnostic Catalog](/docs/error-catalog) — Complete list of PF1001–PF6001 compiler diagnostics.

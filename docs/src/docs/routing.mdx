@@ -3,6 +3,8 @@ title: "File-Based Routing"
 description: "Complete guide to Deshijs file-based routing, dynamic segments, catch-all routes, route groups, and nested layouts."
 ---
 
+import Callout from '../components/Callout.deshi';
+
 # File-Based Routing
 
 Deshijs uses an intuitive, directory-driven routing engine. Every file in your `src/` directory maps directly to a URL route with support for dynamic parameters, nested layouts, and route groups.
@@ -14,7 +16,7 @@ Routes are defined by file and folder naming in `src/`:
 | File Pattern | Resolved URL | Segment Kind |
 | --- | --- | --- |
 | `src/page.deshi` | `/` | Index Route |
-| `src/about/page.deshi` (or `src/about.md`) | `/about` | Static Segment |
+| `src/about/page.deshi` (or `src/about.mdx`) | `/about` | Static Segment |
 | `src/blog/[slug]/page.deshi` | `/blog/:slug` | Dynamic Segment |
 | `src/docs/[...slug]/page.deshi` | `/docs/*` | Catch-All Segment |
 | `src/shop/[[...slug]]/page.deshi` | `/shop` or `/shop/*` | Optional Catch-All |
@@ -72,15 +74,15 @@ src/
 ├── page.deshi                 # Wrapped by root layout
 └── docs/
     ├── layout.deshi           # Docs sub-layout (renders sidebar + <slot />)
-    ├── page.md                # Wrapped by: root layout -> docs layout
-    └── routing.md             # Wrapped by: root layout -> docs layout
+    ├── page.mdx                # Wrapped by: root layout -> docs layout
+    └── routing.mdx             # Wrapped by: root layout -> docs layout
 ```
 
 ---
 
 ## Custom 404 Pages
 
-Place a `not-found.deshi` or `not-found.md` file at the root of `src/`. During static build, this file automatically compiles to `dist/404.html`, compatible with Cloudflare Pages, Vercel, Netlify, and GitHub Pages.
+Place a `not-found.deshi`, `not-found.mdx`, or `not-found.md` file at the root of `src/`. During static build, this file automatically compiles to `dist/404.html`, compatible with Cloudflare Pages, Vercel, Netlify, and GitHub Pages.
 
 ---
 
@@ -92,3 +94,9 @@ In `packages/compiler/src/routes.ts`, routes are sorted deterministically so spe
 2. **Dynamic Segments (Priority 1)** &mdash; e.g. `/blog/[slug]`
 3. **Catch-All Segments (Priority 2)** &mdash; e.g. `/blog/[...all]`
 4. **Optional Catch-All (Priority 3)** &mdash; e.g. `/blog/[[...opt]]`
+
+<Callout type="tip" title="Matching is structural">
+  Deshijs matches routes by walking segments (static / dynamic / catch-all) rather
+  than compiling a regular expression per route. The same matcher runs in the dev
+  server, the build, and the optional client router — so dev and production agree.
+</Callout>

@@ -1,0 +1,151 @@
+<!--
+  Search palette (client island).
+
+  Rendered once from the root layout, so the panel is NOT inside the header's
+  stacking context. The server-rendered triggers live in Header.deshi and are
+  matched document-wide via `[data-search-open]`, which keeps the header itself
+  free of JavaScript.
+
+  The index is built on open: every docs link in the sidebar, plus the current
+  page's h2/h3 anchors — so it stays correct across client-router navigations.
+-->
+<div data-search-panel class="fixed inset-0 z-[60] hidden">
+  <div data-search-close class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Search documentation"
+    class="relative mx-auto mt-24 w-[36rem] max-w-[92vw] rounded-xl border border-[#23252e] bg-[#0c0d12] shadow-[0_30px_80px_rgba(0,0,0,0.8)] overflow-hidden"
+  >
+    <input
+      data-search-input
+      type="text"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      placeholder="Search docs…"
+      aria-label="Search documentation"
+      class="w-full bg-transparent px-4 py-3.5 text-sm text-zinc-200 placeholder-zinc-500 outline-none border-b border-[#1c1d22]"
+    />
+    <ul data-search-results class="max-h-[52vh] overflow-y-auto scrollbar-thin py-2"></ul>
+    <div data-search-empty class="hidden px-4 py-6 text-center text-xs text-zinc-500">No matches found.</div>
+  </div>
+</div>
+
+<script client>
+  const panel = root.querySelector('[data-search-panel]');
+  const input = root.querySelector('[data-search-input]');
+  const results = root.querySelector('[data-search-results]');
+  const empty = root.querySelector('[data-search-empty]');
+
+  const escapeHtml = (s) =>
+    String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // Ctrl/Cmd+K hint differs per platform.
+  if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
+    document.querySelectorAll('[data-search-kbd]').forEach((el) => (el.textContent = '⌘K'));
+  }
+
+  let index = [];
+  let cursor = 0;
+  let isOpen = false;
+
+  function buildIndex() {
+    const items = [];
+    const seen = new Set();
+
+    document.querySelectorAll('a[href^="/docs"]').forEach((a) => {
+      const label = (a.textContent || '').trim().replace(/\s+/g, ' ');
+      const href = a.getAttribute('href');
+      if (!label || !href || seen.has(href)) return;
+      seen.add(href);
+      items.push({ label, group: 'Docs', href });
+    });
+
+    const pageHeading = document.querySelector('main h1');
+    document.querySelectorAll('main h2[id], main h3[id]').forEach((h) => {
+      const label = (h.textContent || '').trim();
+      if (!label) return;
+      items.push({ label, group: pageHeading ? pageHeading.textContent.trim() : 'On this page', href: '#' + h.id });
+    });
+
+    index = items;
+  }
+
+  function matches(q) {
+    const s = q.trim().toLowerCase();
+    if (!s) return index.slice(0, 8);
+    return index.filter((it) => it.label.toLowerCase().includes(s)).slice(0, 12);
+  }
+
+  function render(list) {
+    empty.classList.toggle('hidden', list.length > 0);
+    results.innerHTML = list
+      .map(
+        (it, i) => `<li>
+        <a href="${escapeHtml(it.href)}" data-search-item class="flex items-center gap-3 px-4 py-2 text-sm transition ${
+          i === cursor ? 'bg-[#16171b] text-white' : 'text-zinc-300 hover:bg-[#16171b] hover:text-white'
+        }">
+          <span class="truncate">${escapeHtml(it.label)}</span>
+          <span class="ml-auto text-[10px] font-mono text-zinc-500 shrink-0">${escapeHtml(it.group)}</span>
+        </a>
+      </li>`,
+      )
+      .join('');
+    results.querySelectorAll('[data-search-item]').forEach((a) => a.addEventListener('click', close));
+  }
+
+  function refresh() {
+    cursor = 0;
+    render(matches(input.value));
+  }
+
+  function open() {
+    if (isOpen) return;
+    isOpen = true;
+    buildIndex();
+    input.value = '';
+    refresh();
+    panel.classList.remove('hidden');
+    input.focus();
+  }
+
+  function close() {
+    if (!isOpen) return;
+    isOpen = false;
+    panel.classList.add('hidden');
+  }
+
+  document.querySelectorAll('[data-search-open]').forEach((b) => b.addEventListener('click', open));
+  root.querySelector('[data-search-close]').addEventListener('click', close);
+  input.addEventListener('input', refresh);
+
+  input.addEventListener('keydown', (e) => {
+    const list = matches(input.value);
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      cursor = Math.min(cursor + 1, list.length - 1);
+      render(list);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      cursor = Math.max(cursor - 1, 0);
+      render(list);
+    } else if (e.key === 'Enter') {
+      const hit = list[cursor];
+      if (!hit) return;
+      close();
+      if (hit.href.startsWith('#')) location.hash = hit.href;
+      else location.assign(hit.href);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if (isOpen) close();
+      else open();
+    }
+  });
+</script>

@@ -19,6 +19,29 @@ const deshiClientJs = new Map<string, string>();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * True for ids Vite generates itself, which must never be compiled as Deshi
+ * source. The important case is the HTML proxy: Vite lifts inline
+ * `<script type="module">` out of HTML into `/index.html?html-proxy&index=0.js`.
+ * Stripping the query would leave `index.html` — a source extension — so we'd
+ * try to parse the island's JavaScript as a template (PF4001).
+ */
+export function isViteInternalId(id: string): boolean {
+  if (id.startsWith('\0')) return true;
+  const q = id.indexOf('?');
+  if (q === -1) return false;
+  return id
+    .slice(q + 1)
+    .split('&')
+    .some(
+      (part) =>
+        part.includes('html-proxy') ||
+        part.startsWith('raw') ||
+        part.startsWith('url') ||
+        /\.(js|ts|mjs|cjs|jsx|tsx)$/.test(part),
+    );
+}
+
 export interface DeshiPluginOptions {
   appDir?: string;
   site?: string;
@@ -208,6 +231,9 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
     },
     async transform(code, id) {
       const cleanId = id.split('?')[0];
+      // Never compile Vite's own virtual modules (e.g. the HTML proxy that
+      // carries an inline island <script> extracted from generated HTML).
+      if (isViteInternalId(id)) return null;
       if (isSourceFile(cleanId)) {
         const result = compile(code, {
           file: cleanId,
