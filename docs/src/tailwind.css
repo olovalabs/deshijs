@@ -1,39 +1,808 @@
-/* Tailwind v4 input stylesheet — compiled by docs/vite.config.js (src/tailwind.css → src/public/tailwind.css). */
+/* Tailwind v4 input stylesheet — compiled by docs/vite.config.js
+ * (src/tailwind.css → src/public/tailwind.css).
+ *
+ * The token set mirrors holocron.so's dark theme so the docs share its look.
+ *
+ * Markdown typography ships with the compiler (DOC_TYPOGRAPHY_CSS) and is
+ * appended to <head> AFTER this sheet, so every markdown rule below
+ * out-specifies it with a doubled `.deshi-md` class — at equal specificity the
+ * later (compiler) rule would win.
+ */
 @import "tailwindcss";
 
-@theme {
-  /* Brand primary (lime) — used as bg-primary / text-primary / border-primary across the docs.
-     Matches the compiler's default --deshi-link and page.deshi's glow oklch(62.7% 0.194 149.214). */
-  --color-primary: #a3e635;
-
-  /* Font families (loaded via Google Fonts in src/layout.deshi). */
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-/* Content column width for docs pages (max-w-(--nb-content-max)). */
+/* ── 1. Design tokens (holocron dark) ──────────────────────────────────── */
 :root {
-  --nb-content-max: 48rem;
+  color-scheme: dark;
+
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* Palette */
+  --background: #0d0d10;
+  --foreground: #fafafa;
+  --card: #131316;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  --primary: #5b7cff;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #ffffff73;
+  --accent: #ffffff1a;
+  --accent-foreground: #fafafa;
+  --destructive: oklch(63.7% 0.237 25.331);
+  --border: #323236;
+  --input: #27272a;
+  --ring: #52525c;
+
+  --sidebar: #171717;
+  --sidebar-foreground: #ffffffa6;
+  --sidebar-primary: #ffffffe6;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #262626;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #ffffff1a;
+  --sidebar-ring: #7a7a85;
+
+  --text-tertiary: #ffffff40;
+  --border-subtle: #ffffff1f;
+  --divider: #ffffff0f;
+
+  /* Accent palette (callouts, badges, links in prose) */
+  --blue: #93c5fd;
+  --green: #6ee7b7;
+  --yellow: #fbbf24;
+  --orange: #fb923c;
+  --red: #fca5a5;
+  --purple: #c4b5fd;
+  --pink: #f9a8d4;
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Newsreader", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-code: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --weight-regular: 400;
+  --weight-prose: 475;
+  --weight-heading: 560;
+  --lh-heading: 1.4;
+  --lh-prose: 1.6;
+  --ls-prose: 0;
+  --prose-text: color-mix(in oklch, #fafafa 80%, #0d0d10);
+  --code-font-size: 0.9em;
+  --type-body-size: 14px;
+  --type-heading-1-size: 16px;
+  --type-heading-2-size: 16px;
+  --type-heading-3-size: 16px;
+  --type-small-size: 13px;
+  --type-code-size: calc(var(--type-body-size) * 0.857);
+  --type-nav-group-size: calc(12em / 14);
+
+  /* Code blocks */
+  --code-block-background: transparent;
+  --code-block-border: none;
+  --code-block-radius: 0px;
+  --code-block-padding-x: 0px;
+  --code-block-padding-y: 0.5rem;
+  --blockquote-border-width: 3px;
+  --blockquote-border-color: var(--border);
+
+  /* Layout */
+  --header-padding-y: 16px;
+  --logo-height: 30px;
+  --header-row-height: calc(2 * var(--header-padding-y) + var(--logo-height));
+  --tab-bar-height: 44px;
+  --header-height: calc(var(--header-row-height) + var(--tab-bar-height) + 2px);
+  --layout-gap: 36px;
+  --sticky-top: calc(var(--header-height) + var(--layout-gap));
+  --mobile-padding: 1.25rem;
+  --grid-line-offset: 32px;
+  --prose-gap: 20px;
+  --section-gap: 48px;
+  --list-gap: 8px;
+  --bleed: 32px;
+
+  --grid-max-width: min(calc(100vw - 60px), 1200px);
+  --grid-nav-width: 230px;
+  --grid-sidebar-width: 230px;
+  --grid-gap: 60px;
+  --grid-content-width: minmax(
+    0,
+    min(720px, calc(var(--grid-max-width) - var(--grid-nav-width) - var(--grid-sidebar-width) - 2 * var(--grid-gap)))
+  );
+
+  /* Sidebar rows (13px base, 14px at ≥80rem — same as holocron) */
+  --sidebar-font-size: 13px;
+  --sidebar-group-margin-top: calc(12em / 14);
+  --sidebar-link-radius: calc(6em / 14);
+  --sidebar-row-padding-x: calc(8em / 14);
+  --sidebar-row-padding-y: calc(4em / 14);
+  --sidebar-row-gap: calc(4em / 14);
+  --sidebar-icon-size: calc(12em / 14);
+  --sidebar-leading-gap: calc(6em / 14);
+  --sidebar-active-background: transparent;
+  --sidebar-hover-background: var(--accent);
+  --sidebar-line-height: calc(var(--sidebar-font-size) * var(--lh-prose));
+  --search-input-radius: var(--radius-xl);
 }
 
-/* Base */
+@media (width >= 48rem) and (width < 80rem) {
+  :root {
+    --grid-gap: 45px;
+  }
+}
+@media (width >= 80rem) {
+  :root {
+    --sidebar-font-size: 14px;
+  }
+}
+
+/* ── 2. Tailwind theme aliases (bg-background, text-muted-foreground …) ── */
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border-subtle: var(--border-subtle);
+  --color-divider: var(--divider);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-yellow: var(--yellow);
+  --color-orange: var(--orange);
+  --color-red: var(--red);
+  --color-purple: var(--purple);
+  --color-pink: var(--pink);
+
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-code);
+}
+
+/* ── 3. Base ───────────────────────────────────────────────────────────── */
 body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Markdown typography: align the compiler's --deshi-* defaults with the theme. */
+::selection {
+  background: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* ── 4. Markdown (compiler DOC_TYPOGRAPHY_CSS override) ────────────────── */
 .deshi-md {
-  --deshi-link: var(--color-primary);
-  --deshi-accent: var(--color-primary);
+  --deshi-text: var(--prose-text);
+  --deshi-heading: var(--foreground);
+  --deshi-strong: var(--foreground);
+  --deshi-link: var(--primary);
+  --deshi-accent: var(--primary);
+  --deshi-border: var(--border);
+  --deshi-marker: #52525c;
+  --deshi-muted: var(--muted-foreground);
+  --deshi-quote-border: var(--border);
+  --deshi-pre-bg: transparent;
+  --deshi-code-bg: var(--accent);
+  --deshi-code-text: var(--foreground);
+  --deshi-th-bg: var(--muted);
+  --deshi-code-size: var(--type-code-size);
+  --deshi-font-mono: var(--font-code);
 }
 
-/* Custom thin scrollbar (used by Sidebar / OnThisPage). */
-.scrollbar-thin::-webkit-scrollbar { width: 5px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: #23252b; border-radius: 9999px; }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #333640; }
+.deshi-md.deshi-md {
+  max-width: none;
+  margin: 0;
+  font-size: var(--type-body-size);
+  font-weight: var(--weight-prose);
+  line-height: var(--lh-prose);
+  letter-spacing: var(--ls-prose);
+  color: var(--prose-text);
+}
+.deshi-md.deshi-md > :first-child {
+  margin-top: 0;
+}
+.deshi-md.deshi-md > :last-child {
+  margin-bottom: 0;
+}
+
+/* Editorial headings: 16px, weight 560, h1/h2 carry a divider rule. */
+.deshi-md.deshi-md h1,
+.deshi-md.deshi-md h2,
+.deshi-md.deshi-md h3,
+.deshi-md.deshi-md h4,
+.deshi-md.deshi-md h5,
+.deshi-md.deshi-md h6 {
+  color: var(--foreground);
+  font-weight: var(--weight-heading);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-prose);
+  margin: 0 0 var(--prose-gap);
+  scroll-margin-top: var(--sticky-top);
+}
+.deshi-md.deshi-md h1,
+.deshi-md.deshi-md h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--type-heading-1-size);
+}
+.deshi-md.deshi-md h1::after,
+.deshi-md.deshi-md h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--divider);
+}
+.deshi-md.deshi-md h1 {
+  font-size: var(--type-heading-1-size);
+}
+.deshi-md.deshi-md h2 {
+  font-size: var(--type-heading-2-size);
+  margin-top: var(--section-gap);
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.deshi-md.deshi-md h3 {
+  font-size: var(--type-heading-3-size);
+}
+.deshi-md.deshi-md h4,
+.deshi-md.deshi-md h5,
+.deshi-md.deshi-md h6 {
+  font-size: var(--type-heading-3-size);
+}
+
+/* Prose rhythm — 20px between blocks, 48px above a new section (h2). */
+.deshi-md.deshi-md p,
+.deshi-md.deshi-md ul,
+.deshi-md.deshi-md ol,
+.deshi-md.deshi-md pre,
+.deshi-md.deshi-md blockquote,
+.deshi-md.deshi-md table,
+.deshi-md.deshi-md hr {
+  margin: 0 0 var(--prose-gap);
+}
+.deshi-md.deshi-md p {
+  line-height: var(--lh-prose);
+}
+.deshi-md.deshi-md li {
+  margin: 0.3rem 0;
+  line-height: var(--lh-prose);
+}
+.deshi-md.deshi-md strong,
+.deshi-md.deshi-md b {
+  color: var(--foreground);
+  font-weight: var(--weight-heading);
+}
+.deshi-md.deshi-md a {
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.deshi-md.deshi-md a:hover {
+  color: color-mix(in oklch, var(--primary) 80%, white);
+}
+
+/* Inline code — holocron's `.inline-code`. */
+.deshi-md.deshi-md :not(pre) > code {
+  font-family: var(--font-code);
+  font-size: var(--code-font-size);
+  font-weight: 400;
+  letter-spacing: 0;
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.15em 0.35em;
+  color: var(--foreground);
+  white-space: break-spaces;
+}
+
+/* Code blocks — flush with the prose column: no card, no border, no radius. */
+.deshi-md.deshi-md pre {
+  background: transparent;
+  background-color: transparent !important; /* shiki sets an inline background */
+  border: 0;
+  border-radius: var(--code-block-radius);
+  padding: var(--code-block-padding-y) var(--code-block-padding-x);
+  margin: 0 0 var(--prose-gap);
+  font-size: var(--type-code-size);
+  line-height: 1.6;
+}
+.deshi-md.deshi-md pre code {
+  font-size: 1em;
+}
+
+/* Tables */
+.deshi-md.deshi-md table {
+  font-size: var(--type-small-size);
+}
+.deshi-md.deshi-md th,
+.deshi-md.deshi-md td {
+  border: 1px solid var(--border-subtle);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+.deshi-md.deshi-md th {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.deshi-md.deshi-md blockquote {
+  border-left: var(--blockquote-border-width) solid var(--blockquote-border-color);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+}
+.deshi-md.deshi-md img {
+  border-radius: var(--radius-lg);
+}
+
+/* ── 5. Chrome ─────────────────────────────────────────────────────────── */
+
+/* Vertical grid lines + corner dots (holocron's blueprint background). */
+.grid-line-v {
+  z-index: 10;
+  pointer-events: none;
+  width: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.grid-line-v.solid {
+  border-left: 1px solid var(--border);
+}
+.grid-line-v.dashed {
+  border-left: 1px dashed var(--border);
+}
+.grid-dot {
+  z-index: 20;
+  background: var(--background);
+  pointer-events: none;
+  border-radius: 9999px;
+  width: 1.25rem;
+  height: 1.25rem;
+  position: absolute;
+}
+.grid-dot::after {
+  content: "";
+  background: color-mix(in oklab, var(--foreground) 40%, transparent);
+  border-radius: 9999px;
+  width: 2px;
+  height: 2px;
+  display: block;
+}
+
+/* Navbar + tab bar */
+.slot-navbar {
+  z-index: 100;
+  position: sticky;
+  top: 0;
+  background: var(--background);
+}
+.slot-tabbar {
+  background: var(--background);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.slot-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+  font-weight: var(--weight-prose);
+  color: var(--muted-foreground);
+  transition: color 0.15s ease;
+}
+.slot-tab:hover {
+  color: var(--foreground);
+}
+.slot-tab::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+.slot-tab[data-active="true"] {
+  color: var(--foreground);
+}
+.slot-tab[data-active="true"]::after {
+  background: var(--foreground);
+}
+
+/* Left sidebar — holocron's nav column.
+   Grid child (.slot-sidebar-left) > sticky wrapper > aside > [search | nav]. */
+.slot-sidebar-left {
+  min-width: 0;
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: var(--sidebar-font-size);
+  background: var(--background);
+  border-right: 1px solid var(--border);
+}
+@media (width >= 64rem) {
+  .sidebar-nav {
+    position: static;
+    display: block;
+    overflow: visible;
+    background: transparent;
+    border-right: 0;
+  }
+}
+
+/* Sticky column: pinned below the header, capped so the nav can scroll. */
+.sidebar-sticky {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+@media (width >= 64rem) {
+  .sidebar-sticky {
+    position: sticky;
+    top: var(--sticky-top);
+    max-height: calc(100vh - var(--sticky-top) - var(--layout-gap));
+    height: auto;
+  }
+}
+.sidebar-aside {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: var(--grid-nav-width);
+}
+@media (width < 64rem) {
+  .sidebar-aside {
+    padding-inline: var(--mobile-padding);
+    padding-block: 1rem;
+  }
+}
+
+/* Search row: absolute icon + full-width input + absolute "/" kbd. */
+.sidebar-search-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-bottom: var(--sidebar-group-margin-top);
+}
+.sidebar-search-icon {
+  position: absolute;
+  left: 1em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.sidebar-search-icon svg {
+  width: 1em;
+  height: 1em;
+}
+.sidebar-search-kbd {
+  position: absolute;
+  right: calc(10em / 14);
+  display: flex;
+  align-items: center;
+  gap: calc(4em / 14);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.sidebar-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding-block: var(--sidebar-row-padding-y);
+  padding-inline-start: calc(2em + var(--sidebar-leading-gap));
+  padding-inline-end: calc(34em / 14);
+  border: 1px solid var(--border);
+  border-radius: var(--search-input-radius);
+  background: transparent;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+  font-family: var(--font-sans);
+  font-size: inherit;
+  font-weight: var(--weight-prose);
+  letter-spacing: normal;
+  line-height: var(--lh-prose);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.1s;
+}
+.sidebar-search-kbd kbd {
+  padding: 0 calc(5em / 14);
+  border: 1px solid var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: calc(12em / 14);
+  font-weight: 500;
+  line-height: 1.5;
+}
+.sidebar-search:hover {
+  border-color: color-mix(in srgb, var(--border) 55%, var(--foreground));
+}
+.sidebar-search:focus-visible,
+.sidebar-search:hover {
+  color: var(--foreground);
+}
+.sidebar-search:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 25%, transparent);
+  outline: none;
+}
+
+/* Scrollable nav: horizontal inset so hover pills reach the column edge. */
+.slot-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8em / 14);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-right: calc(-1 * var(--sidebar-row-padding-x));
+  padding-inline: var(--sidebar-row-padding-x);
+  padding-bottom: calc(24em / 14);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.slot-sidebar-nav :focus-visible {
+  background: var(--sidebar-hover-background);
+  outline: none;
+}
+.slot-sidebar-nav :focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Edge fade while scrolling (holocron's nav-scroll-fade). Only meaningful —
+   and only applied — when the column actually overflows. */
+@keyframes nav-scroll-fade {
+  0% {
+    --nav-mask-top: 0px;
+    --nav-mask-bottom: var(--nav-mask-size);
+  }
+  5% {
+    --nav-mask-top: var(--nav-mask-size);
+    --nav-mask-bottom: var(--nav-mask-size);
+  }
+  95% {
+    --nav-mask-top: var(--nav-mask-size);
+    --nav-mask-bottom: var(--nav-mask-size);
+  }
+  100% {
+    --nav-mask-top: var(--nav-mask-size);
+    --nav-mask-bottom: 0px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot-sidebar-nav[data-scrollable] {
+    animation: none;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .slot-sidebar-nav[data-scrollable] {
+    --nav-mask-size: 3.5rem;
+    --nav-mask-min-alpha: 0.12;
+    --nav-mask-top: 0px;
+    --nav-mask-bottom: 0px;
+    scroll-padding-block: var(--nav-mask-size);
+    mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, var(--nav-mask-min-alpha)) 0,
+      rgba(0, 0, 0, 0.55) calc(var(--nav-mask-top) * 0.5),
+      #000 var(--nav-mask-top),
+      #000 calc(100% - var(--nav-mask-bottom)),
+      rgba(0, 0, 0, 0.55) calc(100% - var(--nav-mask-bottom) * 0.5),
+      rgba(0, 0, 0, var(--nav-mask-min-alpha)) 100%
+    );
+    animation: linear both nav-scroll-fade;
+    animation-timeline: scroll(self);
+  }
+}
+
+/* Group blocks: GitHub first, then labelled sections. */
+.sidebar-group-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sidebar-row-gap);
+}
+.sidebar-group-block-top {
+  margin-top: calc(8em / 14);
+  margin-bottom: calc(2em / 14);
+}
+.sidebar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-leading-gap);
+  margin-top: var(--sidebar-group-margin-top);
+  margin-bottom: calc(2em / 14);
+  font-size: var(--type-nav-group-size);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 550;
+  color: var(--muted-foreground);
+  cursor: default;
+  user-select: none;
+}
+.sidebar-group-items {
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-badge {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  font-family: var(--font-code);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--sidebar-leading-gap);
+  padding-inline: var(--sidebar-row-padding-x);
+  padding-block: var(--sidebar-row-padding-y);
+  margin-inline: calc(-1 * var(--sidebar-row-padding-x));
+  border-radius: var(--sidebar-link-radius);
+  color: var(--sidebar-foreground);
+  font-weight: var(--weight-prose);
+  line-height: var(--lh-prose);
+  text-decoration: none;
+  transition: none;
+}
+.sidebar-link:hover {
+  background: var(--sidebar-hover-background);
+  color: var(--foreground);
+}
+.sidebar-link[data-active="true"] {
+  color: var(--sidebar-primary);
+}
+.sidebar-link-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-block-start: calc((var(--sidebar-line-height) - var(--sidebar-icon-size)) / 2);
+  color: currentcolor;
+  transition: filter 0.15s;
+}
+.sidebar-link-icon svg {
+  width: var(--sidebar-icon-size);
+  height: var(--sidebar-icon-size);
+}
+.sidebar-link-label {
+  min-width: 0;
+  font-weight: 500;
+}
+.sidebar-link-external {
+  font-weight: 450;
+}
+.sidebar-link-arrow {
+  margin-inline-start: auto;
+  opacity: 0.5;
+}
+
+/* Right sidebar ("On this page") */
+.slot-sidebar-right {
+  min-width: 0;
+}
+.toc-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+  padding-inline: var(--sidebar-row-padding-x);
+  font-size: var(--type-nav-group-size);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 550;
+  color: var(--muted-foreground);
+}
+.toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.toc-link {
+  display: block;
+  padding-inline: var(--sidebar-row-padding-x);
+  margin-inline: calc(-1 * var(--sidebar-row-padding-x));
+  border-radius: var(--sidebar-link-radius);
+  color: var(--sidebar-foreground);
+  font-size: 13px;
+  font-weight: var(--weight-regular);
+  line-height: 1.43;
+  text-decoration: none;
+}
+.toc-link-child {
+  padding-inline-start: calc(var(--sidebar-row-padding-x) + 0.75rem);
+  color: var(--muted-foreground);
+}
+.toc-link:hover {
+  background: var(--sidebar-hover-background);
+  color: var(--foreground);
+}
+.toc-link-child:hover {
+  color: var(--foreground);
+}
+.toc-link[data-active="true"] {
+  color: var(--sidebar-primary);
+}
+
+/* Callouts (holocron's Mintlify-compatible variants) */
+.callout {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+}
+
+/* Custom thin scrollbars */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #ffffff26;
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #ffffff40;
+}
 
 /* Focus ring for the 0-JS mobile sidebar toggle (docs/layout.deshi). */
-.peer.sr-only:focus-visible ~ aside {
-  outline: 2px solid var(--color-primary);
+.peer.sr-only:focus-visible ~ .sidebar-nav {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* The <aside> is nested inside the grid wrapper, so Tailwind's `peer-checked:`
+   sibling variant (and the focus ring above) can't reach it on the docs pages.
+   Drive the 0-JS drawer from the checkbox itself instead. */
+@media (width < 64rem) {
+  body:has(#mobile-sidebar-toggle:checked) .sidebar-nav {
+    translate: 0 0;
+  }
+  body:has(#mobile-sidebar-toggle:focus-visible) .sidebar-nav {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
 }

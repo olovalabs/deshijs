@@ -1,50 +1,174 @@
 <script>
   const brand = props.brand || "Deshi Docs";
-  const version = props.version || "3.1.0";
 
+  // Rows are holocron's: icon · label · trailing badge. Icon paths are lucide
+  // geometry on a 24 viewBox, stroked at 2.5 (same weight holocron uses).
   const sections = [
     {
       label: "Getting Started",
       items: [
-        { label: "Overview & Quickstart", href: "/docs" },
-        { label: "Architecture & Pipeline", href: "/docs/architecture" },
-        { label: "Vite Plugin & Dev Server", href: "/docs/vite-plugin" },
+        {
+          label: "Overview & Quickstart",
+          href: "/docs",
+          icon: ["m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"],
+        },
+        {
+          label: "Architecture & Pipeline",
+          href: "/docs/architecture",
+          icon: [
+            "m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z",
+            "m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65",
+            "m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65",
+          ],
+        },
+        {
+          label: "Vite Plugin & Dev Server",
+          href: "/docs/vite-plugin",
+          icon: [
+            "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
+          ],
+        },
       ],
     },
     {
       label: "Core Concepts",
       items: [
-        { label: "Template Syntax & AST", href: "/docs/template-syntax" },
-        { label: "Islands & client:*", href: "/docs/islands", badge: { text: "0JS", tone: "primary" } },
-        { label: "Directives & Astro Parity", href: "/docs/directives" },
-        { label: "Scoped Styling & CSS", href: "/docs/styling" },
+        {
+          label: "Template Syntax & AST",
+          href: "/docs/template-syntax",
+          icon: ["m18 16 4-4-4-4", "m6 8-4 4 4 4", "m14.5 4-5 16"],
+        },
+        {
+          label: "Islands & client:*",
+          href: "/docs/islands",
+          badge: { text: "0JS", tone: "primary" },
+          icon: [
+            "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
+            "m3.3 7 8.7 5 8.7-5",
+            "M12 22V12",
+          ],
+        },
+        {
+          label: "Directives & Astro Parity",
+          href: "/docs/directives",
+          icon: ["m4 4 7.07 17 2.51-7.39L21 11.07z"],
+        },
+        {
+          label: "Scoped Styling & CSS",
+          href: "/docs/styling",
+          icon: [
+            "m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08",
+            "M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z",
+          ],
+        },
       ],
     },
     {
       label: "Routing & Data",
       items: [
-        { label: "File-Based Routing", href: "/docs/routing" },
-        { label: "Static Params & Paths", href: "/docs/static-params" },
-        { label: "Content Collections", href: "/docs/content-collections" },
-        { label: "Markdown & MDX", href: "/docs/markdown" },
+        {
+          label: "File-Based Routing",
+          href: "/docs/routing",
+          icon: [
+            "M6 3v12",
+            "M18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
+            "M6 18a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
+            "M15 6a9 9 0 0 1-9 9",
+          ],
+        },
+        {
+          label: "Static Params & Paths",
+          href: "/docs/static-params",
+          icon: ["M4 9h16", "M4 15h16", "M10 3 8 21", "M16 3l-2 18"],
+        },
+        {
+          label: "Content Collections",
+          href: "/docs/content-collections",
+          icon: [
+            "M12 8c4.42 0 8-1.34 8-3s-3.58-3-8-3-8 1.34-8 3 3.58 3 8 3z",
+            "M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5",
+            "M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3",
+          ],
+        },
+        {
+          label: "Markdown & MDX",
+          href: "/docs/markdown",
+          icon: [
+            "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z",
+            "M14 2v4a2 2 0 0 0 2 2h4",
+            "M10 9H8",
+            "M16 13H8",
+            "M16 17H8",
+          ],
+        },
       ],
     },
     {
       label: "Client & Runtime",
       items: [
-        { label: "Client Router & SPA", href: "/docs/client-router", badge: { text: "1KB", tone: "blue" } },
-        { label: "Runtime API & Astro.*", href: "/docs/runtime-api" },
-        { label: "deshi.config.ts Reference", href: "/docs/config" },
+        {
+          label: "Client Router & SPA",
+          href: "/docs/client-router",
+          badge: { text: "1KB", tone: "blue" },
+          icon: ["m3 11 19-9-9 19-2-8-8-2z"],
+        },
+        {
+          label: "Runtime API & Astro.*",
+          href: "/docs/runtime-api",
+          icon: ["m4 17 6-6-6-6", "M12 19h8"],
+        },
+        {
+          label: "deshi.config.ts Reference",
+          href: "/docs/config",
+          icon: [
+            "M21 4H14",
+            "M10 4H3",
+            "M21 12H12",
+            "M8 12H3",
+            "M21 20H16",
+            "M12 20H3",
+            "M14 2v4",
+            "M8 10v4",
+            "M16 18v4",
+          ],
+        },
       ],
     },
     {
       label: "Reference",
       items: [
-        { label: "Programmatic API", href: "/docs/api-reference", badge: { text: "API", tone: "purple" } },
-        { label: "Diagnostic Catalog", href: "/docs/error-catalog", badge: { text: "PF*", tone: "amber" } },
+        {
+          label: "Programmatic API",
+          href: "/docs/api-reference",
+          badge: { text: "API", tone: "purple" },
+          icon: [
+            "M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1",
+            "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1",
+          ],
+        },
+        {
+          label: "Diagnostic Catalog",
+          href: "/docs/error-catalog",
+          badge: { text: "PF*", tone: "amber" },
+          icon: [
+            "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+            "M12 9v4",
+            "M12 17h.01",
+          ],
+        },
       ],
     },
   ];
+
+  // GitHub sits at the top of holocron's nav as its own group, with an ↗ arrow.
+  const github = {
+    href: "https://github.com/olovalabs/deshi",
+    label: "GitHub",
+    icon: [
+      "M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65S8.93 17.38 9 18v4",
+      "M9 18c-4.51 2-5-2-7-2",
+    ],
+  };
 
   // Current page (trailing slash ignored). `url` is provided by the renderer for
   // every page; the client script below re-syncs this after SPA navigations.
@@ -52,86 +176,110 @@
   const current = rawPath.length > 1 && rawPath.endsWith("/") ? rawPath.slice(0, -1) : rawPath;
 
   const isActive = (href) => href === current;
-  const containsActive = (section) => section.items.some((item) => isActive(item.href));
 
-  // Active styling lives in the component <style> (keyed off `data-active`), so
-  // the client only has to flip one attribute per row — no class-string drift.
-  const summaryClass =
-    "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md cursor-pointer select-none transition text-zinc-200 hover:text-white hover:bg-[#16171b]";
-  const itemClass =
-    "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md transition text-zinc-400 hover:text-white hover:bg-[#16171b]";
-
+  const itemClass = "sidebar-link";
   const badgeClass = (tone) =>
     ({
-      primary: "bg-primary/20 text-primary font-mono font-semibold",
-      blue: "bg-blue-950/80 text-blue-400 border border-blue-800/40 font-mono",
-      purple: "bg-purple-950/80 text-purple-300 border border-purple-800/40",
-      amber: "bg-amber-950/80 text-amber-300 border border-amber-800/40 font-mono",
-    })[tone] || "bg-[#1f2026] text-zinc-400 font-mono";
+      primary: "text-blue-300",
+      blue: "text-blue-300",
+      purple: "text-purple-300",
+      amber: "text-amber-300",
+    })[tone] || "text-muted-foreground";
 </script>
 
-<!-- LEFT SIDEBAR (Pinned to Left Edge, w-64) -->
-<aside class="fixed inset-y-0 left-0 z-50 w-64 bg-[#0c0d10] border-r border-[#1c1d22] overflow-y-auto px-4 py-4 scrollbar-thin transition-transform duration-300 ease-in-out -translate-x-full peer-checked:translate-x-0 lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14 lg:bg-[#0c0d10]/60 shrink-0">
-
-  <!-- Mobile Drawer Close Header (0 JS) -->
-  <div class="flex items-center justify-between mb-3 pb-3 border-b border-[#1c1d22] lg:hidden">
-    <div class="flex items-center gap-2">
-      <img src="/deshi.svg" alt="" class="w-5 h-5 shrink-0 object-contain" />
-      <span class="text-xs font-bold text-white font-sans">{brand}</span>
-    </div>
-    <label for="mobile-sidebar-toggle" class="p-1.5 text-zinc-300 hover:text-white rounded-md hover:bg-[#1c1d22] cursor-pointer" aria-label="Close sidebar">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </label>
-  </div>
-
-  <!-- Brand / version card -->
-  <div class="mb-4">
-    <a href="/docs" class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[#14151a] hover:bg-[#1b1d22] border border-[#23242c] text-zinc-300 transition text-xs group">
-      <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-      <span class="font-medium text-white">Deshijs Compiler</span>
-      <span class="ml-auto text-[10px] text-zinc-500 font-mono">v{version}</span>
-    </a>
-  </div>
-
-  <!-- Collapsible nav tree (native <details>; every section starts expanded) -->
-  <nav class="space-y-0.5 text-[13px] font-medium font-sans" aria-label="Documentation">
-    {sections.map((section) => (
-      <details open>
-        <summary data-nav-summary data-active={containsActive(section) ? "true" : "false"} class={summaryClass}>
-          <span>{section.label}</span>
-          <svg class="chev w-3.5 h-3.5 shrink-0 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-            <polyline points="9 6 15 12 9 18"></polyline>
-          </svg>
-        </summary>
-
-        <div class="mt-0.5 mb-1.5 ml-[15px] border-l border-[#202128] pl-2 space-y-0.5">
-          {section.items.map((item) => (
-            <a
-              href={item.href}
-              data-nav-link
-              data-active={isActive(item.href) ? "true" : "false"}
-              aria-current={isActive(item.href) ? "page" : null}
-              class={itemClass}
-            >
-              <span class="min-w-0 truncate">{item.label}</span>
-              {item.badge ? (
-                <span class={`text-[9px] px-1.5 py-0.5 rounded shrink-0 ${badgeClass(item.badge.tone)}`}>{item.badge.text}</span>
-              ) : null}
-            </a>
-          ))}
+<!-- LEFT SIDEBAR — holocron's nav column: search field, GitHub group, sections -->
+<div
+  class="slot-sidebar-left sidebar-nav fixed inset-y-0 left-0 z-50 w-[280px] -translate-x-full peer-checked:translate-x-0 transition-transform duration-300 ease-in-out lg:static lg:z-auto lg:w-auto lg:max-w-(--grid-nav-width) lg:shrink-0 lg:self-stretch lg:translate-x-0 lg:transition-none"
+>
+  <div class="sidebar-sticky">
+    <aside class="sidebar-aside">
+      <!-- Mobile drawer close header (0 JS) -->
+      <div class="flex items-center justify-between mb-3 pb-3 border-b border-border lg:hidden">
+        <div class="flex items-center gap-2">
+          <img src="/deshi.svg" alt="" class="w-5 h-5 shrink-0 object-contain" />
+          <span class="text-xs font-semibold text-foreground font-sans">{brand}</span>
         </div>
-      </details>
-    ))}
-  </nav>
-</aside>
+        <label for="mobile-sidebar-toggle" class="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent cursor-pointer" aria-label="Close sidebar">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </label>
+      </div>
+
+      <!-- Search field (opens the palette) — holocron's bordered input row -->
+      <div class="sidebar-search-row">
+        <span class="sidebar-search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.34-4.34"></path>
+          </svg>
+        </span>
+        <button type="button" data-search-open class="sidebar-search">Search...</button>
+        <span class="sidebar-search-kbd" aria-hidden="true"><kbd>/</kbd></span>
+      </div>
+
+      <!-- Nav: one scrollable column, groups separated by --sidebar-row-gap -->
+      <nav class="slot-sidebar-nav scrollbar-thin" aria-label="Documentation">
+        <div class="sidebar-group-block sidebar-group-block-top">
+          <a href={github.href} target="_blank" rel="noopener noreferrer" class={`sidebar-link ${itemClass} sidebar-link-external`}>
+            <span class="sidebar-link-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                {github.icon.map((d) => <path d={d}></path>)}
+              </svg>
+            </span>
+            <span class="sidebar-link-label">GitHub</span>
+            <span class="sidebar-link-arrow" aria-hidden="true">↗</span>
+          </a>
+        </div>
+
+        {sections.map((section) => (
+          <div class="sidebar-group-block">
+            <div class="sidebar-group" data-nav-summary>{section.label}</div>
+            <div class="sidebar-group-items">
+              {section.items.map((item) => (
+                <a
+                  href={item.href}
+                  data-nav-link
+                  data-active={isActive(item.href) ? "true" : "false"}
+                  aria-current={isActive(item.href) ? "page" : null}
+                  class={itemClass}
+                >
+                  <span class="sidebar-link-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      {item.icon.map((d) => <path d={d}></path>)}
+                    </svg>
+                  </span>
+                  <span class="sidebar-link-label">{item.label}</span>
+                  {item.badge ? (
+                    <span class={`sidebar-badge ${badgeClass(item.badge.tone)}`}>{item.badge.text}</span>
+                  ) : null}
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+    </aside>
+  </div>
+</div>
 
 <script client>
   // The client router swaps <main> only, so the sidebar persists and its
   // server-rendered active state would go stale. Re-sync it on every navigation.
   const normalize = (p) => (p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p);
+
+  // Header tabs are docs sections; mirror Header.deshi's SSR rule exactly:
+  // "/docs" only matches the index, the rest match by prefix.
+  function syncHeaderTabs(here) {
+    const tabs = document.querySelectorAll("header [data-tab]");
+    if (!tabs.length) return;
+    tabs.forEach((el) => {
+      const href = el.getAttribute("data-tab") || "";
+      const on = href === "/docs" ? here === "/docs" : here.startsWith(href);
+      el.dataset.active = on ? "true" : "false";
+    });
+  }
 
   function syncActive() {
     const here = normalize(location.pathname);
@@ -143,44 +291,35 @@
       else link.removeAttribute("aria-current");
     });
 
-    root.querySelectorAll("[data-nav-summary]").forEach((summary) => {
-      const section = summary.closest("details");
-      const on = !!section && !!section.querySelector(`[data-nav-link][href="${here}"]`);
-      summary.dataset.active = on ? "true" : "false";
-    });
+    syncHeaderTabs(here);
 
     // Close the mobile drawer so the new page is visible after navigation.
     const toggle = document.getElementById("mobile-sidebar-toggle");
     if (toggle) toggle.checked = false;
   }
 
+  // Holocron fades the nav's top/bottom edges while it scrolls. The mask is only
+  // worth having when the column actually overflows, so flag it here (and on
+  // resize) rather than dimming a sidebar that fits.
+  const nav = root.querySelector(".slot-sidebar-nav");
+  function syncScrollable() {
+    if (!nav) return;
+    const overflowing = nav.scrollHeight > nav.clientHeight + 2;
+    nav.toggleAttribute("data-scrollable", overflowing);
+  }
+
   syncActive();
-  window.addEventListener("deshi:navigated", syncActive);
+  syncScrollable();
+  window.addEventListener("resize", syncScrollable);
+  window.addEventListener("deshi:navigated", () => {
+    syncActive();
+    syncScrollable();
+  });
 </script>
 
 <style>
-  /* Native disclosure widget: hide the default marker, rotate our chevron. */
-  summary {
-    list-style: none;
-  }
-  summary::-webkit-details-marker {
-    display: none;
-  }
-  .chev {
-    transition: transform 0.15s ease;
-  }
-  details[open] > summary .chev {
-    transform: rotate(90deg);
-  }
-
   /* Active row styling — driven by `data-active` so SSR and client agree. */
-  [data-nav-summary][data-active="true"] {
-    color: var(--color-primary);
-    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
-    font-weight: 500;
-  }
   [data-nav-link][data-active="true"] {
-    color: var(--color-primary);
-    font-weight: 500;
+    color: var(--sidebar-primary);
   }
 </style>

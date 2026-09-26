@@ -4,6 +4,10 @@
   import OnThisPage from '../components/OnThisPage.deshi';
 
   const brand = props.brand || "Deshi";
+
+  // Vertical grid lines sit --grid-line-offset outside the content wrapper,
+  // matching holocron's blueprint background.
+  const lineOffset = "calc(-1 * var(--grid-line-offset))";
 </script>
 
 <!-- Mobile sidebar toggle (0 JS). `sr-only` keeps it focusable so keyboard users
@@ -16,20 +20,28 @@
 <!-- Standalone Header Component -->
 <Header brand={brand} />
 
-<!-- 3-COLUMN DOCS BODY - 100% FULL WIDTH EDGE-TO-EDGE -->
-<div class="flex-1 flex w-full">
-  <!-- Standalone Sidebar Component (Left) -->
-  <Sidebar brand={brand} client:load />
+<!-- 3-COLUMN DOCS GRID (holocron layout). The wrapper starts flush with the
+     header bottom so the grid lines meet the header's corner dots; the grid
+     itself is inset by --layout-gap (holocron's content top = --sticky-top). -->
+<div class="relative">
+  <!-- Grid lines continue down from the header's corner dots -->
+  <div aria-hidden="true" class="grid-line-v solid hidden lg:block" style={`left:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset))`}></div>
+  <div aria-hidden="true" class="grid-line-v solid hidden lg:block" style={`right:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset))`}></div>
 
-  <!-- CENTER MAIN CONTENT -->
-  <main class="flex-1 min-w-0 w-full">
-    <div class="mx-auto px-4 pt-6 pb-16 lg:px-6 max-w-(--nb-content-max)">
-      <slot />
+  <div class="pt-(--layout-gap) lg:max-w-(--grid-max-width) lg:mx-auto px-(--mobile-padding) lg:px-0">
+    <div class="lg:grid lg:grid-cols-[var(--grid-nav-width)_var(--grid-content-width)_var(--grid-sidebar-width)] lg:gap-x-(--grid-gap)">
+      <!-- Standalone Sidebar Component (Left) -->
+      <Sidebar brand={brand} client:load />
+
+      <!-- CENTER MAIN CONTENT -->
+      <main class="min-w-0 w-full pb-16">
+        <slot />
+      </main>
+
+      <!-- Standalone OnThisPage Component (Right) with Slot override -->
+      <slot name="toc">
+        <OnThisPage />
+      </slot>
     </div>
-  </main>
-
-  <!-- Standalone OnThisPage Component (Right) with Slot override -->
-  <slot name="toc">
-    <OnThisPage />
-  </slot>
+  </div>
 </div>

@@ -16,7 +16,7 @@
     role="dialog"
     aria-modal="true"
     aria-label="Search documentation"
-    class="relative mx-auto mt-24 w-[36rem] max-w-[92vw] rounded-xl border border-[#23252e] bg-[#0c0d12] shadow-[0_30px_80px_rgba(0,0,0,0.8)] overflow-hidden"
+    class="relative mx-auto mt-24 w-[36rem] max-w-[92vw] rounded-xl border border-border bg-popover shadow-[0_30px_80px_rgba(0,0,0,0.6)] overflow-hidden"
   >
     <input
       data-search-input
@@ -24,12 +24,12 @@
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
-      placeholder="Search docs…"
+      placeholder="Search documentation…"
       aria-label="Search documentation"
-      class="w-full bg-transparent px-4 py-3.5 text-sm text-zinc-200 placeholder-zinc-500 outline-none border-b border-[#1c1d22]"
+      class="w-full bg-transparent px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none border-b border-border"
     />
     <ul data-search-results class="max-h-[52vh] overflow-y-auto scrollbar-thin py-2"></ul>
-    <div data-search-empty class="hidden px-4 py-6 text-center text-xs text-zinc-500">No matches found.</div>
+    <div data-search-empty class="hidden px-4 py-6 text-center text-xs text-muted-foreground">No matches found.</div>
   </div>
 </div>
 
@@ -56,7 +56,12 @@
     const seen = new Set();
 
     document.querySelectorAll('a[href^="/docs"]').forEach((a) => {
-      const label = (a.textContent || '').trim().replace(/\s+/g, ' ');
+      // Sidebar rows carry an icon + badge; take the label span when present so
+      // the icon's (empty) text and the badge don't leak into the query index.
+      const labelEl = a.querySelector('.sidebar-link-label');
+      const label = (labelEl ? labelEl.textContent : a.textContent || '')
+        .trim()
+        .replace(/\s+/g, ' ');
       const href = a.getAttribute('href');
       if (!label || !href || seen.has(href)) return;
       seen.add(href);
@@ -84,11 +89,11 @@
     results.innerHTML = list
       .map(
         (it, i) => `<li>
-        <a href="${escapeHtml(it.href)}" data-search-item class="flex items-center gap-3 px-4 py-2 text-sm transition ${
-          i === cursor ? 'bg-[#16171b] text-white' : 'text-zinc-300 hover:bg-[#16171b] hover:text-white'
+        <a href="${escapeHtml(it.href)}" data-search-item class="flex items-center gap-3 px-4 py-2 text-sm transition rounded-none ${
+          i === cursor ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
         }">
           <span class="truncate">${escapeHtml(it.label)}</span>
-          <span class="ml-auto text-[10px] font-mono text-zinc-500 shrink-0">${escapeHtml(it.group)}</span>
+          <span class="ml-auto text-[10px] font-mono text-text-tertiary shrink-0">${escapeHtml(it.group)}</span>
         </a>
       </li>`,
       )
@@ -117,7 +122,15 @@
     panel.classList.add('hidden');
   }
 
-  document.querySelectorAll('[data-search-open]').forEach((b) => b.addEventListener('click', open));
+  // Delegated so it doesn't matter which island hydrates first — the trigger may
+  // not exist yet when this script runs (Sidebar is its own client island).
+  document.addEventListener('click', (e) => {
+    const trigger = e.target && e.target.closest ? e.target.closest('[data-search-open]') : null;
+    if (trigger) {
+      e.preventDefault();
+      open();
+    }
+  });
   root.querySelector('[data-search-close]').addEventListener('click', close);
   input.addEventListener('input', refresh);
 
@@ -146,6 +159,17 @@
       e.preventDefault();
       if (isOpen) close();
       else open();
+      return;
+    }
+
+    // The sidebar field advertises "/" — honour it unless the user is typing.
+    if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !isOpen) {
+      const t = e.target;
+      const typing =
+        t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      open();
     }
   });
 </script>

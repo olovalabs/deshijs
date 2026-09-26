@@ -3,76 +3,147 @@
   const brand = props.brand || "Deshi";
   const version = props.version || "3.1.0";
   const showSidebarToggle = props.sidebar !== undefined ? props.sidebar : true;
+
+  // Tab bar (holocron's second header row). Active state is derived from the
+  // URL during SSR and re-synced after client-router navigations by the
+  // Sidebar island (the header itself stays zero-JS).
+  const tabs = [
+    {
+      label: "Docs",
+      href: "/docs",
+      icon: "M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z",
+    },
+    {
+      label: "Architecture",
+      href: "/docs/architecture",
+      icon: "M12 2 2 7l10 5 10-5-10-5Z M2 17l10 5 10-5 M2 12l10 5 10-5",
+    },
+    {
+      label: "Routing",
+      href: "/docs/routing",
+      icon: "M6 3v12M18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6M6 18a3 3 0 1 0 0 6 3 3 0 0 0 0-6M15 6a9 9 0 0 1-9 9",
+    },
+    {
+      label: "Islands",
+      href: "/docs/islands",
+      icon: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z",
+    },
+    {
+      label: "API",
+      href: "/docs/api-reference",
+      icon: "m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16",
+    },
+    {
+      label: "Errors",
+      href: "/docs/error-catalog",
+      icon: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3M12 9v4M12 17h.01",
+    },
+  ];
+
+  const rawPath = (typeof url !== "undefined" && url && url.pathname) || "/";
+  const current = rawPath.length > 1 && rawPath.endsWith("/") ? rawPath.slice(0, -1) : rawPath;
+  const isTabActive = (href) => (href === "/docs" ? current === "/docs" : current.startsWith(href));
+
+  // Same geometry as holocron: the vertical grid lines sit half a grid max
+  // width (plus the line offset) away from the centre of the viewport.
+  const lineOffset = "calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset))";
 </script>
 
-<!-- TOP HEADER (0 JS) - 100% FULL WIDTH EDGE-TO-EDGE -->
-<header class="sticky top-0 z-40 h-14 bg-[#0c0d10] border-b border-[#1c1d22] px-4 lg:px-6 flex items-center justify-between backdrop-blur-md bg-opacity-95 w-full">
-  <!-- Left: Hamburger (mobile) + Deshi Logo + Deshi -->
-  <div class="flex items-center gap-3">
-    <!-- Mobile hamburger button (0 JS label) -->
-    {showSidebarToggle ? (
-      <label for="mobile-sidebar-toggle" class="lg:hidden p-1.5 -ml-1 text-zinc-400 hover:text-white rounded-md hover:bg-[#1c1d22] cursor-pointer" aria-label="Toggle navigation">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </label>
-    ) : null}
+<!-- TOP HEADER — sticky, full-bleed, logo row + tab bar (holocron layout) -->
+<header class="slot-navbar relative">
+  <div aria-hidden="true" class="grid-line-v solid hidden lg:block" style={`left:${lineOffset}`}></div>
+  <div aria-hidden="true" class="grid-line-v solid hidden lg:block" style={`right:${lineOffset}`}></div>
 
-    <a href="/" class="flex items-center gap-2.5 group">
-      <img src={logo} alt={brand + " documentation"} class="w-7 h-7 shrink-0 transition-transform group-hover:scale-105 object-contain" />
-      <span class="text-white font-bold text-base tracking-tight font-sans">{brand}</span>
-      <span class="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-primary/10 text-primary border border-primary/25">v{version}</span>
-    </a>
+  <!-- Row 1: logo · actions -->
+  <div class="mx-auto flex items-center justify-between px-(--mobile-padding) py-(--header-padding-y) lg:max-w-(--grid-max-width) lg:px-0">
+    <div class="flex min-w-0 items-center gap-3">
+      <!-- Mobile hamburger (0 JS) -->
+      {showSidebarToggle ? (
+        <label for="mobile-sidebar-toggle" class="lg:hidden -ml-1 inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground" aria-label="Toggle navigation">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </label>
+      ) : null}
 
-    <!-- Top nav desktop links -->
-    <nav class="hidden md:flex items-center gap-1 pl-4 border-l border-[#1f2026] text-xs">
-      <a href="/docs" class="px-2.5 py-1 text-zinc-300 hover:text-white hover:bg-[#16171b] rounded-md transition font-medium">Docs</a>
-      <a href="/docs/architecture" class="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-[#16171b] rounded-md transition">Architecture</a>
-      <a href="/docs/routing" class="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-[#16171b] rounded-md transition">Routing</a>
-      <a href="/docs/islands" class="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-[#16171b] rounded-md transition">Islands</a>
-      <a href="/docs/api-reference" class="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-[#16171b] rounded-md transition">API</a>
-      <a href="/docs/error-catalog" class="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-[#16171b] rounded-md transition">Errors</a>
-    </nav>
-  </div>
-
-  <!-- Right: Search & External Links -->
-  <div class="flex items-center gap-3">
-    <!-- Search triggers (behaviour lives in SearchPalette.deshi, mounted by the root layout) -->
-    <div class="relative flex items-center">
-      <button
-        type="button"
-        data-search-open
-        aria-label="Search documentation"
-        class="hidden sm:flex items-center gap-2 bg-[#141518] hover:bg-[#1a1b20] border border-[#24262c] hover:border-zinc-700 text-zinc-400 text-xs px-3 py-1.5 rounded-lg w-44 sm:w-52 transition"
-      >
-        <svg class="w-3.5 h-3.5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <span class="text-zinc-500 select-none text-[12px]">Search docs...</span>
-        <span data-search-kbd class="ml-auto flex items-center gap-0.5 text-[10px] text-zinc-400 bg-[#1e2025] px-1.5 py-0.5 rounded border border-[#2d2f38] font-mono select-none">Ctrl K</span>
-      </button>
-
-      <button
-        type="button"
-        data-search-open
-        aria-label="Search documentation"
-        class="sm:hidden text-zinc-400 hover:text-white p-1.5 rounded-md hover:bg-[#1c1d22] transition"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </button>
+      <a href="/" class="slot-logo group flex shrink-0 items-center gap-2 no-underline">
+        <img
+          src={logo}
+          alt={brand + " documentation"}
+          class="shrink-0 object-contain transition-transform duration-150 group-hover:scale-105"
+          style="width:var(--logo-height);height:var(--logo-height)"
+        />
+        <span class="text-sm font-medium text-foreground">{brand}</span>
+        <span class="hidden items-center rounded border border-border-subtle px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground sm:inline-flex">
+          v{version}
+        </span>
+      </a>
     </div>
 
-    <!-- GitHub icon link -->
-    <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="p-1.5 text-zinc-400 hover:text-white rounded-md hover:bg-[#1c1d22] transition" title="GitHub Repository">
-      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
-      </svg>
-    </a>
+    <div class="flex items-center gap-2">
+      <!-- Search (mobile trigger — desktop uses the sidebar field) -->
+      <button
+        type="button"
+        data-search-open
+        aria-label="Search documentation"
+        class="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground sm:hidden"
+      >
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.34-4.34"></path>
+        </svg>
+      </button>
+
+      <!-- GitHub -->
+      <a
+        href="https://github.com/olovalabs/deshi"
+        target="_blank"
+        rel="noreferrer"
+        title="GitHub Repository"
+        aria-label="GitHub"
+        class="hidden items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground sm:inline-flex"
+      >
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+        </svg>
+      </a>
+
+      <!-- Primary pill (holocron's "Get Started" slot) -->
+      <a
+        href="/docs"
+        class="inline-flex items-center gap-1.5 rounded-md border border-border-subtle px-2.5 py-1 text-xs text-muted-foreground no-underline transition-colors duration-150 hover:border-muted-foreground hover:text-foreground"
+      >
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15 3h6v6m-11 5L21 3m-3 10v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+        </svg>
+        <span>Get Started</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Row 2: tab bar (desktop) -->
+  <div class="slot-tabbar relative hidden lg:block">
+    <div class="mx-auto flex h-(--tab-bar-height) max-w-full items-stretch gap-6 overflow-x-auto px-(--mobile-padding) text-sm lg:max-w-(--grid-max-width) lg:px-0">
+      {tabs.map((tab) => (
+        <a
+          href={tab.href}
+          data-tab={tab.href}
+          data-active={isTabActive(tab.href) ? "true" : "false"}
+          aria-current={isTabActive(tab.href) ? "page" : null}
+          class="slot-tab no-underline"
+        >
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d={tab.icon}></path>
+          </svg>
+          <span>{tab.label}</span>
+        </a>
+      ))}
+    </div>
+
+    <!-- Blueprint dots where the grid lines meet the tab bar borders -->
+    <div aria-hidden="true" class="grid-dot hidden lg:flex" style="top:0;left:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset));transform:translate(-50%, -50%)"></div>
+    <div aria-hidden="true" class="grid-dot hidden lg:flex" style="top:0;right:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset));transform:translate(50%, -50%)"></div>
+    <div aria-hidden="true" class="grid-dot hidden lg:flex" style="bottom:0;left:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset));transform:translate(-50%, 50%)"></div>
+    <div aria-hidden="true" class="grid-dot hidden lg:flex" style="bottom:0;right:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset));transform:translate(50%, 50%)"></div>
   </div>
 </header>
