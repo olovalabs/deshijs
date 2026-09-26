@@ -681,8 +681,9 @@ body {
   margin-inline: calc(-1 * var(--sidebar-row-padding-x));
   border-radius: var(--sidebar-link-radius);
   color: var(--sidebar-foreground);
-  font-weight: var(--weight-prose);
-  line-height: var(--lh-prose);
+  /* holocron: font-weight 400 on the row, 500 on the label span; lh 1.5 */
+  font-weight: 400;
+  line-height: var(--sidebar-line-height);
   text-decoration: none;
   transition: none;
 }
@@ -711,6 +712,10 @@ body {
 }
 .sidebar-link-external {
   font-weight: 450;
+}
+/* holocron's GitHub label inherits wght 450 (no font-medium span) */
+.sidebar-link-external .sidebar-link-label {
+  font-weight: inherit;
 }
 .sidebar-link-arrow {
   margin-inline-start: auto;
