@@ -16,6 +16,7 @@
   "scripts": {
     "build": "bun run --filter deshijs build && bun run --filter deshi-playground build && bun run --filter deshi-docs build",
     "build:compiler": "bun run --filter deshijs build",
+    "build:docs": "bun run build:compiler && bun run --filter deshi-docs build",
     "dev": "bun run build:compiler && bun run --filter deshi-playground dev",
     "dev:docs": "bun run build:compiler && bun run --filter deshi-docs dev",
     "preview": "bun run --filter deshi-playground preview",

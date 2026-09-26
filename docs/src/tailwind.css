@@ -128,7 +128,8 @@
   --sidebar-leading-gap: calc(6em / 14);
   --sidebar-active-background: transparent;
   --sidebar-hover-background: var(--accent);
-  --sidebar-line-height: calc(var(--sidebar-font-size) * var(--lh-prose));
+  /* holocron rows use line-height 1.5 (21px at 14px font) — not --lh-prose */
+  --sidebar-line-height: calc(var(--sidebar-font-size) * 1.5);
   --search-input-radius: var(--radius-xl);
 }
 
@@ -660,6 +661,8 @@ body {
 .sidebar-group-items {
   display: flex;
   flex-direction: column;
+  /* holocron row pitch = 29px row + 4px gap = 33px */
+  gap: var(--sidebar-row-gap);
 }
 .sidebar-badge {
   flex-shrink: 0;

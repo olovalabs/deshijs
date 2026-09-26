@@ -1,11 +1,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "deshi-app",
+  "name": "deshi-docs",
   "compatibility_date": "2026-09-18",
   "build": {
-    "command": "bun run build"
+    "command": "bun run build:docs"
   },
   "assets": {
-    "directory": "./examples/playground/dist"
+    "directory": "./docs/dist"
   }
 }
