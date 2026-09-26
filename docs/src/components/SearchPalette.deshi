@@ -34,7 +34,10 @@
 </div>
 
 <script client>
-  const panel = root.querySelector('[data-search-panel]');
+  // The island root IS the panel element (the runtime passes the element that
+  // carries data-deshi-i), and querySelector only matches descendants — so
+  // fall back to the root itself or the search silently never opens.
+  const panel = root.hasAttribute('data-search-panel') ? root : root.querySelector('[data-search-panel]');
   const input = root.querySelector('[data-search-input]');
   const results = root.querySelector('[data-search-results]');
   const empty = root.querySelector('[data-search-empty]');

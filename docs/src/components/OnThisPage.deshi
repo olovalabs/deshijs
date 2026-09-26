@@ -1,65 +1,174 @@
 <script>
   const title = props.title || "On this page";
-  const items = props.items || [
-    { href: "#overview", label: "Overview" },
-  ];
+
+  const tocScript = `
+    (() => {
+      let scrollUnsub = null;
+
+      function refreshToc() {
+        if (scrollUnsub) {
+          scrollUnsub();
+          scrollUnsub = null;
+        }
+
+        const container = document.getElementById('toc-container');
+        const list = document.getElementById('toc-list');
+        const indicator = document.getElementById('toc-indicator');
+        if (!container || !list) return;
+
+        const headings = Array.from(document.querySelectorAll('main h2[id], main h3[id]'));
+        if (!headings.length) {
+          container.style.display = 'none';
+          list.innerHTML = '';
+          if (indicator) indicator.style.opacity = '0';
+          return;
+        }
+
+        container.style.display = '';
+        list.innerHTML = '';
+
+        headings.forEach((h) => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = '#' + h.id;
+          const isH3 = h.tagName.toLowerCase() === 'h3';
+          a.className = isH3 ? 'toc-link toc-link-h3' : 'toc-link';
+          a.textContent = h.textContent.replace(/^#\\s*/, '').trim();
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = document.getElementById(h.id);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth' });
+              history.pushState(null, '', '#' + h.id);
+              updateActive(h.id);
+            }
+          });
+          li.appendChild(a);
+          list.appendChild(li);
+        });
+
+        function updateActive(forcedId) {
+          let activeId = forcedId;
+          if (!activeId) {
+            const offset = 120;
+            const scrollY = window.scrollY;
+            if (window.innerHeight + scrollY >= document.documentElement.scrollHeight - 60) {
+              activeId = headings[headings.length - 1].id;
+            } else {
+              activeId = headings[0].id;
+              for (let i = 0; i < headings.length; i++) {
+                const top = headings[i].getBoundingClientRect().top;
+                if (top <= offset) {
+                  activeId = headings[i].id;
+                } else {
+                  break;
+                }
+              }
+            }
+          }
+
+          list.querySelectorAll('.toc-link').forEach((link) => {
+            const on = link.getAttribute('href') === '#' + activeId;
+            link.dataset.active = on ? 'true' : 'false';
+            if (on && indicator) {
+              const listRect = list.getBoundingClientRect();
+              const linkRect = link.getBoundingClientRect();
+              const top = linkRect.top - listRect.top;
+              indicator.style.top = top + 'px';
+              indicator.style.height = linkRect.height + 'px';
+              indicator.style.opacity = '1';
+            }
+          });
+        }
+
+        updateActive();
+
+        let ticking = false;
+        const onScroll = () => {
+          if (!ticking) {
+            requestAnimationFrame(() => {
+              updateActive();
+              ticking = false;
+            });
+            ticking = true;
+          }
+        };
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        scrollUnsub = () => window.removeEventListener('scroll', onScroll);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', refreshToc);
+      } else {
+        refreshToc();
+      }
+      window.addEventListener('load', refreshToc);
+      window.addEventListener('deshi:navigated', refreshToc);
+    })();
+  `;
 </script>
 
-<!-- RIGHT SIDEBAR: "ON THIS PAGE" (holocron TOC column, sticky) -->
-<aside class="slot-sidebar-right hidden xl:block shrink-0 lg:sticky lg:top-(--sticky-top) lg:h-[calc(100vh-var(--sticky-top))] overflow-y-auto py-8 scrollbar-thin">
-  <div class="space-y-6">
-    <div>
-      <h2 class="toc-heading">{title}</h2>
-
-      <!-- TOC link tree (Dynamically updated for .md headings) -->
-      <ul id="toc-list" class="toc-list">
-        {items.map((item) => (
-          <li>
-            <a href={item.href} class="toc-link">
-              {item.label}
-            </a>
-          </li>
-        ))}
-      </ul>
+<!-- RIGHT SIDEBAR: TABLE OF CONTENTS (dynamic vertical track + active indicator) -->
+<aside class="slot-sidebar-right hidden lg:block shrink-0 lg:sticky lg:top-(--sticky-top) lg:h-[calc(100vh-var(--sticky-top))] overflow-y-auto pt-0 pb-8 scrollbar-thin">
+  <div id="toc-container" class="toc-container relative">
+    <div class="toc-header cursor-default mb-3 text-[11px] font-semibold tracking-wider uppercase text-muted-foreground select-none">
+      {title}
     </div>
 
-    <div class="pt-4 border-t border-divider text-[12px] text-text-tertiary space-y-2">
-      <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="flex items-center gap-2 hover:text-muted-foreground transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-        </svg>
-        <span>Edit this page on GitHub</span>
-      </a>
-      <a href="#top" class="flex items-center gap-2 hover:text-muted-foreground transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <polyline points="18 15 12 9 6 15"></polyline>
-        </svg>
-        <span>Back to top</span>
-      </a>
+    <!-- Track & Links wrapper -->
+    <div class="toc-nav-wrapper relative">
+      <!-- Vertical guide track line -->
+      <div
+        aria-hidden="true"
+        class="toc-track pointer-events-none absolute rounded-full"
+        style="inset-block-start: 4px; inset-block-end: 4px; inset-inline-start: 0; width: 1.5px; background-color: var(--border-subtle);"
+      ></div>
+
+      <!-- Active indicator bar (smooth sliding highlight) -->
+      <div
+        id="toc-indicator"
+        aria-hidden="true"
+        class="toc-indicator pointer-events-none absolute rounded-full"
+        style="inset-inline-start: 0; width: 2px; background-color: var(--foreground); transition: top 0.15s ease, height 0.15s ease, opacity 0.15s ease; opacity: 0;"
+      ></div>
+
+      <!-- Heading links list -->
+      <ul
+        id="toc-list"
+        class="toc-list relative list-none m-0 p-0 flex flex-col gap-1 leading-[1.33]"
+        style="padding-inline-start: 14px;"
+      ></ul>
     </div>
   </div>
+
+  <script set:html={tocScript}></script>
 </aside>
 
-<!-- Auto-generate Table of Contents from headings on page load and client navigation -->
-<script client>
-  (() => {
-    function refreshToc() {
-      const list = document.getElementById('toc-list');
-      const headings = document.querySelectorAll('main h2[id], main h3[id]');
-      if (!list || headings.length === 0) return;
-      list.innerHTML = '';
-      headings.forEach((h) => {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = '#' + h.id;
-        a.textContent = h.textContent.replace(/^#\s*/, '');
-        const isH3 = h.tagName.toLowerCase() === 'h3';
-        a.className = isH3 ? 'toc-link toc-link-child' : 'toc-link';
-        li.appendChild(a);
-        list.appendChild(li);
-      });
-    }
-    refreshToc();
-    window.addEventListener('deshi:navigated', refreshToc);
-  })();
-</script>
+<style>
+  .toc-link {
+    display: block;
+    font-size: 13px;
+    line-height: 1.43;
+    color: var(--sidebar-foreground);
+    text-decoration: none;
+    font-weight: 400;
+    padding-block: 2px;
+    padding-inline: 8px;
+    margin-inline: -8px;
+    border-radius: var(--sidebar-link-radius);
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+  .toc-link-h3 {
+    padding-inline-start: 16px;
+    font-size: 12px;
+  }
+  .toc-link:hover {
+    color: var(--foreground);
+    background: var(--sidebar-hover-background);
+  }
+  .toc-link[data-active="true"] {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+</style>

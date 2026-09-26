@@ -15,7 +15,7 @@
 <input type="checkbox" id="mobile-sidebar-toggle" class="peer sr-only" />
 
 <!-- Backdrop overlay for mobile sidebar drawer (0 JS) -->
-<label for="mobile-sidebar-toggle" aria-hidden="true" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden peer-checked:block lg:hidden cursor-pointer"></label>
+<label for="mobile-sidebar-toggle" aria-hidden="true" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-[105] hidden peer-checked:block lg:hidden cursor-pointer"></label>
 
 <!-- Standalone Header Component -->
 <Header brand={brand} />
@@ -34,7 +34,7 @@
       <Sidebar brand={brand} client:load />
 
       <!-- CENTER MAIN CONTENT -->
-      <main class="min-w-0 w-full pb-16">
+      <main class="min-w-0 w-full pb-16 pt-6 sm:pt-8">
         <slot />
       </main>
 

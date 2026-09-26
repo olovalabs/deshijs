@@ -11,7 +11,7 @@
   <input type="checkbox" id="mobile-sidebar-toggle" class="peer sr-only" />
 
   <!-- Backdrop overlay for mobile sidebar drawer (0 JS) -->
-  <label for="mobile-sidebar-toggle" aria-hidden="true" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden peer-checked:block lg:hidden cursor-pointer"></label>
+  <label for="mobile-sidebar-toggle" aria-hidden="true" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-[105] hidden peer-checked:block lg:hidden cursor-pointer"></label>
 
   <Header brand={brand} />
 
