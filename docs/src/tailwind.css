@@ -1,0 +1,39 @@
+/* Tailwind v4 input stylesheet — compiled by docs/vite.config.js (src/tailwind.css → src/public/tailwind.css). */
+@import "tailwindcss";
+
+@theme {
+  /* Brand primary (lime) — used as bg-primary / text-primary / border-primary across the docs.
+     Matches the compiler's default --deshi-link and page.deshi's glow oklch(62.7% 0.194 149.214). */
+  --color-primary: #a3e635;
+
+  /* Font families (loaded via Google Fonts in src/layout.deshi). */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Content column width for docs pages (max-w-(--nb-content-max)). */
+:root {
+  --nb-content-max: 48rem;
+}
+
+/* Base */
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Markdown typography: align the compiler's --deshi-* defaults with the theme. */
+.deshi-md {
+  --deshi-link: var(--color-primary);
+  --deshi-accent: var(--color-primary);
+}
+
+/* Custom thin scrollbar (used by Sidebar / OnThisPage). */
+.scrollbar-thin::-webkit-scrollbar { width: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #23252b; border-radius: 9999px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #333640; }
+
+/* Focus ring for the 0-JS mobile sidebar toggle (docs/layout.deshi). */
+.peer.sr-only:focus-visible ~ aside {
+  outline: 2px solid var(--color-primary);
+}

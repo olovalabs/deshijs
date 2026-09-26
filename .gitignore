@@ -4,4 +4,5 @@ dist
 *.log
 *.tsbuildinfo
 tailwind.css
+!docs/src/tailwind.css
 .commandcode
