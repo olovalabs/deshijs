@@ -7,7 +7,7 @@ import * as acorn from 'acorn';
 import { transformSync } from 'esbuild';
 import { fail, makeDiagnostic, type Diagnostic } from './types';
 import { ACORN_OPTIONS, JsxParser, isComponentName } from './expression';
-import { isSourceFile } from './filetype';
+import { extname, isComponentFile, isSourceFile } from './filetype';
 import { collectTypeDeclarations, contractFromSite, findDefineProps, type PropContract } from './tsprops';
 
 export interface ImportSpec {
@@ -185,7 +185,6 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
     switch (stmt.type) {
       case 'ImportDeclaration': {
         const source = String(stmt.source.value);
-        const isComponent = isSourceFile(source);
         const specifiers: ImportSpec[] = stmt.specifiers.map((s: AnyNode) => ({
           imported:
             s.type === 'ImportDefaultSpecifier' ? 'default'
@@ -193,6 +192,8 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
             : (s.imported.type === 'Identifier' ? s.imported.name : String(s.imported.value)),
           local: s.local.name,
         }));
+        const hasCapitalizedDefault = specifiers.some((s) => s.imported === 'default' && isComponentName(s.local));
+        const isComponent = isComponentFile(source) || (extname(source) === '' && hasCapitalizedDefault);
         if (isComponent) {
           for (const s of specifiers) {
             if (s.imported !== 'default') {

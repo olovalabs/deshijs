@@ -26,6 +26,7 @@
         <a href="/about">About</a>
         <a href="/blog">Blog</a>
         <a href="/counter">Counter</a>
+        <a href="/multi">Multi-Framework</a>
         <a href="/hello">Markdown</a>
         <a href="/guide">MDX</a>
       </nav>

@@ -3,11 +3,13 @@
 // routes.ts, build.ts and vite.ts so extension handling can never drift again.
 
 export const SOURCE_EXTENSIONS = ['deshi', 'html', 'md', 'mdx'] as const;
-export const CODE_EXTENSIONS = ['js', 'ts'] as const;
+export const FRAMEWORK_EXTENSIONS = ['jsx', 'tsx', 'vue', 'svelte'] as const;
+export const CODE_EXTENSIONS = ['js', 'ts', 'jsx', 'tsx', 'mjs', 'cjs'] as const;
 export const DOCUMENT_EXTENSIONS = ['md', 'mdx'] as const;
 export const LAYOUT_EXTENSIONS = ['deshi', 'html'] as const;
 
 const SOURCE = new Set<string>(SOURCE_EXTENSIONS);
+const FRAMEWORK = new Set<string>(FRAMEWORK_EXTENSIONS);
 const CODE = new Set<string>(CODE_EXTENSIONS);
 const DOCUMENT = new Set<string>(DOCUMENT_EXTENSIONS);
 
@@ -39,7 +41,9 @@ export function isCodeExt(ext: string): boolean {
 export function isDocumentExt(ext: string): boolean {
   return DOCUMENT.has(ext);
 }
-
+export function isFrameworkExt(ext: string): boolean {
+  return FRAMEWORK.has(ext);
+}
 /** A `.deshi` / `.html` / `.md` / `.mdx` file. */
 export function isSourceFile(p: string): boolean {
   return SOURCE.has(extname(p));
@@ -52,7 +56,18 @@ export function isCodeFile(p: string): boolean {
 export function isDocumentFile(p: string): boolean {
   return DOCUMENT.has(extname(p));
 }
-
+/** A React/Preact (.jsx/.tsx), Vue (.vue), or Svelte (.svelte) component file. */
+export function isFrameworkComponent(p: string): boolean {
+  return FRAMEWORK.has(extname(p));
+}
+/** Any component file (.deshi, .html, or framework component). */
+export function isComponentFile(p: string): boolean {
+  return isSourceFile(p) || isFrameworkComponent(p);
+}
+/** Any source, code, or framework component file that belongs in project files. */
+export function isProjectFile(p: string): boolean {
+  return isSourceFile(p) || isCodeFile(p) || isFrameworkComponent(p);
+}
 export function isPageStem(stem: string): boolean {
   return PAGE_STEMS.has(stem);
 }

@@ -1,10 +1,10 @@
 ---
 import Counter from '../components/Counter.deshi';
+import ReactWidget from '../components/ReactWidget.jsx';
 const heroColor = "#a3e635";
 const isActive = true;
 const label = "set:text demo — Astro parity";
 ---
-
 <head>
   <title>Demo · Deshi Super-Power</title>
   <meta name="description" content="Deshi Astro parity demo: class:list, define:vars, set:text, client:media, client:only, transition:*" />
@@ -55,6 +55,12 @@ const label = "set:text demo — Astro parity";
     <Counter client:visible start={10} step={10} />
     <Counter client:idle start={100} step={5} />
   </section>
+  <section class="card">
+    <h2>Multi-Framework Island (JSX / React)</h2>
+    <p class="muted">Deshi dynamically loads and hydrates components authored in JSX, Vue, or Svelte with full Astro parity.</p>
+    <ReactWidget name="Dynamic JSX Island" client:visible />
+  </section>
+
 
   <section class="card">
     <h2>Astro global</h2>

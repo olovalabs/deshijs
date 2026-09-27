@@ -33,22 +33,28 @@ import {
   hasContext,
   runWithContext,
   type RenderCtx,
+  type ComponentMeta,
   type RenderModule,
   type SlotFns,
 } from './runtime';
-import { DeshiError, type Diagnostic } from './types';
+import { DeshiError, hashString, type Diagnostic } from './types';
 import { walk } from './ast/walk';
 import { resolverFromCompiled, type ComponentResolver } from './props';
 import { prepareHighlight } from './highlight';
 import {
   CODE_EXTENSIONS,
+  FRAMEWORK_EXTENSIONS,
   SOURCE_EXTENSIONS,
   extname,
   isCodeFile,
+  isComponentFile,
+  isFrameworkComponent,
   isLayoutPath,
+  isProjectFile,
   isSourceFile,
   splitFilename,
 } from './filetype';
+import { ensureJsxRuntime, generateFrameworkClientMount } from './frameworks';
 
 export interface Project {
   /** file path (project-relative, e.g. "src/app/page.html") → source */
@@ -132,15 +138,37 @@ function diag(code: string, message: string, file: string, severity: 'error' | '
 
 /** Evaluate a plain JS/TS helper module (src/lib/*.js|ts) — imports/exports rewritten via the ESTree. */
 function jsModuleBody(source: string, file: string): string {
-  let program: acorn.Program;
   let src = source;
+  const isJsx = file.endsWith('.jsx') || file.endsWith('.tsx');
+  if (file.endsWith('.vue')) {
+    const scriptMatch = source.match(/<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/i);
+    const templateMatch = source.match(/<template(?:\s+[^>]*)?>([\s\S]*?)<\/template>/i);
+    const scriptContent = scriptMatch ? scriptMatch[1].trim() : 'export default {};';
+    const templateContent = templateMatch ? templateMatch[1].trim() : '';
+    src = `${scriptContent}\nexport const __template = ${JSON.stringify(templateContent)};`;
+  } else if (file.endsWith('.svelte')) {
+    const scriptMatch = source.match(/<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/i);
+    const templateContent = source.replace(/<script(?:\s+[^>]*)?>[\s\S]*?<\/script>/gi, '').trim();
+    const scriptContent = scriptMatch ? scriptMatch[1].trim() : '';
+    src = `${scriptContent}\nexport default function SvelteComponent(props) { return ${JSON.stringify(templateContent)}; }\nexport const __template = ${JSON.stringify(templateContent)};`;
+  }
+  let program: acorn.Program;
   try {
-    program = acorn.parse(source, ACORN_OPTIONS);
+    if (isJsx) {
+      src = transformSync(src, {
+        loader: 'tsx',
+        format: 'esm',
+        tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } },
+      }).code;
+      program = JsxParser.parse(src, ACORN_OPTIONS) as acorn.Program;
+    } else {
+      program = acorn.parse(src, ACORN_OPTIONS);
+    }
   } catch (e) {
     // TypeScript helper: strip types, then parse (same fallback as <script>).
     // All slicing below must use the stripped source the positions came from.
     try {
-      src = transformSync(source, {
+      src = transformSync(src, {
         loader: 'tsx',
         format: 'esm',
         tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } },
@@ -151,6 +179,22 @@ function jsModuleBody(source: string, file: string): string {
     }
   }
   const out: string[] = [];
+  if (isJsx) {
+    out.push(`
+if (typeof React === 'undefined') {
+  var $jsxH = function(type, props, ...children) {
+    var p = Object.assign({}, props);
+    if (children.length === 1) p.children = children[0];
+    else if (children.length > 1) p.children = children;
+    return { type: type, props: p };
+  };
+  var React = { createElement: $jsxH, Fragment: function(p) { return p && p.children; } };
+}
+if (typeof h === 'undefined') {
+  var h = React.createElement;
+}
+`);
+  }
   const exportsList: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const node of program.body as any[]) {
@@ -197,6 +241,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   };
   const t0 = performance.now();
   resetCache();
+  ensureJsxRuntime();
   if (options.highlight) await prepareHighlight(options.highlight);
   const diagnostics: Diagnostic[] = [];
   const compiled: Record<string, CompileResult> = {};
@@ -230,6 +275,54 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     if (compiled[key]) return compiled[key];
     const source = files[file];
     if (source === undefined) throw new DeshiError(diag('PF4004', `Component file not found: ${file}`, file));
+
+    if (isFrameworkComponent(file)) {
+      const hash = hashString(source);
+      const clientMount = generateFrameworkClientMount(file, source);
+      const res: CompileResult = {
+        code: source,
+        evalBody: '',
+        css: { scoped: '', global: '', hash },
+        client: {
+          body: source,
+          code: clientMount,
+        },
+        meta: {
+          file,
+          hash,
+          isLayout: false,
+          isDocument: false,
+          slots: ['default'],
+          requiredSlots: [],
+          dynamicSlots: true,
+          deps: [],
+          hasClient: true,
+          hasCss: false,
+          headBlocks: 0,
+          usesParams: false,
+          bindings: [],
+          contract: null,
+          propReads: [],
+          propReadsOpaque: true,
+        },
+        diagnostics: [],
+        script: {
+          imports: [],
+          components: new Set(),
+          bindings: [],
+          propsLocal: null,
+          contract: null,
+          diagnostics: [],
+          programBody: [],
+          body: '',
+          source: '',
+        },
+        ast: { type: 'Root', children: [], document: false },
+      };
+      compiled[key] = res;
+      return res;
+    }
+
     const rel = file.startsWith(appDir + '/') ? file.slice(appDir.length + 1) : null;
     const isLayout = rel ? isLayoutPath(rel) : false;
     const res = compile(source, {
@@ -252,12 +345,21 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
         base,
         ...CODE_EXTENSIONS.map((e) => `${base}.${e}`),
         ...SOURCE_EXTENSIONS.map((e) => `${base}.${e}`),
+        ...FRAMEWORK_EXTENSIONS.map((e) => `${base}.${e}`),
         `${base}/index.js`,
       ];
       for (const cand of cands) if (files[cand] !== undefined) return cand;
       return base;
     }
-    if (spec.startsWith('./') || spec.startsWith('../')) return joinPath(dirname(from), spec);
+    if (spec.startsWith('./') || spec.startsWith('../')) {
+      const target = joinPath(dirname(from), spec);
+      if (files[target] !== undefined) return target;
+      for (const ext of [...SOURCE_EXTENSIONS, ...FRAMEWORK_EXTENSIONS, ...CODE_EXTENSIONS]) {
+        const withExt = `${target}.${ext}`;
+        if (files[withExt] !== undefined) return withExt;
+      }
+      return target;
+    }
     return spec;
   };
 
@@ -318,7 +420,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       return proxyNs;
     }
     if (files[file] === undefined) {
-      const code = isSourceFile(file) ? 'PF4004' : 'PF5002';
+      const code = isComponentFile(file) ? 'PF4004' : 'PF5002';
       throw new DeshiError(diag(code, `Cannot resolve "${spec}" from ${from} (${file} not found)`, from));
     }
     loading.add(file);
@@ -332,6 +434,24 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       } else {
         const fn = new AsyncFunction('$import', jsModuleBody(files[file], file));
         ns = (await fn($import)) as ModuleNs;
+        if (isFrameworkComponent(file) && ns.default) {
+          const compMeta = getCompiled(file)?.meta;
+          if (compMeta && (typeof ns.default === 'function' || typeof ns.default === 'object')) {
+            (ns.default as { __deshi?: ComponentMeta; template?: string }).__deshi = {
+              file: compMeta.file,
+              hash: compMeta.hash,
+              slots: compMeta.slots,
+              deps: compMeta.deps,
+              css: compMeta.hasCss,
+              client: compMeta.hasClient,
+              isLayout: compMeta.isLayout,
+              isDocument: compMeta.isDocument,
+            };
+            if (ns.__template && typeof ns.default === 'object') {
+              (ns.default as { template?: string }).template = String(ns.__template);
+            }
+          }
+        }
       }
       modules.set(file, ns);
       return ns;
@@ -355,7 +475,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
 
   // Compile every component/page file up front so that diagnostics cover unused files too.
   for (const f of Object.keys(files)) {
-    if (!isSourceFile(f)) continue;
+    if (!isComponentFile(f)) continue;
     try {
       getCompiled(f);
     } catch (e) {
@@ -775,7 +895,7 @@ export async function buildToDisk(
         Object.assign(out, readDirRecursive(full, rel));
       } else if (
         item.isFile() &&
-        (isSourceFile(item.name) || isCodeFile(item.name))
+        isProjectFile(item.name)
       ) {
         out[`${appDir}/${rel}`] = fs.readFileSync(full, 'utf-8');
       }

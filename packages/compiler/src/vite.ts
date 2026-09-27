@@ -8,7 +8,7 @@ import { resolverFromCompiled } from './props';
 import { hashString } from './types';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
 import { loadConfig, mergeConfig, defaultConfig } from './config';
-import { isCodeFile, isSourceFile } from './filetype';
+import { isCodeFile, isProjectFile, isSourceFile } from './filetype';
 import { prepareHighlight } from './highlight';
 
 // Virtual per-file CSS served through Vite's pipeline (postcss, HMR):
@@ -90,7 +90,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
   }
 
   function isDeshiSource(file: string): boolean {
-    return isSourceFile(file);
+    return isProjectFile(file);
   }
 
   function cssOnlyChange(
@@ -401,7 +401,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
               const rel = base ? `${base}/${item.name}` : item.name;
               if (item.isDirectory() && !item.name.startsWith('.') && item.name !== 'node_modules' && item.name !== 'compiler') {
                 Object.assign(out, readFilesRecursively(full, rel));
-              } else if (item.isFile() && (isSourceFile(item.name) || isCodeFile(item.name))) {
+              } else if (item.isFile() && isProjectFile(item.name)) {
                 out[`src/${rel}`] = fs.readFileSync(full, 'utf-8');
               }
             }

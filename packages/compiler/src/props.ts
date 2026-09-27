@@ -17,7 +17,7 @@ import type { Attr, Component, Loc, Node, Root } from './types';
 import { walk } from './ast/walk';
 import { hasOpaquePropertyAccess, propertyAccesses, staticType, staticValue } from './ast/estree';
 import { describeType, type PropContract, type PropType } from './tsprops';
-
+import { isFrameworkComponent } from './filetype';
 /** What one compiled component file tells the compiler about its interface. */
 export interface ComponentInfo {
   /** project-relative path of the component */
@@ -81,7 +81,22 @@ export function resolverFromCompiled(
     const owner = compiled[fromFile];
     const imp = owner?.script.imports.find((i) => i.specifiers.some((s) => s.local === ident));
     if (!imp) return null;
-    return interfaces.get(resolvePath(imp.source, fromFile)) ?? null;
+    const resolved = resolvePath(imp.source, fromFile);
+    const existing = interfaces.get(resolved);
+    if (existing) return existing;
+    if (isFrameworkComponent(resolved) || isFrameworkComponent(imp.source)) {
+      return {
+        file: resolved,
+        slots: ['default'],
+        requiredSlots: [],
+        dynamicSlots: true,
+        contract: null,
+        reads: [],
+        opaque: true,
+        client: true,
+      };
+    }
+    return null;
   };
 }
 

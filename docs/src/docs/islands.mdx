@@ -128,6 +128,33 @@ Declare browser interactivity within a `<script client>` block inside your compo
 
 ---
 
+## Multi-Framework Islands (React, Preact, Vue, Svelte)
+
+Deshijs natively supports importing and hydrating UI framework components directly inside `.deshi` files, matching Astro's multi-framework islands:
+
+```html
+<script>
+  import ReactCounter from './components/ReactCounter.jsx';
+  import VueWidget from './components/VueWidget.vue';
+  import SvelteButton from './components/SvelteButton.svelte';
+</script>
+
+<!-- Rendered statically at build time (0 bytes client JS) -->
+<ReactCounter initial={10} />
+
+<!-- Hydrated in the browser using the framework's client runtime -->
+<ReactCounter initial={10} client:load />
+<VueWidget title="Dashboard" client:visible />
+<SvelteButton client:idle />
+```
+
+### How It Works:
+- **Zero-Config Detection**: The compiler recognizes `.jsx`, `.tsx`, `.vue`, and `.svelte` files automatically.
+- **Server Rendering (SSR)**: At build time, the component is rendered to static HTML using the framework's SSR renderer (`react-dom/server`, `@vue/server-renderer`, `svelte/server`, or `preact-render-to-string`).
+- **Client Hydration**: When a `client:*` directive is attached, Deshijs generates an ultra-compact island chunk (`/_deshi/c/<Component>.<hash>.js`) that mounts the component into the DOM.
+- **Props Passing**: Standard props are serialized into `data-deshi-props` automatically and passed to both the server renderer and client hydration.
+---
+
 ## Runtime Internals (islands.ts)
 
 In `packages/compiler/src/islands.ts`:

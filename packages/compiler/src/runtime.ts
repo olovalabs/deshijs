@@ -3,7 +3,8 @@
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { islandInlineScript, type IslandStrategy } from './islands';
-import { splitFilename } from './filetype';
+import { isFrameworkComponent, splitFilename } from './filetype';
+import { renderFrameworkComponent } from './frameworks';
 import { DESHI_VERSION } from './types';
 
 export class Raw {
@@ -275,6 +276,7 @@ export async function renderComponent(
 ): Promise<string> {
   const meta = Comp.__deshi;
   if (!meta) throw new Error('renderComponent: not a compiled Deshi component');
+  const isFramework = isFrameworkComponent(meta.file);
   const maxDepth = ctx.maxDepth ?? 500;
   if (ctx.depth > maxDepth) {
     throw new Error(`PF4002: Component nesting deeper than ${maxDepth} (${meta.file})`);
@@ -293,6 +295,7 @@ export async function renderComponent(
     ctx.clients.add(meta.hash);
     ctx.islands++;
   } else if (isOnly) {
+    ctx.clients.add(meta.hash);
     ctx.islands++;
   }
   ctx.depth++;
@@ -310,9 +313,13 @@ export async function renderComponent(
     const marker = island || isOnly ? { id: `d-${meta.hash}-${ctx.islands}` } : undefined;
     const parentStore = contextStorage.getStore();
     const componentStore = new Map<unknown, unknown>(parentStore);
-    const html = await contextStorage.run(componentStore, () =>
-      Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp, marker)
-    );
+    const html = await contextStorage.run(componentStore, async () => {
+      if (isFramework) {
+        if (isOnly) return '';
+        return renderFrameworkComponent(Comp, props, meta.file);
+      }
+      return Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp, marker);
+    });
     if (!marker) return html;
     const name = componentBaseName(meta.file);
     const src = `/_deshi/c/${name}.${meta.hash}.js`;
@@ -321,7 +328,10 @@ export async function renderComponent(
     if (isOnly && !html.trim()) {
       return `<div id="${escapeAttr(nid)}" style="display:contents" data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}"></div>` + islandInlineScript(nid, src, strategy as IslandStrategy, media);
     }
-    return html + islandInlineScript(nid, src, strategy as IslandStrategy, media);
+    const finalHtml = isFramework
+      ? `<div id="${escapeAttr(nid)}" style="display:contents" data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}">${html}</div>`
+      : html;
+    return finalHtml + islandInlineScript(nid, src, strategy as IslandStrategy, media);
   } finally {
     ctx.depth--;
   }

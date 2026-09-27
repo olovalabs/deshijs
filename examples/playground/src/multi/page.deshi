@@ -1,0 +1,190 @@
+<script>
+  import ReactWidget from '../components/ReactWidget.jsx';
+  import VueWidget from '../components/VueWidget.vue';
+  import SvelteWidget from '../components/SvelteWidget.svelte';
+  import PreactWidget from '../components/PreactWidget.tsx';
+</script>
+
+<head>
+  <title>Multi-Framework Islands · Deshijs</title>
+  <meta name="description" content="Multi-framework islands showcase: React, Preact, Vue, and Svelte running inside Deshijs." />
+</head>
+
+<div class="multi-page">
+  <span class="badge">Route: /multi · Astro-like Multi-Framework</span>
+  <h1>Multi-Framework Islands</h1>
+  <p class="lede">
+    Deshijs allows importing and hydrating components authored in <strong>React (JSX/TSX)</strong>,
+    <strong>Vue 3 (.vue)</strong>, <strong>Svelte (.svelte)</strong>, and <strong>Preact</strong>
+    directly inside <code>.deshi</code> templates with zero configuration.
+  </p>
+
+  <section class="section">
+    <h2>1 · Interactive Islands (Hydration)</h2>
+    <p class="muted">
+      Each component below is an independent island running its respective framework runtime.
+      Props are serialized automatically into <code>data-deshi-props</code> at build time.
+    </p>
+
+    <div class="grid">
+      <!-- React Island -->
+      <ReactWidget name="Interactive React Island" initial={100} client:load />
+
+      <!-- Vue Island -->
+      <VueWidget title="Dynamic Vue 3 Island" description="Hydrates on viewport entry via IntersectionObserver." client:visible />
+
+      <!-- Svelte Island -->
+      <SvelteWidget title="Lightweight Svelte Island" count={7} client:idle />
+
+      <!-- Preact Island -->
+      <PreactWidget title="Fast Preact Island" speed={120} client:visible />
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2 · Zero-JS Static Mode (0 Bytes JS)</h2>
+    <p class="muted">
+      The exact same framework components can also be rendered <strong>statically</strong> on the server.
+      Without a <code>client:*</code> directive, Deshijs emits pure HTML and ships <strong>0 bytes of client JavaScript</strong>.
+    </p>
+
+    <div class="grid">
+      <ReactWidget name="Static React (0-JS)" initial={0} />
+      <VueWidget title="Static Vue (0-JS)" description="Rendered on server, 0 bytes JS sent to browser." />
+      <SvelteWidget title="Static Svelte (0-JS)" count={0} />
+      <PreactWidget title="Static Preact (0-JS)" speed={0} />
+    </div>
+  </section>
+</div>
+
+<style>
+  .multi-page {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #a3e635;
+    background: rgba(163, 230, 53, 0.1);
+    border: 1px solid rgba(163, 230, 53, 0.3);
+    border-radius: 9999px;
+    margin-bottom: 1rem;
+  }
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0 0 1rem;
+    color: #fafafa;
+  }
+  .lede {
+    font-size: 1.15rem;
+    color: #a1a1aa;
+    line-height: 1.7;
+    margin-bottom: 2.5rem;
+  }
+  .section {
+    margin-bottom: 3.5rem;
+    background: #121214;
+    border: 1px solid #27272a;
+    border-radius: 14px;
+    padding: 2rem;
+  }
+  .section h2 {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem;
+    color: #fafafa;
+  }
+  .muted {
+    color: #71717a;
+    font-size: 0.95rem;
+    margin: 0 0 1.5rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+</style>
+
+<style global>
+  .framework-card {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .framework-card:hover {
+    transform: translateY(-2px);
+    border-color: #3f3f46;
+  }
+  .framework-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .framework-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+  }
+  .react-badge {
+    background: rgba(56, 189, 248, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  .vue-badge {
+    background: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.3);
+  }
+  .svelte-badge {
+    background: rgba(251, 146, 60, 0.15);
+    color: #fb923c;
+    border: 1px solid rgba(251, 146, 60, 0.3);
+  }
+  .preact-badge {
+    background: rgba(192, 132, 252, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(192, 132, 252, 0.3);
+  }
+  .status-indicator {
+    font-size: 0.7rem;
+    color: #a1a1aa;
+    background: #27272a;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+  }
+  .framework-card h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #fafafa;
+  }
+  .framework-card p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #a1a1aa;
+    line-height: 1.5;
+  }
+  .framework-meta {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid #27272a;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #71717a;
+  }
+  .framework-meta code {
+    color: #d4d4d8;
+  }
+</style>
