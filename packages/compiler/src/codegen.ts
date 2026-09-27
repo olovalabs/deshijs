@@ -142,12 +142,16 @@ function genComponent(c: Component, em: Em, g: G): void {
       return `${JSON.stringify(name)}: async () => ${s.code()}`;
     })
     .join(', ');
-  const cp = c.clientProps ? genExprCode(c.clientProps, g) : 'undefined';
+  const cp = c.clientProps
+    ? `{ ...(${props}), ...(${genExprCode(c.clientProps, g)}) }`
+    : c.clientStrategy
+      ? props
+      : 'undefined';
   const strat = c.clientStrategy ? JSON.stringify(c.clientStrategy) : 'undefined';
-  const media = (c as any).clientMedia ? JSON.stringify((c as any).clientMedia) : 'undefined';
-  const only = (c as any).clientOnly ? JSON.stringify((c as any).clientOnly) : 'undefined';
-  // renderComponent signature now includes media/only for islands
-  if ((c as any).clientMedia || (c as any).clientOnly) {
+  const media = c.clientMedia ? JSON.stringify(c.clientMedia) : 'undefined';
+  const only = c.clientOnly ? JSON.stringify(c.clientOnly) : 'undefined';
+  // renderComponent signature includes media/only for islands
+  if (c.clientMedia || c.clientOnly) {
     em.expr(`(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}, ${media}, ${only}))`, true);
   } else {
     em.expr(`(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);

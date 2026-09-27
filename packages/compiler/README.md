@@ -114,7 +114,7 @@ A `.deshi` file is a template plus optional block-level tags:
 </head>
 
 <h1>{title}</h1>
-<Counter client:visible client:props={{ start: 0 }} />
+<Counter start={0} client:visible />
 
 <style>
   /* scoped to this file automatically */
@@ -126,7 +126,7 @@ A `.deshi` file is a template plus optional block-level tags:
 - `<script client>` — the browser island body; only emitted if an island hydrates.
 - `<style>` scoped by default; `<style global>` and `<style is:inline>` escape scoping.
 - Hydration directives: `client:load`, `client:visible`, `client:idle`,
-  `client:click`, `client:media="(max-width: 600px)"`, `client:only`.
+  `client:media="(max-width: 600px)"`, `client:only`.
 - Attribute directives: `set:html`, `set:text`, `class:list`, `define:vars`,
   `transition:*`.
 
@@ -164,7 +164,7 @@ import Callout from '../components/Callout.deshi';
 
 Welcome to Deshijs! Interactive islands work seamlessly in MDX:
 
-<Counter client:visible client:props={{ start: 0 }} />
+<Counter start={0} client:visible />
 
 <Callout type="tip">
   This is a static component rendered directly inside MDX.

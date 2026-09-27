@@ -66,9 +66,6 @@ export function islandInlineScript(
       body = `${get}const run=()=>{${go}};const q=${q};if(!q||!matchMedia)run();else{const mq=matchMedia(q);if(mq.matches)run();else mq.addEventListener("change",function h(){if(mq.matches){mq.removeEventListener("change",h);run()}})}`;
       break;
     }
-    case 'click':
-      body = `${get}r.addEventListener("click",function(e){if(r.dataset.deshiHydrated)return;const t=e.target;(async()=>{${go}})().then(()=>{t&&t.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}))})},true)`;
-      break;
     case 'load':
     default:
       body = `${get}${go}`;

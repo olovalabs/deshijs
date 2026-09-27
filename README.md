@@ -79,7 +79,7 @@ export default defineConfig({
 `examples/playground` is a full demo — file-system routes, dynamic `[slug]`
 params via `getStaticParams()`, markdown + MDX pages (with Shiki build-time
 highlighting and MDX components), content collections, scoped
-CSS, and per-usage island hydration (`client:click`, `client:visible`,
+CSS, and per-usage island hydration (`client:load`, `client:visible`,
 `client:idle`). It depends on `deshi` through the workspace
 (`"deshi": "workspace:*"`) exactly like an external consumer would, so it
 doubles as an integration test of the published package surface.

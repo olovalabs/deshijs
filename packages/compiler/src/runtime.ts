@@ -257,7 +257,7 @@ export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<
   return '';
 }
 
-const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'click', 'media', 'only']);
+const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'media', 'only']);
 
 function componentBaseName(file: string): string {
   return splitFilename(file).stem;

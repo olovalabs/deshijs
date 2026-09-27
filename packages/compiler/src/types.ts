@@ -40,7 +40,7 @@ export interface Element {
   /** document-mode <head>: children are lifted into a head contribution */
   isDocHead?: boolean;
 }
-export type ClientStrategy = 'load' | 'visible' | 'idle' | 'click' | 'media' | 'only';
+export type ClientStrategy = 'load' | 'visible' | 'idle' | 'media' | 'only';
 
 export interface Component {
   type: 'Component';
@@ -48,7 +48,7 @@ export interface Component {
   props: Attr[];
   slots: Record<string, Node[]>;
   clientProps?: Expression;
-  /** Per-usage island strategy — Astro-parity: load, visible, idle, media, only, click. */
+  /** Per-usage island strategy — Astro parity: load, visible, idle, media, only. */
   clientStrategy?: ClientStrategy;
   /** For client:media — the media query string */
   clientMedia?: string;

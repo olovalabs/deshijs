@@ -3,7 +3,7 @@
  * Strategy is chosen at the usage site, not in the component definition.
  * Same per-usage semantics as Astro's `client:*` directives.
  */
-export type DeshiClientStrategy = 'load' | 'visible' | 'idle' | 'click' | 'media' | 'only';
+export type DeshiClientStrategy = 'load' | 'visible' | 'idle' | 'media' | 'only';
 
 export interface DeshiClientDirectives {
   /** Hydrate immediately on page load (Astro client:load). Boolean — no value. */
@@ -12,16 +12,12 @@ export interface DeshiClientDirectives {
   'client:visible'?: boolean;
   /** Hydrate on requestIdleCallback / setTimeout fallback (Astro client:idle). Boolean. */
   'client:idle'?: boolean;
-  /** Hydrate on first click — JS not requested until click (Astro client:click → Deshi extension). Boolean. */
-  'client:click'?: boolean;
   /** Hydrate when media query matches (Astro client:media). Value = media query string. */
   'client:media'?: string;
   /** Client-only — skip SSR, hydrate on the client (Astro client:only). Value = framework hint. */
   'client:only'?: boolean | string;
-  /** Props serialized into SSR HTML and restored during hydration (Deshi extension of Astro island props). */
+  /** Optional override for serialized island props (props are passed automatically by default). */
   'client:props'?: Record<string, unknown>;
-  /** Alias: allow passing props via `client:props` as JSON literal */
-  'client:component-hydration'?: never;
 }
 
 export interface DeshiTransitionDirectives {
@@ -72,10 +68,16 @@ export interface DeshiAstroGlobal {
   };
   redirect(path: string, status?: number): Response;
   rewrite(path: string): unknown;
+  setContext<T = unknown>(key: unknown, value: T): void;
+  getContext<T = unknown>(key: unknown, fallback?: T): T | undefined;
+  hasContext(key: unknown): boolean;
 }
 
+export type DeshiGlobal = DeshiAstroGlobal;
+
 declare global {
-  const Astro: DeshiAstroGlobal;
+  const Deshi: DeshiGlobal;
+  const Astro: DeshiGlobal;
 }
 
 export {};

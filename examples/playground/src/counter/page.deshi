@@ -4,7 +4,7 @@
 
 <head>
   <title>Counter · Deshi Islands</title>
-  <meta name="description" content="Per-usage island hydration: client:click, client:visible, client:idle." />
+  <meta name="description" content="Per-usage island hydration: client:load, client:visible, client:idle." />
 </head>
 
 <div class="counter-page">
@@ -18,9 +18,9 @@
   </p>
 
   <section class="island">
-    <h2>1 · client:click</h2>
-    <p>Needed on interaction — Counter.js loads when you press +1.</p>
-    <Counter client:click client:props={{ start: 0, step: 1 }} />
+    <h2>1 · client:load</h2>
+    <p>Immediate hydration — Counter.js loads right away on page load.</p>
+    <Counter client:load start={0} step={1} />
   </section>
 
   <div class="spacer" aria-hidden="true">
@@ -30,7 +30,7 @@
   <section class="island">
     <h2>2 · client:visible</h2>
     <p>Astro client:visible: hydrate on scroll-into-view. No click required.</p>
-    <Counter client:visible client:props={{ start: 0, step: 1 }} />
+    <Counter client:visible start={0} step={1} />
   </section>
 
   <div class="spacer" aria-hidden="true">
@@ -40,7 +40,7 @@
   <section class="island">
     <h2>3 · client:idle</h2>
     <p>Hydrate when visible and idle — so visiting /counter does not fetch Counter.js.</p>
-    <Counter client:idle client:props={{ start: 0, step: 1 }} />
+    <Counter client:idle start={0} step={1} />
   </section>
 </div>
 

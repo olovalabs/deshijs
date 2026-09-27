@@ -99,7 +99,6 @@ Whenever an imported component has a `client:*` directive at its call site, the 
 - `client:visible`: Hydrates when component enters viewport via `IntersectionObserver`.
 - `client:idle`: Hydrates when browser is idle via `requestIdleCallback`.
 - `client:media="(query)"`: Hydrates only when media query matches.
-- `client:click`: Hydrates on first user click.
 - `client:only`: Skips SSR completely, client mounts directly.
 
 ---
@@ -109,7 +108,7 @@ Whenever an imported component has a `client:*` directive at its call site, the 
 Every variable used inside a template expression is checked at compile time. It must resolve to one of:
 
 1. A top-level binding from the `<script>` block.
-2. An implicit binding: `props`, `slots`, `params`, `url`, `route`, `env`, `Astro`.
+2. An implicit binding: `props`, `slots`, `params`, `url`, `route`, `env`, `Deshi`, `Astro`.
 3. A local expression parameter (e.g. `item` inside `items.map(item => ...)`).
 4. A standard JavaScript global whitelist (`JSON`, `Math`, `Date`, `fetch`, `Response`, etc.).
 

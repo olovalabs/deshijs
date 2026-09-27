@@ -21,7 +21,7 @@ Deshijs implements the **Islands Architecture**:
 
 ---
 
-## The 6 Hydration Strategies
+## The 5 Hydration Strategies
 
 | Directive | Strategy | When It Hydrates |
 | --- | --- | --- |
@@ -29,9 +29,7 @@ Deshijs implements the **Islands Architecture**:
 | `client:visible` | Viewport Trigger | When component scrolls into the viewport via `IntersectionObserver`. |
 | `client:idle` | Background Idle | When browser is idle via `requestIdleCallback` (with 200ms timeout fallback). |
 | `client:media="(query)"` | Media Query | When CSS media query matches (e.g. `client:media="(max-width: 768px)"`). |
-| `client:click` | User Interaction | On first click. Zero JS is downloaded until user clicks! |
 | `client:only` | Client Only | Skips SSR entirely and mounts directly in the browser. |
-
 ---
 
 ### 1. client:load (Immediate)
@@ -66,15 +64,7 @@ Hydrates only when the media query matches. Ideal for responsive navigation draw
 
 ---
 
-### 5. client:click (User Interaction)
-```html
-<SettingsModal client:click />
-```
-A unique Deshi extension: zero JavaScript is downloaded until the user clicks the element. On click, it downloads the chunk, mounts the island, and re-dispatches the click event seamlessly.
-
----
-
-### 6. client:only (Client Only)
+### 5. client:only (Client Only)
 ```html
 <CanvasGame client:only />
 ```
@@ -88,15 +78,15 @@ Skips server-side rendering entirely. Useful for browser-only libraries like Thr
 
 ---
 
-## Passing Props with client:props
+## Passing Props to Islands
 
-Server props can be serialized into the SSR HTML and made available during client hydration using `client:props`:
+Like Astro, any standard props passed to an island component are automatically serialized into the SSR HTML and made available during client hydration:
 
 ```html
-<Counter client:visible client:props={{ initialCount: 42, step: 2 }} />
+<Counter initialCount={42} step={2} client:visible />
 ```
 
-The compiler serializes the object into `data-deshi-props` on the island's root element. During hydration, it is automatically parsed and passed to the component's `mount()` function as `ctx.props`.
+The compiler automatically serializes the props into `data-deshi-props` on the island's root element. During hydration, they are parsed and passed to the component's `<script client>` mount function as `ctx.props`.
 
 ---
 

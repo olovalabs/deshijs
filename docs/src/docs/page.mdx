@@ -23,7 +23,7 @@ Modern web frameworks often ship megabytes of JavaScript just to render static d
 
 - **0KB JavaScript by Default**: Pages without interactive islands emit zero client JS. No hydration tax, 100/100 Lighthouse performance.
 - **Instant Vite HMR**: Co-located styles and templates update in under 20ms over WebSockets without losing page state or triggering full refreshes.
-- **Islands Architecture**: Hydrate only what needs interactivity using `client:load`, `client:visible`, `client:idle`, or `client:click`.
+- **Islands Architecture**: Hydrate only what needs interactivity using Astro directives: `client:load`, `client:visible`, `client:idle`, `client:media`, or `client:only`.
 - **First-Class Markdown & MDX**: Put `.md` / `.mdx` files directly in your routes directory. Frontmatter turns into bindings, layouts wrap content seamlessly, and MDX adds real `.deshi` components, `{expressions}` and build-time Shiki highlighting.
 
 ---

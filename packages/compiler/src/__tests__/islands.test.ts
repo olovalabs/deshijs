@@ -56,11 +56,10 @@ describe('island root stamping', () => {
 });
 
 describe('islandInlineScript', () => {
-  it('emits a strategy-specific loader for visible/idle/media/click', () => {
+  it('emits a strategy-specific loader for visible/idle/media/load', () => {
     expect(islandInlineScript('i', '/c.js', 'visible')).toContain('IntersectionObserver');
     expect(islandInlineScript('i', '/c.js', 'idle')).toContain('requestIdleCallback');
     expect(islandInlineScript('i', '/c.js', 'media', '(max-width: 1px)')).toContain('matchMedia');
-    expect(islandInlineScript('i', '/c.js', 'click')).toContain('addEventListener');
     expect(islandInlineScript('i', '/c.js', 'load')).toContain('import(');
   });
 
@@ -74,5 +73,49 @@ describe('islandInlineScript', () => {
     // The literal `</script>` must never appear — it is unicode-escaped.
     expect(out).not.toContain('</script><script>');
     expect(out).toContain('\\u003c/script\\u003e');
+  });
+});
+
+describe('Astro parity: automatic props and directive validation', () => {
+  it('automatically serializes standard component props into data-deshi-props for islands', async () => {
+    const comp = `<script>const start = props.start; const step = props.step;</script>
+<div class="box">{start}</div>
+<script client>root.textContent = String(ctx.props.start);</script>`;
+    const html = await renderPage(comp, `<Box start={42} step={5} client:load />`);
+    expect(html).toContain('data-deshi-props="{&quot;start&quot;:42,&quot;step&quot;:5}"');
+  });
+
+  it('rejects client:click as an unknown directive (Astro parity)', async () => {
+    __clearCompileMemoForTests();
+    const r = await build(
+      {
+        files: {
+          'src/layout.deshi': `<html><head><title>t</title></head><body><slot /></body></html>`,
+          'src/components/Box.deshi': ISLAND,
+          'src/page.deshi': `<script>import Box from './components/Box.deshi';</script>\n<Box client:click />`,
+        },
+      },
+      { router: false, minify: false, appDir: 'src' },
+    );
+    expect(r.ok).toBe(false);
+    expect(r.diagnostics.some((d) => d.code === 'PF4026' && d.message.includes('client:click'))).toBe(true);
+  });
+
+  it('guarantees 0 bytes of client JS and no script tags when no client directives are used', async () => {
+    __clearCompileMemoForTests();
+    const r = await build(
+      {
+        files: {
+          'src/layout.deshi': `<html><head><title>t</title></head><body><slot /></body></html>`,
+          'src/components/Static.deshi': `<div>Static content</div>`,
+          'src/page.deshi': `<script>import Static from './components/Static.deshi';</script>\n<Static />`,
+        },
+      },
+      { router: false, minify: false, appDir: 'src' },
+    );
+    expect(r.ok).toBe(true);
+    expect(r.pages[0].clients).toHaveLength(0);
+    expect(r.pages[0].html).not.toContain('<script');
+    expect(r.pages[0].html).not.toContain('modulepreload');
   });
 });

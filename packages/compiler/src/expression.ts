@@ -155,7 +155,7 @@ function convertJsxAttr(a: AnyNode, ctx: TemplateContext): Attr {
   fail('PF1002', `Unsupported attribute value for "${name}"`, ctx.file, ctx.source, a.start);
 }
 
-const CLIENT_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'click', 'media', 'only']);
+const CLIENT_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'media', 'only']);
 
 export function takeClientDirectives(
   attrs: Attr[],

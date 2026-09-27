@@ -168,7 +168,7 @@ Diagnostics in the `PF2000` series relate to the file-system router (`src/app/` 
 ### PF4011: Function Value Interpolated
 - **Severity**: Error
 - **Cause**: A function was directly interpolated into HTML (`<span>{handleClick}</span>`).
-- **Fix**: Execute the function (`<span>{handleClick()}</span>`) or bind it to an event directive inside an island (`<button client:click onclick={handleClick}>`).
+- **Fix**: Execute the function (`<span>{handleClick()}</span>`) or handle interactivity inside a component's `<script client>` block.
 
 ### PF4020: Component Import Must Be Capitalized
 - **Severity**: Error
@@ -208,7 +208,7 @@ Diagnostics in the `PF2000` series relate to the file-system router (`src/app/` 
 
 ### PF4026: Invalid `client:*` Directive
 - **Severity**: Error
-- **Cause**: An unrecognized hydration directive was specified (supported: `client:load`, `client:visible`, `client:idle`, `client:media`, `client:only`, `client:click`).
+- **Cause**: An unrecognized hydration directive was specified (supported: `client:load`, `client:visible`, `client:idle`, `client:media`, `client:only`).
 - **Fix**: Use a supported island hydration strategy.
 
 ### PF4027: Invalid `transition:*` Directive

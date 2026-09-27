@@ -33,16 +33,16 @@ const label = "set:text demo — Astro parity";
   </section>
 
   <section class="card">
-    <h2>Islands: media + click + visible + idle</h2>
+    <h2>Islands: media + load + visible + idle</h2>
     <p class="muted">Astro `client:media` hydrates only when the media query matches. Try resizing.</p>
     <div class="island-grid">
       <div>
         <h3>client:media="(max-width: 768px)"</h3>
-        <Counter client:media="(max-width: 768px)" client:props={{ start: 5, step: 2 }} />
+        <Counter client:media="(max-width: 768px)" start={5} step={2} />
       </div>
       <div>
-        <h3>client:click</h3>
-        <Counter client:click client:props={{ start: 0, step: 1 }} />
+        <h3>client:load</h3>
+        <Counter client:load start={0} step={1} />
       </div>
     </div>
     <p class="hint">Scroll down for <code>client:visible</code> + <code>client:idle</code> (same as /counter)</p>
@@ -52,8 +52,8 @@ const label = "set:text demo — Astro parity";
 
   <section class="card">
     <h2>client:visible + client:idle</h2>
-    <Counter client:visible client:props={{ start: 10, step: 10 }} />
-    <Counter client:idle client:props={{ start: 100, step: 5 }} />
+    <Counter client:visible start={10} step={10} />
+    <Counter client:idle start={100} step={5} />
   </section>
 
   <section class="card">
