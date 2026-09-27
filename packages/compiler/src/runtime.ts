@@ -1,6 +1,7 @@
 // deshi/runtime — helpers imported by every compiled render module.
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { islandInlineScript, type IslandStrategy } from './islands';
 import { splitFilename } from './filetype';
 import { DESHI_VERSION } from './types';
@@ -114,6 +115,7 @@ export interface RenderCtx {
   clients: Set<string>;
   used: Set<string>;
   depth: number;
+  maxDepth?: number;
   segments: boolean;
   islands: number;
   /** modulepreload hrefs for client:load islands only */
@@ -127,6 +129,21 @@ export interface Bindings {
   url: URL;
   route: { pattern: string; file: string };
   env: Record<string, string>;
+  setContext: <T = unknown>(key: unknown, value: T) => void;
+  getContext: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
+  hasContext: (key: unknown) => boolean;
+  Deshi: {
+    props: Record<string, unknown>;
+    params: Record<string, string | string[]>;
+    url: URL;
+    request: { url: string; headers: Headers };
+    site?: URL;
+    generator: string;
+    slots: Record<string, true>;
+    setContext: <T = unknown>(key: unknown, value: T) => void;
+    getContext: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
+    hasContext: (key: unknown) => boolean;
+  };
   Astro: {
     props: Record<string, unknown>;
     params: Record<string, string | string[]>;
@@ -135,6 +152,9 @@ export interface Bindings {
     site?: URL;
     generator: string;
     slots: Record<string, true>;
+    setContext: <T = unknown>(key: unknown, value: T) => void;
+    getContext: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
+    hasContext: (key: unknown) => boolean;
   };
 }
 
@@ -162,6 +182,43 @@ export interface ComponentMeta {
   isDocument: boolean;
 }
 
+const contextStorage = new AsyncLocalStorage<Map<unknown, unknown>>();
+
+/**
+ * Set a context value for the current component subtree (React/Svelte-style).
+ * Any child or descendant component, or slot rendered inside this subtree, can read it via `getContext()`.
+ */
+export function setContext<T = unknown>(key: unknown, value: T): void {
+  const store = contextStorage.getStore();
+  if (store) {
+    store.set(key, value);
+  }
+}
+
+/**
+ * Retrieve a context value set by an ancestor component.
+ */
+export function getContext<T = unknown>(key: unknown, fallback?: T): T | undefined {
+  const store = contextStorage.getStore();
+  if (!store || !store.has(key)) return fallback;
+  return store.get(key) as T;
+}
+
+/**
+ * Check whether a context key has been set in the current component subtree.
+ */
+export function hasContext(key: unknown): boolean {
+  const store = contextStorage.getStore();
+  return !!store && store.has(key);
+}
+
+/**
+ * Run a render callback within an isolated context store.
+ */
+export function runWithContext<R>(store: Map<unknown, unknown>, fn: () => R): R {
+  return contextStorage.run(store, fn);
+}
+
 export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns: SlotFns): Bindings {
   const slots: Record<string, true> = {};
   for (const k of Object.keys(slotFns)) slots[k] = true;
@@ -173,8 +230,24 @@ export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns
     site: ctx.url ? new URL(ctx.url.origin) : undefined,
     generator: 'Deshi ' + DESHI_VERSION,
     slots,
+    setContext,
+    getContext,
+    hasContext,
   };
-  return { props, slots, params: ctx.params, url: ctx.url, route: ctx.route, env: ctx.env, Astro } as Bindings;
+  const Deshi = Astro;
+  return {
+    props,
+    slots,
+    params: ctx.params,
+    url: ctx.url,
+    route: ctx.route,
+    env: ctx.env,
+    setContext,
+    getContext,
+    hasContext,
+    Deshi,
+    Astro,
+  } as Bindings;
 }
 
 export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<string>): Promise<string> {
@@ -202,8 +275,9 @@ export async function renderComponent(
 ): Promise<string> {
   const meta = Comp.__deshi;
   if (!meta) throw new Error('renderComponent: not a compiled Deshi component');
-  if (ctx.depth > 50) {
-    throw new Error(`PF4002: Component nesting deeper than 50 (${meta.file})`);
+  const maxDepth = ctx.maxDepth ?? 500;
+  if (ctx.depth > maxDepth) {
+    throw new Error(`PF4002: Component nesting deeper than ${maxDepth} (${meta.file})`);
   }
   if (meta.css) ctx.css.add(meta.hash);
   ctx.used.add(meta.file);
@@ -234,7 +308,11 @@ export async function renderComponent(
     // The island id is decided here and stamped by the compiled module, so the
     // rendered HTML is never re-parsed to attach it.
     const marker = island || isOnly ? { id: `d-${meta.hash}-${ctx.islands}` } : undefined;
-    const html = await Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp, marker);
+    const parentStore = contextStorage.getStore();
+    const componentStore = new Map<unknown, unknown>(parentStore);
+    const html = await contextStorage.run(componentStore, () =>
+      Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp, marker)
+    );
     if (!marker) return html;
     const name = componentBaseName(meta.file);
     const src = `/_deshi/c/${name}.${meta.hash}.js`;
@@ -340,5 +418,21 @@ export function cache<A extends unknown[], R>(fn: (...args: A) => R): (...args: 
   };
 }
 
-export const runtime = { esc, unsafe, attrs, cls, sty, raw, Raw, slot, renderComponent, headPush, cache };
+export const runtime = {
+  esc,
+  unsafe,
+  attrs,
+  cls,
+  sty,
+  raw,
+  Raw,
+  slot,
+  renderComponent,
+  headPush,
+  cache,
+  setContext,
+  getContext,
+  hasContext,
+  runWithContext,
+};
 export type Runtime = typeof runtime;

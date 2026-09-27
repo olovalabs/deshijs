@@ -28,6 +28,10 @@ import {
   runtime,
   cache,
   raw,
+  setContext,
+  getContext,
+  hasContext,
+  runWithContext,
   type RenderCtx,
   type RenderModule,
   type SlotFns,
@@ -58,6 +62,8 @@ export interface BuildOptions {
   site?: string;
   minify?: boolean;
   appDir?: string; // defaults to 'src' (or 'src/app' if present)
+  /** Maximum component nesting depth before throwing PF4002. Defaults to 500. */
+  maxDepth?: number;
   /** File-stable CSS URLs + per-file (scoped+global) sheets — Vite HMR in dev. */
   stableCssUrl?: boolean;
   /** Build-time Shiki highlighting for markdown code fences. Falsy = plain blocks. */
@@ -187,6 +193,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     site: options.site,
     appDir: options.appDir,
     stableCssUrl: options.stableCssUrl,
+    maxDepth: options.maxDepth,
   };
   const t0 = performance.now();
   resetCache();
@@ -196,6 +203,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   /** filled in after the first compile pass, then used to check usages */
   let componentResolver: ComponentResolver = () => null;
   const modules = new Map<string, ModuleNs>();
+  const cyclicProxies = new Map<string, ModuleNs>();
   const loading = new Set<string>();
   const notes: string[] = [];
   const files = project.files;
@@ -254,10 +262,61 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   };
 
   const importModule = async (spec: string, from: string): Promise<ModuleNs> => {
-    if (spec === 'deshi') return { cache, raw, defineConfig: (c: unknown) => c };
+    if (spec === 'deshi' || spec === 'deshijs') {
+      return { cache, raw, setContext, getContext, hasContext, runWithContext, defineConfig: (c: unknown) => c };
+    }
     const file = resolve(spec, from);
     if (modules.has(file)) return modules.get(file)!;
-    if (loading.has(file)) throw new DeshiError(diag('PF4003', `Import cycle: ${from} → ${file}`, from));
+    if (loading.has(file)) {
+      if (cyclicProxies.has(file)) return cyclicProxies.get(file)!;
+      const proxyFn = async (...args: unknown[]) => {
+        const resolved = modules.get(file);
+        if (!resolved) {
+          throw new DeshiError(diag('PF4003', `Unresolved circular dependency: ${file}`, from));
+        }
+        const fn = resolved.default as ((...a: unknown[]) => Promise<unknown>) | undefined;
+        if (typeof fn !== 'function') {
+          throw new DeshiError(diag('PF4003', `Circular dependency "${file}" default export is not a function`, from));
+        }
+        return fn(...args);
+      };
+      const getMeta = (): RenderModule['__deshi'] | undefined => {
+        const resolved = modules.get(file);
+        const def = resolved?.default as RenderModule | undefined;
+        if (def?.__deshi) return def.__deshi;
+        if (resolved?.__deshi) return resolved.__deshi;
+        const res = compiled[file];
+        if (res?.meta) {
+          return {
+            file: res.meta.file,
+            hash: res.meta.hash,
+            slots: res.meta.slots,
+            deps: res.meta.deps,
+            css: res.meta.hasCss,
+            client: res.meta.hasClient,
+            isLayout: res.meta.isLayout,
+            isDocument: res.meta.isDocument,
+          };
+        }
+        return undefined;
+      };
+      Object.defineProperty(proxyFn, '__deshi', {
+        get: getMeta,
+        configurable: true,
+        enumerable: true,
+      });
+      const proxyNs = new Proxy({} as ModuleNs, {
+        get(_target, prop) {
+          const resolved = modules.get(file);
+          if (resolved && prop in resolved) return (resolved as Record<string | symbol, unknown>)[prop];
+          if (prop === 'default') return proxyFn;
+          if (prop === '__deshi') return getMeta();
+          return resolved ? (resolved as Record<string | symbol, unknown>)[prop] : undefined;
+        },
+      });
+      cyclicProxies.set(file, proxyNs);
+      return proxyNs;
+    }
     if (files[file] === undefined) {
       const code = isSourceFile(file) ? 'PF4004' : 'PF5002';
       throw new DeshiError(diag(code, `Cannot resolve "${spec}" from ${from} (${file} not found)`, from));
@@ -385,6 +444,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     notFound = false,
   ): Promise<PageOutput> => {
     const start = performance.now();
+    const maxDepth = opts.maxDepth ?? 500;
     const ctx: RenderCtx = {
       params,
       url: new URL(url, origin),
@@ -395,6 +455,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       clients: new Set(),
       used: new Set(),
       depth: 0,
+      maxDepth,
       segments: opts.router,
       islands: 0,
       preloads: new Set<string>(),
@@ -418,7 +479,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       return mod(makeBindings(ctx, {}, slotFns), slotFns, ctx);
     };
 
-    let html = await run(0);
+    let html = await runWithContext(new Map(), () => run(0));
 
     // head
     let head = mergeHead(ctx.head);
@@ -733,6 +794,7 @@ export async function buildToDisk(
       appDir,
       site: options.site,
       highlight: options.highlight,
+      maxDepth: options.maxDepth,
     }
   );
 

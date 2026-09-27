@@ -48,9 +48,12 @@ export interface DeshiConfig {
   trailingSlash?: TrailingSlash;
   appDir?: string; // defaults to `src`
   outDir?: string; // defaults to `dist`
+  /** Maximum component nesting depth before throwing PF4002 (defaults to 500). */
+  maxDepth?: number;
   build?: {
     assetsPrefix?: string;
     inlineStylesheets?: 'always' | 'auto' | 'never';
+    maxDepth?: number;
   };
   router?: boolean | { prefetch?: DeshiPrefetchConfig | boolean };
   css?: 'extract' | 'inline';
@@ -80,6 +83,7 @@ export const defaultConfig: Required<Pick<DeshiConfig, 'output' | 'trailingSlash
   router: true,
   css: 'inline',
   minify: true,
+  maxDepth: 500,
   site: undefined as unknown as string,
   base: '/',
   build: { assetsPrefix: undefined as unknown as string, inlineStylesheets: 'auto' },

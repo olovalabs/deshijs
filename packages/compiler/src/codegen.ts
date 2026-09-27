@@ -267,8 +267,9 @@ export function generate(input: CodegenInput): CodegenOutput {
   // Astro global parity: expose Astro alongside props/params/url/route/env.
   // Template expressions can use `Astro.props`, `Astro.params`, `Astro.url`, etc.
   const renderFn = [
-    `async function render({ props, slots, params, url, route, env, Astro }, $slotFns, $ctx, $cp, $island) {`,
-    `  if (!Astro) { Astro = { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: ${JSON.stringify('Deshi ' + DESHI_VERSION)}, slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null }; }`,
+    `async function render({ props, slots, params, url, route, env, Deshi, Astro }, $slotFns, $ctx, $cp, $island) {`,
+    `  if (!Deshi) { Deshi = Astro || { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: ${JSON.stringify('Deshi ' + DESHI_VERSION)}, slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null, setContext, getContext, hasContext }; }`,
+    `  if (!Astro) { Astro = Deshi; }`,
     hasClientRoot
       ? `  const islandAttrs = () => attrs($island ? { id: $island.id, "data-deshi-c": ${JSON.stringify(input.hash)}, "data-deshi-props": $cp } : {});`
       : '',
@@ -296,8 +297,15 @@ export function generate(input: CodegenInput): CodegenOutput {
   const sp = input.script.staticParams;
 
   const runtimeSource = input.runtimeImport ?? 'deshi/runtime';
+  const userImports = new Set<string>();
+  for (const imp of input.script.imports) {
+    for (const s of imp.specifiers) userImports.add(s.local);
+  }
+  const contextHelpers = ['setContext', 'getContext', 'hasContext'].filter((h) => !userImports.has(h));
+  const esmHelpers = ['esc', 'unsafe', 'attrs', 'cls', 'sty', 'renderComponent', 'headPush', 'slot as $slot', 'raw as $r', ...contextHelpers];
+  const evalHelpers = ['esc', 'unsafe', 'attrs', 'cls', 'sty', 'renderComponent', 'headPush', 'slot: $slot', 'raw: $r', ...contextHelpers];
   const esm = [
-    `import { esc, unsafe, attrs, cls, sty, renderComponent, headPush, slot as $slot, raw as $r } from '${runtimeSource}';`,
+    `import { ${esmHelpers.join(', ')} } from '${runtimeSource}';`,
     // React-style co-located CSS: Vite serves/transforms this (postcss, HMR, bundling).
     // The SSG evaluator ignores it (see evalBody below) and links the emitted file instead.
     ...(input.cssUrl ? [`import ${JSON.stringify(input.cssUrl)};`] : []),
@@ -314,7 +322,7 @@ export function generate(input: CodegenInput): CodegenOutput {
     .join('\n');
 
   const evalBody = [
-    `const { esc, unsafe, attrs, cls, sty, renderComponent, headPush, slot: $slot, raw: $r } = $rt;`,
+    `const { ${evalHelpers.join(', ')} } = $rt;`,
     ...input.script.imports.map(evalImport),
     sp ?? '',
     renderFn,

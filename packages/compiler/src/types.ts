@@ -153,7 +153,7 @@ export const ERROR_CATALOG: Record<string, string> = {
   PF3003: '<script> body threw',
   PF3004: 'getStaticParams() threw',
   PF4001: 'Expression syntax error',
-  PF4002: 'Component nesting deeper than 50',
+  PF4002: 'Component nesting deeper than maximum allowed depth',
   PF4003: 'Component import cycle',
   PF4004: 'Component file not found',
   PF4005: 'Unknown slot name',

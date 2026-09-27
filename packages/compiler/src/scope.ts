@@ -9,14 +9,15 @@ import { fail, type Expression, type Node } from './types';
 import { walk } from './ast/walk';
 import { unresolvedIdentifiers } from './ast/estree';
 
-export const IMPLICIT_BINDINGS = ['props', 'slots', 'params', 'url', 'route', 'env', 'Astro'];
+export const IMPLICIT_BINDINGS = ['props', 'slots', 'params', 'url', 'route', 'env', 'Deshi', 'Astro'];
 export const GLOBALS_WHITELIST = [
   'JSON', 'Math', 'Date', 'Intl', 'Object', 'Array', 'String', 'Number', 'Boolean',
   'encodeURIComponent', 'decodeURIComponent', 'URL', 'URLSearchParams',
-  'console', 'undefined', 'NaN', 'Infinity', 'Astro',
-  // Astro-like globals: fetch, Response etc for SSR
+  'console', 'undefined', 'NaN', 'Infinity', 'Deshi', 'Astro',
+  // SSR globals
   'fetch', 'Response', 'Request', 'Headers',
   'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+  'setContext', 'getContext', 'hasContext',
 ];
 
 export function analyzeExpression(expr: Expression, known: Set<string>, file: string, source: string): void {

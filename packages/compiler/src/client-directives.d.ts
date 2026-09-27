@@ -72,10 +72,16 @@ export interface DeshiAstroGlobal {
   };
   redirect(path: string, status?: number): Response;
   rewrite(path: string): unknown;
+  setContext<T = unknown>(key: unknown, value: T): void;
+  getContext<T = unknown>(key: unknown, fallback?: T): T | undefined;
+  hasContext(key: unknown): boolean;
 }
 
+export type DeshiGlobal = DeshiAstroGlobal;
+
 declare global {
-  const Astro: DeshiAstroGlobal;
+  const Deshi: DeshiGlobal;
+  const Astro: DeshiGlobal;
 }
 
 export {};

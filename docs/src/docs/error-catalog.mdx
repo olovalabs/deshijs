@@ -141,16 +141,15 @@ Diagnostics in the `PF2000` series relate to the file-system router (`src/app/` 
 - **Cause**: An interpolation expression `{ ... }` failed JavaScript / ESTree parsing.
 - **Fix**: Verify JavaScript syntax inside braces.
 
-### PF4002: Component Nesting Deeper Than 50
+### PF4002: Component Nesting Deeper Than Max Depth
 - **Severity**: Error
-- **Cause**: Maximum recursion depth exceeded (likely caused by recursive components without a base condition).
-- **Fix**: Add a termination guard to recursive component rendering.
+- **Cause**: Maximum recursion depth exceeded (defaults to 500, configurable via `maxDepth` in `deshi.config.ts`). Usually caused by recursive components without a termination condition.
+- **Fix**: Add a termination guard to recursive component rendering, or increase `maxDepth` in `deshi.config.ts` if the deep nesting is intentional.
 
 ### PF4003: Component Import Cycle
 - **Severity**: Error
-- **Cause**: Component A imports Component B which imports Component A.
-- **Fix**: Break the circular dependency by extracting shared templates or layout slots.
-
+- **Cause**: Unresolvable circular dependency cycle during module evaluation. Note: self-referential and recursive components are supported automatically via deferred proxies; unresolvable cycles occur when circular non-component modules fail to export expected bindings.
+- **Fix**: Break the circular dependency between JS modules or extract shared logic into a separate file.
 ### PF4004: Component File Not Found
 - **Severity**: Error
 - **Cause**: An imported `.deshi` component path could not be resolved on disk.

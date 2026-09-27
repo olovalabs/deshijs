@@ -381,3 +381,4 @@ function attrToJson(a: import('./types').Attr): unknown {
 
 export { DeshiError, ERROR_CATALOG } from './types';
 export type { Diagnostic, Root, Node } from './types';
+export { setContext, getContext, hasContext, runWithContext } from './runtime';
