@@ -184,8 +184,61 @@ const result = compile(source, { file: 'src/page.deshi' });
 result.code;         // ESM render module
 result.css;          // { scoped, global, hash }
 result.diagnostics;  // { code, severity, message, file, line, column, frame }
-result.meta;         // slots, deps, hasCss, hasClient, bindings, ...
+result.meta;         // slots, deps, hasCss, hasClient, bindings, propReads, contract
 ```
+
+## Component props
+
+A component can declare its props, and the compiler then checks every usage in
+the project against that declaration — names, types, literal unions and slots:
+
+```deshi
+<script>
+  interface CardProps {
+    title: string
+    count?: number
+    tone?: 'note' | 'tip'
+  }
+  const props = defineProps<CardProps>();
+</script>
+
+<h2>{props.title}</h2>
+<slot />
+<slot name="footer" />
+```
+
+```deshi
+<Card title="Hello" tone="tip">body</Card>
+<!-- <Card tite="Hello" />      → PF4030 unknown prop, with a suggestion
+     <Card count={1} />         → PF4031 missing required prop
+     <Card title="x" count="2"/→ PF4032 string where number was declared
+     <Card><span slot="aside"/> → PF4033 unknown slot -->
+```
+
+`defineProps` is a compile-time macro: it never runs, and `props` is the implicit
+binding every `<script>` body already has. A plain-JavaScript form works too —
+`defineProps({ title: String, count: Number })`. Checks only fire when a value's
+type is provable, a spread suppresses the completeness checks, and a component
+that declares nothing is never reported for unknown props.
+
+## Architecture
+
+Everything is AST-based, from source text to output:
+
+| Stage | Module | What it does |
+| --- | --- | --- |
+| Block split | `blocks.ts` | lifts `<script>` / `<style>` / `---` fences with parse5's tokenizer |
+| Prescan | `template.ts` | records every `{ … }` expression by offset and masks it, so parse5's source locations *are* original offsets — no offset map, no placeholder tokens |
+| Parse | `template.ts` | parse5 builds the tree; nodes and expressions are joined by AST offsets |
+| Scope | `scope.ts`, `ast/estree.ts` | identifier resolution over a real scope chain |
+| Props | `props.ts`, `tsprops.ts` | contract extraction and per-usage checking |
+| Attributes | `attrs.ts` | attribute analysis and the start-tag code plan |
+| Codegen | `codegen.ts`, `ast/print.ts` | expressions printed from the AST; attributes planned, not concatenated |
+| Islands | `runtime.ts`, `islands.ts` | the island root is stamped by codegen, so rendered HTML is never re-parsed |
+
+`ast/walk.ts` is the single traversal primitive; `ast/estree.ts` is the single
+ESTree toolkit. Adding a node type touches one file.
+
 
 ## Output
 

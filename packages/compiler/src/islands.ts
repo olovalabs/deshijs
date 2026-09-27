@@ -3,7 +3,9 @@
  *
  * Build time: client:* on a component usage marks an island and emits a
  * dedicated /_deshi/c/<Name>.<hash>.js chunk (the component's <script client>).
- * Pages without client:* send 0 bytes of island JS.
+ * The island root element is stamped by code generation, so the rendered HTML
+ * is never re-parsed to find it. Pages without client:* send 0 bytes of island
+ * JS.
  *
  * Runtime: each island gets an inline type=module script that implements only
  * that usage's strategy, then import()s its chunk. Strategies not used on the
@@ -11,26 +13,10 @@
  */
 
 import type { ClientStrategy } from './types';
-import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 
 /** Alias kept at the definition site so `runtime.ts` can type its
  * `strategy` param without a circular *value* import (type-only). */
 export type IslandStrategy = ClientStrategy;
-
-export function stampIslandRoot(html: string, id: string): string {
-  const frag = parseFragment(html);
-  // Original behavior: only a *leading* element is stamped; leading text means
-  // the island root is ambiguous, so wrap it instead.
-  const first = frag.childNodes.find(
-    (n) => !(n.nodeName === '#text' && !((n as P5.TextNode).value ?? '').trim()),
-  ) as P5.Element | undefined;
-  if (!first || !first.tagName) {
-    return `<div id="${id}" style="display:contents">${html}</div>`;
-  }
-  const hasId = first.attrs.some((a) => a.name.toLowerCase() === 'id');
-  first.attrs.push({ name: hasId ? 'data-deshi-i' : 'id', value: id });
-  return frag.childNodes.map((n) => serializeOuter(n)).join('');
-}
 
 function findRoot(id: string): string {
   const j = js(id);

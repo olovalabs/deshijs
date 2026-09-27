@@ -2,8 +2,9 @@ import type { Plugin, ViteDevServer, PreviewServer, ResolvedConfig } from 'vite'
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { compile } from './index';
+import { compile, type CompileResult } from './index';
 import { build as buildSite, buildToDisk, type BuildResult } from './build';
+import { resolverFromCompiled } from './props';
 import { hashString } from './types';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
 import { loadConfig, mergeConfig, defaultConfig } from './config';
@@ -64,6 +65,25 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
   let config: ResolvedConfig | undefined;
   let cachedBuild: { fp: string; result: BuildResult } | null = null;
   const lastCompile = new Map<string, { evalBody: string; clientBody: string; css: string; hasCss: boolean; hash: string }>();
+  /**
+   * The most recent dev-server build. Its compiled results are the project-wide
+   * view the single-file `transform` needs in order to check component usages
+   * against the components' declared props and slots.
+   */
+  let projectView: { files: Record<string, string>; compiled: Record<string, CompileResult> } | null = null;
+
+  /** Resolve an import specifier the way the project build does. */
+  function resolveSpec(spec: string, from: string): string {
+    if (!spec.startsWith('.')) return spec;
+    const dir = from.slice(0, from.lastIndexOf('/'));
+    const parts = dir ? dir.split('/') : [];
+    for (const seg of spec.split('/')) {
+      if (seg === '.' || seg === '') continue;
+      if (seg === '..') parts.pop();
+      else parts.push(seg);
+    }
+    return parts.join('/');
+  }
 
   function toPosix(p: string): string {
     return p.replace(/\\/g, '/');
@@ -240,6 +260,9 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           minify: options.minify ?? false,
           runtimeImport: virtualRuntimeId,
           stableCssUrl: true,
+          resolveComponent: projectView
+            ? resolverFromCompiled(projectView.compiled, resolveSpec)
+            : undefined,
         });
         const errors = result.diagnostics.filter((d) => d.severity === 'error');
         if (errors.length > 0) {
@@ -409,6 +432,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
               } as any
             );
             cachedBuild = { fp, result };
+            projectView = { files: projectFiles, compiled: result.compiled };
             for (const [f, res] of Object.entries(result.compiled)) {
               lastCompile.set(f, {
                 evalBody: res.evalBody,

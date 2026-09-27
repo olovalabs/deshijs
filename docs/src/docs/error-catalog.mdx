@@ -157,9 +157,9 @@ Diagnostics in the `PF2000` series relate to the file-system router (`src/app/` 
 - **Fix**: Verify relative import paths and file extensions (`import Button from './Button.deshi'`).
 
 ### PF4005: Unknown Slot Name
-- **Severity**: Warning / Error
+- **Severity**: Error
 - **Cause**: Content was passed with `<div slot="sidebar">`, but the child component has no `<slot name="sidebar" />`.
-- **Fix**: Verify slot names declared in child components.
+- **Fix**: Verify slot names declared in child components. See also **PF4033**, which is the check the compiler raises automatically.
 
 ### PF4010: Unresolved Identifier in Template Expression
 - **Severity**: Error
@@ -221,6 +221,66 @@ Diagnostics in the `PF2000` series relate to the file-system router (`src/app/` 
 - **Severity**: Error
 - **Cause**: `define:vars` was passed an invalid object shape or expression.
 - **Fix**: Pass a plain object mapping CSS variables to values: `<style define:vars={{ brandColor, bgOpacity }}>`.
+
+### PF4030: Unknown Component Prop
+- **Severity**: Error
+- **Cause**: A component usage passed a prop the component does not declare. Only reported when the component declares its props with `defineProps`.
+- **Example**:
+  ```deshi
+  <!-- Card declares { title: string; count?: number } -->
+  <Card tite="Hello" />   <!-- PF4030: <Card> has no prop "tite" -->
+  ```
+- **Fix**: Use a declared name. The hint suggests the closest match when the name looks like a typo.
+
+### PF4031: Missing Required Prop
+- **Severity**: Error
+- **Cause**: A component usage omitted a prop that the component declares as required (not marked `?`).
+- **Fix**: Add the prop to the usage. Suppressed when the usage spreads (`{...rest}`), because the compiler cannot know what the spread contains.
+
+### PF4032: Prop Type Mismatch
+- **Severity**: Error
+- **Cause**: The value passed for a prop provably does not match its declared type — for example a string for a `number` prop, or a value outside a literal union such as `'note' | 'tip'`.
+- **Fix**: Note that HTML attribute values are always strings. Use an expression: `count={2}`, not `count="2"`. Checks only fire when the value's type is provable, so a dynamic value is never rejected.
+
+### PF4033: Unknown Slot Name
+- **Severity**: Error
+- **Cause**: A usage passed content with `slot="name"` where the component renders no `<slot name="name" />`.
+- **Fix**: Use a name the component declares, or add the slot to the component. Skipped when the component computes its slot names dynamically.
+
+### PF4034: Prop Declared but Never Read
+- **Severity**: Warning
+- **Cause**: A prop is declared in a component's contract but never read by its `<script>` body or template.
+- **Fix**: Remove it from the contract, or read it. Not reported when props are read in a way static analysis cannot follow (for example `props[key]`), because the analysis would then be guessing.
+
+### PF4035: `client:props` Is Not JSON-Serializable
+- **Severity**: Warning
+- **Cause**: `client:props` contains a function, arrow function or class, which cannot survive the JSON round-trip to the browser.
+- **Fix**: Pass plain data and handle events inside the component's `<script client>` block.
+
+### PF4036: `client:props` Key Is Not a Declared Prop
+- **Severity**: Warning
+- **Cause**: A statically known `client:props` object passes a key the component does not declare.
+- **Fix**: Remove the key, or declare it.
+
+### PF4037: Duplicate Prop on a Component Usage
+- **Severity**: Warning
+- **Cause**: The same attribute name appears twice on one tag. The HTML parser silently keeps only the first, so the second is dropped without notice.
+- **Fix**: Combine the values into one attribute. This also applies to plain elements, where `class` twice is the common case.
+
+### PF4038: React-Style Prop on a Component
+- **Severity**: Warning
+- **Cause**: A prop such as `onClick` was passed to a component. Deshi ships no client-side event system, so such props go nowhere.
+- **Fix**: Add a `<script client>` block to the component and bind the listener there.
+
+### PF4039: Element Directive Used on a Component
+- **Severity**: Error
+- **Cause**: `set:html`, `set:text`, `class:list` or `define:vars` was used on a component tag. They act on markup, not on a component.
+- **Fix**: Put the directive on an element inside the component, or pass the value as an ordinary prop.
+
+### PF4040: Required Slot Not Provided
+- **Severity**: Warning
+- **Cause**: A component renders `<slot name="x" />` with no fallback content, and a usage provides no `x` slot, so the region is empty.
+- **Fix**: Provide the slot, or give the component fallback content.
 
 ---
 

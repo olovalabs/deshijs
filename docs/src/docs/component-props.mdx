@@ -1,0 +1,123 @@
+---
+title: Component Props & Attributes
+description: Declare a component's props once and have every usage in the project checked against it — names, types, literals and slots.
+---
+
+# Component Props & Attributes
+
+A component can **declare** its props instead of implying them. The compiler
+reads that declaration and checks every usage in the project against it, so a
+renamed prop or a wrong type is a build error rather than a blank page.
+
+```deshi
+// src/components/Card.deshi
+<script>
+  interface CardProps {
+    title: string          // required
+    count?: number         // optional
+    tone?: 'note' | 'tip'  // a literal union
+    tags?: string[]
+  }
+
+  const props = defineProps<CardProps>();
+</script>
+
+<article>
+  <h2>{props.title}</h2>
+  <slot />
+  <slot name="footer" />
+</article>
+```
+
+```deshi
+// anywhere in the project
+<Card title="Hello" tone="tip">body</Card>
+```
+
+`defineProps` is a compiler macro: the call never runs, and `props` is the same
+implicit binding `<script>` bodies always have. Writing the result under another
+name works too — `const p = defineProps<CardProps>()` compiles to
+`const p = props`.
+
+## What gets checked
+
+| Check | Code | Example |
+| --- | --- | --- |
+| Unknown prop | `PF4030` | `<Card tite="x" />` |
+| Missing required prop | `PF4031` | `<Card count={1} />` |
+| Prop type mismatch | `PF4032` | `<Card title="x" count="2" />` |
+| Unknown slot | `PF4033` | `<Card><span slot="aside">…</span></Card>` |
+| Declared but never read | `PF4034` | a contract entry the component ignores |
+| `client:props` not serializable | `PF4035` | `client:props={{ onClick: () => {} }}` |
+| `client:props` key not declared | `PF4036` | `client:props={{ stp: 1 }}` |
+| React-style prop | `PF4038` | `<Card onClick={fn} />` |
+| Element directive on a component | `PF4039` | `<Card set:html={x} />` |
+| Required slot not provided | `PF4040` | `<Card title="x" />` with no `footer` slot |
+
+Each diagnostic carries the file, line and column, plus a hint — including a
+"did you mean" suggestion when a name is a near miss of a declared one.
+
+## Rules the checks follow
+
+- **A spread silences the completeness checks.** `<Card {...rest} />` cannot be
+  checked for missing props, because the compiler cannot see what `rest` holds.
+- **Only provable types are rejected.** `<Card count={n} />` is always accepted;
+  `<Card count="2" />` is an error, because an attribute value is a string.
+- **Literal unions are compared by value**, not by type:
+  `tone="warning"` is an error when the union is `'note' | 'tip'`.
+- **Slots are checked against what the component actually renders.** A component
+  that computes its slot names (`<slot name={x} />`) turns the slot check off
+  rather than guessing.
+- **Undeclared components are left alone.** A component with no contract is
+  never reported for unknown props — only its *reads* are inferred.
+
+## Plain JavaScript projects
+
+Without TypeScript, the same contract can be written as a value:
+
+```deshi
+<script>
+  const props = defineProps({ title: String, count: Number, onPick: Function });
+</script>
+```
+
+## Unused and unread props
+
+The compiler also infers which props a component actually reads (`props.x`, and
+`const { x } = props`), from both the `<script>` body and the template. Two
+things follow:
+
+- a prop declared in the contract but never read is reported (`PF4034`);
+- a usage passing a prop nobody reads is *not* an error, so components stay free
+  to ignore inputs.
+
+When a component reads props opaquely — `props[key]`, or aliasing the whole
+object — the analysis assumes the worst and stays quiet instead of guessing.
+
+## Attribute handling
+
+Props are attributes, and the HTML parser lower-cases attribute names. For a
+component that would corrupt `showIcon` into `showicon`, so component props keep
+the case they were written in. Plain elements keep normal HTML normalization
+(`viewBox` on `<svg>` is still corrected).
+
+Attributes are also planned rather than concatenated:
+
+- `class="a"` + `class:list={{ b: true }}` merge into a single `class`, so
+  neither value is lost;
+- `style="…"` + `define:vars={{ … }}` merge into a single `style`;
+- a fully static element is emitted as literal text with **no** runtime call;
+- dynamic attributes are grouped into one `attrs({…})` call per run, in source
+  order, so output stays compact and predictable.
+
+## Islands
+
+`client:props` is checked against the same contract:
+
+```deshi
+<Counter client:visible client:props={{ start: 0, step: 1 }} />
+```
+
+Because it is serialized to JSON for the browser, functions and class instances
+do not survive it — `PF4035` warns when one is written literally, and
+`PF4036` reports keys the component does not declare.

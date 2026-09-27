@@ -284,7 +284,7 @@ function codeNode(node: M): Element {
 function literalExpression(value: string, l: Loc): Expression {
   const raw = JSON.stringify(value);
   const ast = JsxParser.parseExpressionAt(raw, 0, ACORN_OPTIONS) as acorn.Expression;
-  return { type: 'Expression', ast, raw, start: 0, loc: l, jsx: [] };
+  return { type: 'Expression', ast, raw, start: 0, src: raw, loc: l, jsx: [] };
 }
 
 function tableNode(node: M, ctx: TemplateContext): Element {
@@ -468,6 +468,7 @@ export function compileDocument(source: string, file: string, _opts: DocumentOpt
     scoped: false,
     usedComponents: new Set(),
     usedSlots: new Set(),
+    dynamicSlots: { value: false },
   };
   const bodyNodes = convertChildren(
     (tree.children ?? []).filter((c: M) => c.type !== 'yaml' && c.type !== 'mdxjsEsm'),

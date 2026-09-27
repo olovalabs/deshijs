@@ -33,6 +33,8 @@ import {
   type SlotFns,
 } from './runtime';
 import { DeshiError, type Diagnostic } from './types';
+import { walk } from './ast/walk';
+import { resolverFromCompiled, type ComponentResolver } from './props';
 import { prepareHighlight } from './highlight';
 import {
   CODE_EXTENSIONS,
@@ -191,6 +193,8 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   if (options.highlight) await prepareHighlight(options.highlight);
   const diagnostics: Diagnostic[] = [];
   const compiled: Record<string, CompileResult> = {};
+  /** filled in after the first compile pass, then used to check usages */
+  let componentResolver: ComponentResolver = () => null;
   const modules = new Map<string, ModuleNs>();
   const loading = new Set<string>();
   const notes: string[] = [];
@@ -213,8 +217,9 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     return patternOf(segs);
   };
 
-  const getCompiled = (file: string): CompileResult => {
-    if (compiled[file]) return compiled[file];
+  const getCompiled = (file: string, linked = false): CompileResult => {
+    const key = linked ? `${file}\0l` : file;
+    if (compiled[key]) return compiled[key];
     const source = files[file];
     if (source === undefined) throw new DeshiError(diag('PF4004', `Component file not found: ${file}`, file));
     const rel = file.startsWith(appDir + '/') ? file.slice(appDir.length + 1) : null;
@@ -225,8 +230,9 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       isLayout,
       segment: opts.router && isLayout && rel ? layoutPattern(rel) : null,
       stableCssUrl: opts.stableCssUrl,
+      resolveComponent: linked ? componentResolver : undefined,
     });
-    compiled[file] = res;
+    compiled[key] = res;
     diagnostics.push(...res.diagnostics);
     return res;
   };
@@ -296,6 +302,37 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     } catch (e) {
       diagnostics.push(toDiag(e, f, 'PF4001'));
     }
+  }
+
+  // Second pass: every file now knows the interface of the components it
+  // imports, so component usages can be checked against their declarations
+  // (props, prop types, slots) instead of being taken on trust.
+  componentResolver = resolverFromCompiled(compiled, resolve);
+  for (const f of Object.keys(files)) {
+    if (!isSourceFile(f)) continue;
+    const first = compiled[f];
+    // only files that actually use a component can gain new diagnostics
+    if (!first || !usesComponent(first)) continue;
+    try {
+      getCompiled(f, true);
+    } catch {
+      // the unlinked pass already reported the real error
+    }
+  }
+  // promote the linked results — they are strictly more informative
+  for (const key of Object.keys(compiled)) {
+    if (!key.endsWith('\0l')) continue;
+    const base = key.slice(0, -2);
+    compiled[base] = compiled[key];
+    delete compiled[key];
+  }
+  /** Whether a compiled file renders a component at all. */
+  function usesComponent(res: CompileResult): boolean {
+    let found = false;
+    walk(res.ast.children, (n) => {
+      if (n.type === 'Component') found = true;
+    });
+    return found;
   }
 
   const cssByHash: Record<string, { scoped: string; global: string; file: string; url: string | null }> = {};

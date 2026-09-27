@@ -8,6 +8,7 @@ import { transformSync } from 'esbuild';
 import { fail, makeDiagnostic, type Diagnostic } from './types';
 import { ACORN_OPTIONS, JsxParser, isComponentName } from './expression';
 import { isSourceFile } from './filetype';
+import { collectTypeDeclarations, contractFromSite, findDefineProps, type PropContract } from './tsprops';
 
 export interface ImportSpec {
   imported: string; // 'default' | '*' | name
@@ -30,6 +31,12 @@ export interface ScriptInfo {
   diagnostics: Diagnostic[];
   /** ESTree body of the analyzed program — for AST-based queries (e.g. usesParams) */
   programBody: unknown[];
+  /** the prop contract declared via `defineProps`, if any */
+  contract: PropContract | null;
+  /** local name `defineProps` was bound to (`props` in `const props = defineProps()`) */
+  propsLocal: string | null;
+  /** source text of the `<script>` body *as parsed* (type-stripped when TS) */
+  source: string;
 }
 
 const IGNORED_EXPORTS = new Set(['prerender', 'dynamic', 'revalidate', 'runtime']);
@@ -86,7 +93,17 @@ function sliceDeclarationRenamed(src: string, decl: AnyNode, from: string, to: s
 }
 
 export function emptyScript(): ScriptInfo {
-  return { imports: [], body: '', bindings: [], components: new Set(), diagnostics: [], programBody: [] };
+  return {
+    imports: [],
+    body: '',
+    bindings: [],
+    components: new Set(),
+    diagnostics: [],
+    programBody: [],
+    contract: null,
+    propsLocal: null,
+    source: '',
+  };
 }
 
 // Re-export helper for external tools (e.g. content collections)
@@ -122,7 +139,46 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
 
   const info = emptyScript();
   info.programBody = program.body as unknown[];
+  info.source = src;
   const bodyParts: string[] = [];
+
+  // The prop contract is read from the *original* body, before esbuild erased
+  // its types. Erasure of the call itself is driven off the parsed source, which
+  // is what the body slices come from.
+  const typeScope = collectTypeDeclarations(code);
+  for (const site of findDefineProps(code)) {
+    const contract = contractFromSite(code, site, typeScope);
+    if (contract) {
+      info.contract = contract;
+      info.propsLocal = site.local;
+      break;
+    }
+    if (!info.propsLocal) info.propsLocal = site.local;
+  }
+  const definePropsSites = findDefineProps(src).sort((a, b) => a.at - b.at);
+
+  /**
+   * The body text of one statement, with any `defineProps(…)` call replaced by
+   * a plain `props` reference. The binding itself is dropped when it is called
+   * `props`, because `props` is already an implicit binding.
+   */
+  const statementText = (stmt: AnyNode): string | null => {
+    const sites = definePropsSites.filter((s) => s.at >= stmt.start && s.at < stmt.end);
+    if (!sites.length) return src.slice(stmt.start, stmt.end);
+    const single =
+      sites.length === 1 &&
+      sites[0].local === 'props' &&
+      stmt.type === 'VariableDeclaration' &&
+      stmt.declarations.length === 1;
+    if (single) return null;
+    let out = '';
+    let cursor = stmt.start;
+    for (const s of sites) {
+      out += src.slice(cursor, s.at) + 'props';
+      cursor = s.end;
+    }
+    return out + src.slice(cursor, stmt.end);
+  };
 
   for (const stmt of program.body as AnyNode[]) {
     const at = offset + stmt.start;
@@ -193,7 +249,8 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
         break;
       default: {
         info.bindings.push(...declarationNames(stmt));
-        bodyParts.push(src.slice(stmt.start, stmt.end));
+        const text = statementText(stmt);
+        if (text !== null) bodyParts.push(text);
       }
     }
   }

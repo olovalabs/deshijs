@@ -1,17 +1,57 @@
 import { describe, expect, it } from 'vitest';
-import { islandInlineScript, stampIslandRoot } from '../islands';
+import { islandInlineScript } from '../islands';
+import { build } from '../build';
+import { __clearCompileMemoForTests } from '../index';
 
-describe('stampIslandRoot', () => {
-  it('adds the island id to the root element', () => {
-    expect(stampIslandRoot('<div class="x">hi</div>', 'd-1')).toContain('id="d-1"');
+const ISLAND = `<div class="box">hi</div>
+<script client>root.textContent = 'x';</script>`;
+
+async function renderPage(component: string, usage: string): Promise<string> {
+  __clearCompileMemoForTests();
+  const r = await build(
+    {
+      files: {
+        'src/layout.deshi': `<html><head><title>t</title></head><body><slot /></body></html>`,
+        'src/components/Box.deshi': component,
+        'src/page.deshi': `<script>import Box from './components/Box.deshi';</script>\n${usage}`,
+      },
+    },
+    { router: false, minify: false, appDir: 'src' },
+  );
+  const err = r.diagnostics.find((d) => d.severity === 'error');
+  if (err) throw new Error(`${err.code} ${err.message}`);
+  return r.pages[0].html;
+}
+
+describe('island root stamping', () => {
+  it('adds the island id to the root element', async () => {
+    const html = await renderPage(ISLAND, `<Box client:load />`);
+    expect(html).toContain('id="d-');
+    expect(html).toContain('data-deshi-c=');
   });
 
-  it('uses data-deshi-i when an id already exists', () => {
-    expect(stampIslandRoot('<div id="keep">hi</div>', 'd-2')).toContain('data-deshi-i="d-2"');
+  it('uses data-deshi-i when the root already has an id', async () => {
+    const html = await renderPage(`<div id="keep">hi</div>\n<script client>root.textContent = 'x';</script>`, `<Box client:load />`);
+    expect(html).toContain('id="keep"');
+    expect(html).toContain('data-deshi-i="d-');
   });
 
-  it('wraps non-element html in a display:contents div', () => {
-    expect(stampIslandRoot('just text', 'd-3')).toContain('display:contents');
+  it('wraps output that has no root element', async () => {
+    const html = await renderPage(`just text\n<script client>root.textContent = 'x';</script>`, `<Box client:load />`);
+    expect(html).toContain('display:contents');
+    expect(html).toMatch(/<div[^>]*id="d-[^"]*"[^>]*style="display:contents"/);
+  });
+
+  it('stamps nothing when the component is not an island', async () => {
+    const html = await renderPage(`<div class="box">hi</div>`, `<Box />`);
+    expect(html).not.toContain('data-deshi-c');
+    expect(html).not.toContain('d-');
+  });
+
+  it('gives each usage on a page its own id', async () => {
+    const html = await renderPage(ISLAND, `<Box client:load /><Box client:visible />`);
+    const ids = [...html.matchAll(/id="(d-[^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(2);
   });
 });
 

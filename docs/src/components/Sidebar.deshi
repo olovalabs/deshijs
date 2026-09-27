@@ -39,6 +39,17 @@
           icon: ["m18 16 4-4-4-4", "m6 8-4 4 4 4", "m14.5 4-5 16"],
         },
         {
+          label: "Component Props",
+          href: "/docs/component-props",
+          badge: { text: "NEW", tone: "primary" },
+          icon: [
+            "M9.5 7.5 12 10l2.5-2.5",
+            "M7 13l-2.5 2.5L7 18",
+            "M17 13l2.5 2.5L17 18",
+            "M9.5 16.5 12 14l2.5 2.5",
+          ],
+        },
+        {
           label: "Islands & client:*",
           href: "/docs/islands",
           badge: { text: "0JS", tone: "primary" },

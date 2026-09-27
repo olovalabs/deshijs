@@ -33,6 +33,8 @@ export interface TemplateContext {
   scoped: boolean;
   usedComponents: Set<string>;
   usedSlots: Set<string>;
+  /** set when a `<slot name={…}>` computes its name, so slot checks relax */
+  dynamicSlots?: { value: boolean };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,6 +81,7 @@ export function makeExpression(ast: acorn.Expression, ctx: TemplateContext): Exp
     ast,
     raw: ctx.source.slice(ast.start, ast.end),
     start: ast.start,
+    src: ctx.source,
     loc: locAt(ctx.source, ast.start, ast.end),
     jsx: [],
   };

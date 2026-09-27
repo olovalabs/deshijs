@@ -1,13 +1,17 @@
 // deshi — compile(source, options) => { code, css, client, meta, diagnostics }
 import { splitBlocks } from './blocks';
 import { analyzeScript, emptyScript, type ScriptInfo } from './script';
-import { parseTemplate, walkNodes } from './template';
+import { parseTemplate } from './template';
+import { walk, hasDescendant } from './ast/walk';
+import { referencesIdentifier } from './ast/estree';
 import { analyzeTemplateScope } from './scope';
+import { checkComponentUsages, collectPropReads, unusedDeclaredProps, type ComponentResolver } from './props';
 import { scopeCss, minifyCss, scopedCssUrl } from './css';
 import { generate } from './codegen';
 import { compileDocument } from './document';
 import { isDocumentFile, isLayoutPath } from './filetype';
 import { highlightStateToken } from './highlight';
+import type { PropContract } from './tsprops';
 import {
   DeshiError,
   hashString,
@@ -28,6 +32,12 @@ export interface CompileOptions {
   runtimeImport?: string;
   /** File-stable `/_deshi/<filehash>.css` (dev HMR). Default is content-hashed. */
   stableCssUrl?: boolean;
+  /**
+   * Resolves an imported component to its declared interface, enabling the
+   * cross-file prop/slot checks. Omitted by single-file callers (a Vite
+   * transform), which then only get the file-local checks.
+   */
+  resolveComponent?: ComponentResolver;
 }
 
 export interface CompileMeta {
@@ -36,12 +46,22 @@ export interface CompileMeta {
   isLayout: boolean;
   isDocument: boolean;
   slots: string[];
+  /** slots rendered without a fallback — a usage must provide them */
+  requiredSlots: string[];
+  /** true when a `<slot name={…}>` is computed, so slot checks are skipped */
+  dynamicSlots: boolean;
   deps: string[];
   hasClient: boolean;
   hasCss: boolean;
   headBlocks: number;
   usesParams: boolean;
   bindings: string[];
+  /** the prop contract this file declares via `defineProps` */
+  contract: PropContract | null;
+  /** `props.x` names this file reads */
+  propReads: string[];
+  /** true when props are read in a way static analysis cannot follow */
+  propReadsOpaque: boolean;
 }
 
 export interface CompileResult {
@@ -67,7 +87,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   const file = opts.file;
   const minify = opts.minify ?? true;
   const isMarkdownDoc = isDocumentFile(file);
-  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${highlightStateToken()}\0${hashString(source)}`;
+  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${opts.resolveComponent ? 'l' : ''}\0${highlightStateToken()}\0${hashString(source)}`;
   const cached = compileMemo.get(memoKey);
   if (cached) {
     return {
@@ -137,9 +157,11 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       scoped: scoped.length > 0,
       usedComponents: new Set(),
       usedSlots: new Set(),
+      dynamicSlots: { value: false },
     };
     const parsed = parseTemplate(blocks.template, tctx, { minify, isLayout });
     root = parsed.root;
+    diagnostics.push(...parsed.diagnostics);
 
     // 5. client roots
     hasClient = !!blocks.client;
@@ -158,9 +180,13 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
 
   // 7. meta
   const slots = new Set<string>();
+  const requiredSlots = new Set<string>();
   let headBlocks = 0;
-  walkNodes(root.children, (n: Node) => {
-    if (n.type === 'Slot' && !(root.document && n.name === 'head')) slots.add(n.name);
+  walk(root.children, (n) => {
+    if (n.type === 'Slot' && !(root.document && n.name === 'head')) {
+      slots.add(n.name);
+      if (!n.fallback.some((c) => c.type !== 'Text' || c.value.trim())) requiredSlots.add(n.name);
+    }
     if (n.type === 'HeadBlock') headBlocks++;
   });
   const deps = script.imports.filter((i) => i.isComponent).map((i) => i.source);
@@ -173,9 +199,52 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       );
     }
   }
-  const usesParams = scriptUsesParams(script) || (root.children.length > 0 && sourceUsesParams(root));
+  const usesParams =
+    referencesIdentifier(script.programBody, 'params') ||
+    hasDescendant(root.children, (n) => n.type === 'Expression' && referencesIdentifier(n.ast, 'params'));
 
-  // 8. codegen
+  // 8. component props & attributes: what this file exposes, and what its
+  //    component usages are allowed to ask for.
+  const { reads, opaque } = collectPropReads(root, script.programBody, [
+    'props',
+    ...(script.propsLocal && script.propsLocal !== 'props' ? [script.propsLocal] : []),
+  ]);
+  if (script.contract) {
+    // contract offsets are relative to the <script> body; diagnostics are not
+    const scriptBase = blocks?.script ? blocks.script.contentStart : 0;
+    for (const name of unusedDeclaredProps({
+      file,
+      slots: [...slots],
+      requiredSlots: [...requiredSlots],
+      dynamicSlots: false,
+      contract: script.contract,
+      reads,
+      opaque,
+      client: hasClient,
+    })) {
+      const spec = script.contract.props[name];
+      diagnostics.push(
+        makeDiagnostic(
+          'PF4034',
+          `Prop "${name}" is declared but never read by ${file}`,
+          file,
+          source,
+          scriptBase + spec.offset,
+          'warning',
+          'Remove it from the contract, or read it in the template / <script>.',
+        ),
+      );
+    }
+  }
+  if (opts.resolveComponent) {
+    for (const issue of checkComponentUsages(root, { file, resolve: opts.resolveComponent })) {
+      diagnostics.push(
+        makeDiagnostic(issue.code, issue.message, file, source, issue.loc.start, issue.severity, issue.hint),
+      );
+    }
+  }
+
+  // 9. codegen
   const out = generate({
     file,
     root,
@@ -212,12 +281,17 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       isLayout,
       isDocument: root.document,
       slots: [...slots],
+      requiredSlots: [...requiredSlots],
+      dynamicSlots: tctx.dynamicSlots?.value ?? false,
       deps,
       hasClient,
       hasCss: scoped.length > 0 || global.length > 0,
       headBlocks,
       usesParams,
       bindings: script.bindings,
+      contract: script.contract,
+      propReads: reads,
+      propReadsOpaque: opaque,
     },
     diagnostics,
     ast: root,
@@ -225,32 +299,6 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   };
   compileMemo.set(memoKey, result);
   return result;
-}
-
-/** True when an ESTree subtree references the identifier `params`. */
-function astUsesParams(node: unknown): boolean {
-  if (!node || typeof node !== 'object') return false;
-  if (Array.isArray(node)) return node.some(astUsesParams);
-  const n = node as { type?: string; name?: string; [k: string]: unknown };
-  if (typeof n.type !== 'string') return false;
-  if (n.type === 'Identifier' && n.name === 'params') return true;
-  for (const k of Object.keys(n)) {
-    if (k === 'type' || k === 'start' || k === 'end' || k === 'loc') continue;
-    if (astUsesParams(n[k])) return true;
-  }
-  return false;
-}
-
-function sourceUsesParams(root: Root): boolean {
-  let found = false;
-  walkNodes(root.children, (n) => {
-    if (n.type === 'Expression' && astUsesParams(n.ast)) found = true;
-  });
-  return found;
-}
-
-function scriptUsesParams(script: ScriptInfo): boolean {
-  return astUsesParams(script.programBody);
 }
 
 function indent(s: string): string {

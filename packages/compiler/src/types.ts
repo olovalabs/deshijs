@@ -73,6 +73,12 @@ export interface Expression {
   raw: string;
   /** absolute start offset of `raw` in the template source */
   start: number;
+  /**
+   * The exact text this expression was parsed from. Kept on the node so every
+   * later pass can print code straight from the AST without re-deriving which
+   * source a node came from (documents build expressions from synthetic text).
+   */
+  src: string;
   loc: Loc;
   jsx: JsxSlot[];
 }
@@ -162,6 +168,17 @@ export const ERROR_CATALOG: Record<string, string> = {
   PF4026: 'Invalid client:* directive',
   PF4027: 'Invalid transition:* directive',
   PF4028: 'Invalid define:vars',
+  PF4030: 'Unknown component prop',
+  PF4031: 'Missing required prop',
+  PF4032: 'Prop type mismatch',
+  PF4033: 'Unknown slot name',
+  PF4034: 'Prop passed but never read',
+  PF4035: 'client:props is not JSON-serializable',
+  PF4036: 'client:props key is not a declared prop',
+  PF4037: 'Duplicate prop on a component usage',
+  PF4038: 'React-style prop on a component',
+  PF4039: 'Element directive used on a component',
+  PF4040: 'Required slot not provided',
   PF5001: 'Forbidden <script> in zero-JS mode',
   PF5002: 'Asset not found',
   PF5003: 'Client chunk missing from manifest',

@@ -1,9 +1,11 @@
 // Stage 5 — codegen: Deshi AST → ESM render module.
 // Every template node becomes a string-concatenation expression; JSX found inside
 // `{ }` expressions is spliced back into the expression source as `$r(...)` calls.
-import type { Attr, Component, Element, Expression, Node, Root, Slot } from './types';
+import type { Component, Element, Expression, Node, Root, Slot } from './types';
 import type { ImportInfo, ScriptInfo } from './script';
-import { escapeAttr, escapeHtml } from './runtime';
+import { escapeHtml } from './runtime';
+import { planAttributes, planPropsObject } from './attrs';
+import { printExpression } from './ast/print';
 import { scopeAttribute } from './css';
 import { DESHI_VERSION } from './types';
 
@@ -58,54 +60,27 @@ class Em {
 
 interface G extends CodegenInput {
   heads: string[];
+  /** island markers for a component with a `<script client>` block */
+  island: { hash: string } | null;
+}
+
+/** Render a run of template nodes to a JS expression that produces its HTML. */
+function renderNodes(nodes: Node[], g: G): { code: string; hasAwait: boolean } {
+  const em = new Em();
+  genNodes(nodes, em, g);
+  return { code: em.code(), hasAwait: em.hasAwait };
 }
 
 function genExprCode(expr: Expression, g: G): string {
-  let code = expr.raw;
-  for (const j of [...expr.jsx].sort((a, b) => b.start - a.start)) {
-    const em = new Em();
-    genNodes(j.nodes, em, g);
-    const rep = em.hasAwait ? `(async () => $r(${em.code()}))()` : `$r(${em.code()})`;
-    code = code.slice(0, j.start - expr.start) + rep + code.slice(j.end - expr.start);
-  }
+  // The JS comes from the AST: JSX ranges are handed to the node renderer and
+  // the rest of the expression is emitted exactly as the parser saw it. The
+  // result is parenthesised so it is safe in any position (object value, call
+  // argument, template hole).
+  const code = printExpression(expr, (nodes) => {
+    const { code, hasAwait } = renderNodes(nodes, g);
+    return hasAwait ? `(async () => $r(${code}))()` : `$r(${code})`;
+  });
   return `(${code})`;
-}
-
-function attrEntries(attrs: Attr[], g: G): string[] {
-  const out: string[] = [];
-  for (const a of attrs) {
-    switch (a.kind) {
-      case 'static':
-        out.push(`${JSON.stringify(a.name)}: ${JSON.stringify(a.value)}`);
-        break;
-      case 'boolean':
-        out.push(`${JSON.stringify(a.name)}: true`);
-        break;
-      case 'dynamic':
-        out.push(`${JSON.stringify(a.name)}: ${genExprCode(a.expr, g)}`);
-        break;
-      case 'spread':
-        out.push(`...${genExprCode(a.expr, g)}`);
-        break;
-      case 'setHtml':
-      case 'setText':
-        break;
-      case 'classList':
-        out.push(`${JSON.stringify('class')}: cls(${genExprCode(a.expr, g)})`);
-        break;
-      case 'defineVars': {
-        // define:vars is handled on <style> blocks, not as element attr — skip here
-        break;
-      }
-      case 'transition': {
-        const v = typeof a.value === 'string' ? JSON.stringify(a.value) : genExprCode(a.value as any, g);
-        if (typeof a.value === 'string' && a.value === '') out.push(`${JSON.stringify(a.name)}: true`);
-        else out.push(`${JSON.stringify(a.name)}: ${v}`);
-        break;
-      }
-    }
-  }
-  return out;
 }
 
 function genElement(el: Element, em: Em, g: G): void {
@@ -113,37 +88,21 @@ function genElement(el: Element, em: Em, g: G): void {
     genDocHead(el, em, g);
     return;
   }
-  // Handle define:vars — inject CSS variable style attribute (Astro parity)
-  const defineVars = el.attrs.find((a) => a.kind === 'defineVars') as { expr: Expression } | undefined;
   em.str('<' + el.name);
-  // include class:list and transition in dyn detection
-  const dyn = el.attrs.some((a) => a.kind === 'dynamic' || a.kind === 'spread' || a.kind === 'classList' || a.kind === 'transition' || a.kind === 'defineVars') || el.clientRoot;
-  if (!dyn) {
-    for (const a of el.attrs) {
-      if (a.kind === 'static') em.str(` ${a.name}="${escapeAttr(a.value)}"`);
-      else if (a.kind === 'boolean') em.str(` ${a.name}`);
-      else if (a.kind === 'transition' && typeof a.value === 'string') {
-        if (a.value === '') em.str(` ${a.name}`);
-        else em.str(` ${a.name}="${escapeAttr(a.value)}"`);
-      }
-    }
-    if (el.scoped) em.str(' ' + scopeAttribute(g.hash));
-  } else {
-    const entries = attrEntries(el.attrs, g);
-    // define:vars produces style variables: style="--x:val;..."
-    if (defineVars) {
-      entries.push(`style: sty(Object.entries(${genExprCode(defineVars.expr, g)}).map(([k,v])=> '--'+k+':'+v).join(';'))`);
-    }
-    if (el.scoped) entries.push(`${JSON.stringify(scopeAttribute(g.hash))}: true`);
-    const base = `{ ${entries.join(', ')} }`;
-    if (el.clientRoot) {
-      em.expr(
-        `attrs($cp !== undefined ? Object.assign({}, ${base}, { "data-deshi-c": ${JSON.stringify(g.hash)}, "data-deshi-props": $cp }) : ${base})`,
-      );
-    } else {
-      em.expr(`attrs(${base})`);
-    }
+  // The attribute planner folds class/class:list, style/define:vars, spreads and
+  // the island markers into one literal prefix plus at most one attrs() call, so
+  // a fully static element costs nothing at runtime and nothing is ever emitted
+  // twice.
+  const plan = planAttributes(el.attrs, {
+    print: (expr) => genExprCode(expr, g),
+    scopeAttr: el.scoped ? scopeAttribute(g.hash) : undefined,
+    island: el.clientRoot ? g.island : null,
+  });
+  for (const part of plan.parts) {
+    if (typeof part === 'string') em.str(part);
+    else em.expr(part.code);
   }
+  if (plan.scopeAttr) em.str(' ' + plan.scopeAttr);
   em.str('>');
   if (VOID.has(el.name.toLowerCase())) return;
   const setHtml = el.attrs.find((a) => a.kind === 'setHtml') as { expr: Expression } | undefined;
@@ -165,14 +124,16 @@ function genDocHead(el: Element, em: Em, g: G): void {
   genNodes(after, a, g);
   if (a.parts.length) g.heads.push(`headPush($ctx, ${a.code()}, true);`);
   em.str('<head');
-  const dyn = el.attrs.some((x) => x.kind === 'dynamic' || x.kind === 'spread');
-  if (dyn) em.expr(`attrs({ ${attrEntries(el.attrs, g).join(', ')} })`);
-  else for (const x of el.attrs) em.str(x.kind === 'static' ? ` ${x.name}="${escapeAttr(x.value)}"` : x.kind === 'boolean' ? ` ${x.name}` : '');
+  const headAttrs = planAttributes(el.attrs, { print: (e) => genExprCode(e, g) });
+  for (const part of headAttrs.parts) {
+    if (typeof part === 'string') em.str(part);
+    else em.expr(part.code);
+  }
   em.str('><!--deshi:head--></head>');
 }
 
 function genComponent(c: Component, em: Em, g: G): void {
-  const props = attrEntries(c.props, g).join(', ');
+  const props = planPropsObject(c.props, { print: (e) => genExprCode(e, g) });
   const slots = Object.entries(c.slots)
     .filter(([, nodes]) => nodes.length)
     .map(([name, nodes]) => {
@@ -187,9 +148,9 @@ function genComponent(c: Component, em: Em, g: G): void {
   const only = (c as any).clientOnly ? JSON.stringify((c as any).clientOnly) : 'undefined';
   // renderComponent signature now includes media/only for islands
   if ((c as any).clientMedia || (c as any).clientOnly) {
-    em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx, ${cp}, ${strat}, ${media}, ${only}))`, true);
+    em.expr(`(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}, ${media}, ${only}))`, true);
   } else {
-    em.expr(`(await renderComponent(${c.ident}, { ${props} }, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);
+    em.expr(`(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);
   }
 }
 
@@ -279,12 +240,23 @@ function evalImport(imp: ImportInfo): string {
 }
 
 export function generate(input: CodegenInput): CodegenOutput {
-  const g: G = { ...input, heads: [] };
+  // A component with a `<script client>` block renders island markers on its
+  // root element. When it has no root element (it starts with text or a
+  // comment) the output is wrapped, so the boot script always has a node to
+  // attach to — decided here, at compile time, instead of by re-parsing the
+  // rendered HTML at runtime.
+  const hasClientRoot = input.hasClient;
+  const wrapIslandRoot = hasClientRoot && !input.root.children.some((c) => c.type === 'Element');
+  const g: G = { ...input, heads: [], island: hasClientRoot ? { hash: input.hash } : null };
   const statements: string[] = [];
   for (const child of input.root.children) {
     const em = new Em();
     genNodes([child], em, g);
     if (em.parts.length) statements.push(`  $o += ${em.code()};`);
+  }
+  if (wrapIslandRoot) {
+    statements.unshift(`  $o += '<div' + islandAttrs() + ' style="display:contents">';`);
+    statements.push(`  $o += '</div>';`);
   }
 
   const body = input.script.body
@@ -295,8 +267,11 @@ export function generate(input: CodegenInput): CodegenOutput {
   // Astro global parity: expose Astro alongside props/params/url/route/env.
   // Template expressions can use `Astro.props`, `Astro.params`, `Astro.url`, etc.
   const renderFn = [
-    `async function render({ props, slots, params, url, route, env, Astro }, $slotFns, $ctx, $cp) {`,
+    `async function render({ props, slots, params, url, route, env, Astro }, $slotFns, $ctx, $cp, $island) {`,
     `  if (!Astro) { Astro = { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: ${JSON.stringify('Deshi ' + DESHI_VERSION)}, slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null }; }`,
+    hasClientRoot
+      ? `  const islandAttrs = () => attrs($island ? { id: $island.id, "data-deshi-c": ${JSON.stringify(input.hash)}, "data-deshi-props": $cp } : {});`
+      : '',
     body.trimEnd(),
     heads,
     `  let $o = '';`,

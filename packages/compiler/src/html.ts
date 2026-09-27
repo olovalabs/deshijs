@@ -2,8 +2,39 @@
 // The document/fragment is parsed once, transformed at the tree level
 // (whitespace, inline <style> minification) and serialized, so no regex ever
 // touches markup.
-import { parse, parseFragment, serialize, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
+import { parse, parseFragment, serialize, serializeOuter, Tokenizer, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { minifyCss } from './css';
+
+/**
+ * Decode character references the way the HTML parser does.
+ *
+ * The parser hands back already-decoded text, but the template pass works on
+ * masked source offsets; decoding each text run with the tokenizer (instead of
+ * re-implementing entities) is what keeps `&larr;` from being escaped twice.
+ */
+export function decodeText(raw: string): string {
+  // Nothing to decode — by far the common case.
+  if (raw.indexOf('&') === -1) return raw;
+  let out = '';
+  const handler = {
+    onCharacter(t: { chars: string }) {
+      out += t.chars;
+    },
+    onNullCharacter() {
+      out += '\uFFFD';
+    },
+    onWhitespaceCharacter(t: { chars: string }) {
+      out += t.chars;
+    },
+    onStartTag() {},
+    onEndTag() {},
+    onEof() {},
+    onComment() {},
+    onDoctype() {},
+  };
+  new Tokenizer({}, handler).write(raw, true);
+  return out;
+}
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',

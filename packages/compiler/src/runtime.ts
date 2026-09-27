@@ -1,7 +1,7 @@
 // deshi/runtime — helpers imported by every compiled render module.
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
-import { islandInlineScript, stampIslandRoot, type IslandStrategy } from './islands';
+import { islandInlineScript, type IslandStrategy } from './islands';
 import { splitFilename } from './filetype';
 import { DESHI_VERSION } from './types';
 
@@ -57,9 +57,20 @@ export function cls(v: unknown): string {
 
 const kebab = (k: string) => (k.startsWith('--') ? k : k.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()));
 
+/**
+ * Render a style value. Accepts a string, an object, or an array of either —
+ * arrays are how `style` + `define:vars` (and repeated `style` attributes) are
+ * merged into one declaration list.
+ */
 export function sty(v: unknown): string {
-  if (!v) return '';
+  if (v == null || v === false || v === '') return '';
   if (typeof v === 'string') return v;
+  if (Array.isArray(v)) {
+    return v
+      .map(sty)
+      .filter(Boolean)
+      .join(';');
+  }
   if (typeof v === 'object') {
     return Object.entries(v as Record<string, unknown>)
       .filter(([, val]) => val != null && val !== false && val !== '')
@@ -130,7 +141,13 @@ export interface Bindings {
 export type SlotFns = Record<string, () => Promise<string>>;
 
 export interface RenderModule {
-  (bindings: Bindings, slotFns: SlotFns, ctx: RenderCtx, clientProps?: string): Promise<string>;
+  (
+    bindings: Bindings,
+    slotFns: SlotFns,
+    ctx: RenderCtx,
+    clientProps?: string,
+    island?: { id: string },
+  ): Promise<string>;
   __deshi: ComponentMeta;
 }
 
@@ -214,16 +231,19 @@ export async function renderComponent(
         throw new Error('PF4026: client:props must be JSON-serializable');
       }
     }
-    let html = await Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp);
-    if (!island || !strategy) return html;
+    // The island id is decided here and stamped by the compiled module, so the
+    // rendered HTML is never re-parsed to attach it.
+    const marker = island || isOnly ? { id: `d-${meta.hash}-${ctx.islands}` } : undefined;
+    const html = await Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp, marker);
+    if (!marker) return html;
     const name = componentBaseName(meta.file);
     const src = `/_deshi/c/${name}.${meta.hash}.js`;
     if (strategy === 'load' || strategy === 'only') ctx.preloads.add(src);
-    const nid = `d-${meta.hash}-${ctx.islands}`;
+    const nid = marker.id;
     if (isOnly && !html.trim()) {
-      html = `<div data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}"></div>`;
+      return `<div id="${escapeAttr(nid)}" style="display:contents" data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}"></div>` + islandInlineScript(nid, src, strategy as IslandStrategy, media);
     }
-    return stampIslandRoot(html, nid) + islandInlineScript(nid, src, strategy as IslandStrategy, media);
+    return html + islandInlineScript(nid, src, strategy as IslandStrategy, media);
   } finally {
     ctx.depth--;
   }
