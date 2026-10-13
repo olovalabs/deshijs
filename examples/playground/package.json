@@ -5,6 +5,7 @@
   "description": "Example site consuming the published `deshi` compiler through Vite.",
   "type": "module",
   "scripts": {
+    "predev": "bun run --filter deshijs build",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
