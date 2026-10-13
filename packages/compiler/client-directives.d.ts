@@ -8,10 +8,12 @@ export type DeshiClientStrategy = 'load' | 'visible' | 'idle' | 'media' | 'only'
 export interface DeshiClientDirectives {
   /** Hydrate immediately on page load (Astro client:load). Boolean — no value. */
   'client:load'?: boolean;
-  /** Hydrate when the island enters the viewport (Astro client:visible). Boolean. */
-  'client:visible'?: boolean;
-  /** Hydrate on requestIdleCallback / setTimeout fallback (Astro client:idle). Boolean. */
-  'client:idle'?: boolean;
+  /** Hydrate when an island child enters the viewport (Astro client:visible).
+   * Optional `{{ rootMargin }}` matches Astro's client:visible={{ rootMargin: '200px' }}. */
+  'client:visible'?: boolean | { rootMargin?: string };
+  /** Hydrate on requestIdleCallback (Astro client:idle), with optional
+   * `{{ timeout }}` — falls back to setTimeout(200). */
+  'client:idle'?: boolean | { timeout?: number };
   /** Hydrate when media query matches (Astro client:media). Value = media query string. */
   'client:media'?: string;
   /** Client-only — skip SSR, hydrate on the client (Astro client:only). Value = framework hint. */

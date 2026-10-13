@@ -36,7 +36,6 @@ export interface Element {
   children: Node[];
   loc: Loc;
   scoped: boolean;
-  clientRoot: boolean;
   /** document-mode <head>: children are lifted into a head contribution */
   isDocHead?: boolean;
 }
@@ -50,10 +49,10 @@ export interface Component {
   clientProps?: Expression;
   /** Per-usage island strategy — Astro parity: load, visible, idle, media, only. */
   clientStrategy?: ClientStrategy;
-  /** For client:media — the media query string */
-  clientMedia?: string;
-  /** For client:only — framework hint (kept for compat) */
-  clientOnly?: string;
+  /** Dynamic directive value — client:media={query}, client:idle={{timeout}}, client:only={framework} */
+  clientValue?: Expression;
+  /** Static directive value — client:media="(max-width: 600px)", client:only="react" */
+  clientValueStatic?: string;
   loc: Loc;
 }
 export interface Text {

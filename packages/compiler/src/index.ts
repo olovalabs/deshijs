@@ -163,15 +163,12 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     root = parsed.root;
     diagnostics.push(...parsed.diagnostics);
 
-    // 5. client roots
+    // 5. client blocks
     hasClient = !!blocks.client;
-    if (hasClient) {
-      if (root.document) {
-        throw new DeshiError(
-          makeDiagnostic('PF1002', '<script client> is not allowed in the root layout; put it in a component', file, source, blocks.client!.start),
-        );
-      }
-      for (const n of root.children) if (n.type === 'Element') n.clientRoot = true;
+    if (hasClient && root.document) {
+      throw new DeshiError(
+        makeDiagnostic('PF1002', '<script client> is not allowed in the root layout; put it in a component', file, source, blocks.client!.start),
+      );
     }
   }
 
@@ -266,7 +263,11 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   const client = blocks?.client
     ? {
         body: blocks.client.content,
-        code: `// \0deshi:client:${file}\nexport default function mount(root, ctx) {\n${indent(blocks.client.content.trim())}\n}\n`,
+        // Astro renderer contract: the chunk default-exports a factory that
+        // receives the <deshi-island> element and returns the hydrate function
+        // `(Component, props, slots, { client })`. The `<script client>` body
+        // keeps its documented `root` / `ctx` bindings.
+        code: `// deshi island chunk for ${file}\nexport default function islandRenderer(element) {\n  return function ($Component, $props, $slots, $client) {\n    if (!element.hasAttribute("ssr")) return;\n    const root = element;\n    const ctx = { props: $props, slots: $slots, url: location.href, client: $client && $client.client };\n${indent(blocks.client.content.trim())}\n  };\n}\n`,
       }
     : undefined;
 
@@ -331,7 +332,6 @@ export function astToJson(node: Node | Node[]): unknown {
         type: 'Element',
         name: node.name,
         ...(node.scoped ? { scoped: true } : {}),
-        ...(node.clientRoot ? { clientRoot: true } : {}),
         ...(node.isDocHead ? { docHead: true } : {}),
         attrs: node.attrs.map(attrToJson),
         children: astToJson(node.children),
@@ -343,8 +343,8 @@ export function astToJson(node: Node | Node[]): unknown {
         props: node.props.map(attrToJson),
         ...(node.clientProps ? { clientProps: node.clientProps.raw } : {}),
         ...(node.clientStrategy ? { clientStrategy: node.clientStrategy } : {}),
-        ...((node as any).clientMedia ? { clientMedia: (node as any).clientMedia } : {}),
-        ...((node as any).clientOnly ? { clientOnly: (node as any).clientOnly } : {}),
+        ...(node.clientValue ? { clientValue: node.clientValue.raw } : {}),
+        ...(node.clientValueStatic !== undefined ? { clientValueStatic: node.clientValueStatic } : {}),
         slots: Object.fromEntries(Object.entries(node.slots).map(([k, v]) => [k, astToJson(v)])),
       };
     case 'Slot':
@@ -382,4 +382,4 @@ function attrToJson(a: import('./types').Attr): unknown {
 export { DeshiError, ERROR_CATALOG } from './types';
 export type { Diagnostic, Root, Node } from './types';
 export { setContext, getContext, hasContext, runWithContext } from './runtime';
-export { detectFramework, generateFrameworkClientMount, renderFrameworkComponent, serializeVNode } from './frameworks';
+export { detectFramework, generateFrameworkIslandChunk, renderFrameworkComponent, serializeVNode } from './frameworks';

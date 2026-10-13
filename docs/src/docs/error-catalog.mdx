@@ -208,8 +208,8 @@ Diagnostics in the `PF2000` series relate to the file-system router (`src/app/` 
 
 ### PF4026: Invalid `client:*` Directive
 - **Severity**: Error
-- **Cause**: An unrecognized hydration directive was specified (supported: `client:load`, `client:visible`, `client:idle`, `client:media`, `client:only`).
-- **Fix**: Use a supported island hydration strategy.
+- **Cause**: An unrecognized hydration directive was specified (supported: `client:load`, `client:visible`, `client:idle`, `client:media`, `client:only`), two strategies were combined on one usage, `client:media` had no query, a directive value had the wrong shape (`client:visible={{ rootMargin: '200px' }}`, `client:idle={{ timeout: 500 }}`), or island props could not be serialized (cyclic reference).
+- **Fix**: Use a supported island hydration strategy with the correct value shape.
 
 ### PF4027: Invalid `transition:*` Directive
 - **Severity**: Error

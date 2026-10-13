@@ -429,6 +429,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
                 appDir: (dcDev as any).appDir ?? 'src',
                 site: (dcDev as any).site,
                 highlight: highlightOpts ?? undefined,
+                projectRoot: root,
               } as any
             );
             cachedBuild = { fp, result };

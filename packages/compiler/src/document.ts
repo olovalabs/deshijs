@@ -99,7 +99,7 @@ function loc(node: M): Loc {
 }
 
 function el(name: string, attrs: Attr[], children: Node[], l: Loc): Element {
-  return { type: 'Element', name, attrs, children, loc: l, scoped: false, clientRoot: false };
+  return { type: 'Element', name, attrs, children, loc: l, scoped: false };
 }
 
 function text(value: string, l: Loc): Node {
@@ -197,8 +197,8 @@ function mdxElement(node: M, ctx: TemplateContext): Node[] {
       slots: bucketSlots(children, ctx),
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
-      clientMedia: taken.clientMedia,
-      clientOnly: taken.clientOnly,
+      clientValue: taken.clientValue,
+      clientValueStatic: taken.clientValueStatic,
       loc: l,
     }];
   }

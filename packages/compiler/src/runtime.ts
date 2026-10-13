@@ -2,10 +2,20 @@
 // These run at build time (Node) — never in the browser of a Deshi site.
 import { parseFragment, serializeOuter, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { islandInlineScript, type IslandStrategy } from './islands';
+import {
+  islandPrescripts,
+  islandUid,
+  renderIsland,
+  type IslandState,
+  type IslandStrategy,
+} from './islands';
 import { isFrameworkComponent, splitFilename } from './filetype';
 import { renderFrameworkComponent } from './frameworks';
+import { serializeProps } from './serialize';
+import { escapeAttr, escapeHtml } from './escape';
 import { DESHI_VERSION } from './types';
+
+export { escapeAttr, escapeHtml };
 
 export class Raw {
   constructor(public html: string) {}
@@ -15,14 +25,6 @@ export class Raw {
 }
 
 export const raw = (s: unknown): Raw => new Raw(s == null ? '' : String(s));
-
-export function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-export function escapeAttr(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 /** Escape an interpolated value for text position. Raw / arrays / promises aware. */
 export async function esc(v: unknown): Promise<string> {
@@ -119,6 +121,10 @@ export interface RenderCtx {
   maxDepth?: number;
   segments: boolean;
   islands: number;
+  /** dev builds keep the island prescripts readable (Astro's islandScriptDev parity) */
+  dev?: boolean;
+  /** island prescript emission state — style / directives / runtime once per page */
+  island: IslandState;
   /** modulepreload hrefs for client:load islands only */
   preloads: Set<string>;
 }
@@ -162,13 +168,7 @@ export interface Bindings {
 export type SlotFns = Record<string, () => Promise<string>>;
 
 export interface RenderModule {
-  (
-    bindings: Bindings,
-    slotFns: SlotFns,
-    ctx: RenderCtx,
-    clientProps?: string,
-    island?: { id: string },
-  ): Promise<string>;
+  (bindings: Bindings, slotFns: SlotFns, ctx: RenderCtx): Promise<string>;
   __deshi: ComponentMeta;
 }
 
@@ -258,10 +258,20 @@ export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<
   return '';
 }
 
-const ISLAND_STRATEGIES = new Set(['load', 'visible', 'idle', 'media', 'only']);
+const ISLAND_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'media', 'only']);
 
 function componentBaseName(file: string): string {
   return splitFilename(file).stem;
+}
+
+/** Wrap each rendered slot in `<deshi-slot>` so the client island can recover
+ * the slot HTML (display:contents, invisible in the page). */
+function wrapIslandSlots(slotFns: SlotFns): SlotFns {
+  const wrapped: SlotFns = {};
+  for (const [name, fn] of Object.entries(slotFns)) {
+    wrapped[name] = async () => `<deshi-slot name="${escapeAttr(name)}">${await fn()}</deshi-slot>`;
+  }
+  return wrapped;
 }
 
 export async function renderComponent(
@@ -271,8 +281,7 @@ export async function renderComponent(
   ctx: RenderCtx,
   clientProps?: unknown,
   strategy?: IslandStrategy | string,
-  media?: string,
-  only?: string,
+  directiveValue?: unknown,
 ): Promise<string> {
   const meta = Comp.__deshi;
   if (!meta) throw new Error('renderComponent: not a compiled Deshi component');
@@ -298,40 +307,64 @@ export async function renderComponent(
     ctx.clients.add(meta.hash);
     ctx.islands++;
   }
+  if (island && strategy === 'media' && typeof directiveValue !== 'string') {
+    throw new Error(
+      'PF4026: client:media requires a media query string: client:media="(max-width: 600px)"',
+    );
+  }
   ctx.depth++;
   try {
-    let cp: string | undefined;
-    if (island) {
-      try {
-        cp = JSON.stringify(clientProps === undefined ? {} : clientProps);
-      } catch {
-        throw new Error('PF4026: client:props must be JSON-serializable');
-      }
-    }
-    // The island id is decided here and stamped by the compiled module, so the
-    // rendered HTML is never re-parsed to attach it.
-    const marker = island || isOnly ? { id: `d-${meta.hash}-${ctx.islands}` } : undefined;
     const parentStore = contextStorage.getStore();
     const componentStore = new Map<unknown, unknown>(parentStore);
     const html = await contextStorage.run(componentStore, async () => {
+      if (isOnly) {
+        // Astro parity: client:only never renders the component on the server —
+        // only its fallback slot (usually empty).
+        return slotFns.fallback ? await slotFns.fallback() : '';
+      }
       if (isFramework) {
-        if (isOnly) return '';
         return renderFrameworkComponent(Comp, props, meta.file);
       }
-      return Comp(bindings(ctx, props, slotFns), slotFns, ctx, cp, marker);
+      const islandSlots = island ? wrapIslandSlots(slotFns) : slotFns;
+      return Comp(bindings(ctx, props, islandSlots), islandSlots, ctx);
     });
-    if (!marker) return html;
+    if (!island) return html;
+
     const name = componentBaseName(meta.file);
     const src = `/_deshi/c/${name}.${meta.hash}.js`;
-    if (strategy === 'load' || strategy === 'only') ctx.preloads.add(src);
-    const nid = marker.id;
-    if (isOnly && !html.trim()) {
-      return `<div id="${escapeAttr(nid)}" style="display:contents" data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}"></div>` + islandInlineScript(nid, src, strategy as IslandStrategy, media);
+    if (strategy === 'load' || isOnly) ctx.preloads.add(src);
+
+    // Astro-format props: client:props overrides the usage props when present.
+    const clientData = (clientProps === undefined ? props : clientProps) as Record<string, unknown>;
+    let propJson: string;
+    try {
+      propJson = serializeProps(clientData, { displayName: name, hydrate: strategy });
+    } catch (e) {
+      throw new Error(`PF4026: ${(e as Error).message}`);
     }
-    const finalHtml = isFramework
-      ? `<div id="${escapeAttr(nid)}" style="display:contents" data-deshi-c="${escapeAttr(meta.hash)}" data-deshi-props="${escapeAttr(cp ?? '{}')}">${html}</div>`
-      : html;
-    return finalHtml + islandInlineScript(nid, src, strategy as IslandStrategy, media);
+    let optsJson: string;
+    try {
+      optsJson = JSON.stringify({
+        name,
+        value: directiveValue === undefined ? '' : directiveValue || '',
+      });
+    } catch {
+      throw new Error(`PF4026: client:${strategy} value must be JSON-serializable`);
+    }
+    const uid = islandUid([src, 'default', propJson, html]);
+    return (
+      islandPrescripts(ctx.island, strategy as IslandStrategy, ctx.dev) +
+      renderIsland({
+        uid,
+        componentUrl: src,
+        componentExport: 'default',
+        rendererUrl: src,
+        props: propJson,
+        opts: optsJson,
+        client: strategy as IslandStrategy,
+        html,
+      })
+    );
   } finally {
     ctx.depth--;
   }

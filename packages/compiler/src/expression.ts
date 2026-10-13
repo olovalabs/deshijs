@@ -155,20 +155,36 @@ function convertJsxAttr(a: AnyNode, ctx: TemplateContext): Attr {
   fail('PF1002', `Unsupported attribute value for "${name}"`, ctx.file, ctx.source, a.start);
 }
 
-const CLIENT_STRATEGIES = new Set<string>(['load', 'visible', 'idle', 'media', 'only']);
-
 export function takeClientDirectives(
   attrs: Attr[],
   loc: Loc,
   ctx: TemplateContext,
   tagName: string,
   isComponent: boolean,
-): { attrs: Attr[]; clientStrategy?: ClientStrategy; clientProps?: Expression; clientMedia?: string; clientOnly?: string } {
+): {
+  attrs: Attr[];
+  clientStrategy?: ClientStrategy;
+  clientProps?: Expression;
+  clientValue?: Expression;
+  clientValueStatic?: string;
+} {
   let clientStrategy: ClientStrategy | undefined;
   let clientProps: Expression | undefined;
-  let clientMedia: string | undefined;
-  let clientOnly: string | undefined;
+  let clientValue: Expression | undefined;
+  let clientValueStatic: string | undefined;
   const rest: Attr[] = [];
+  const takeStrategy = (dir: string): void => {
+    if (clientStrategy) {
+      fail(
+        'PF4026',
+        `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`,
+        ctx.file,
+        ctx.source,
+        loc.start,
+      );
+    }
+    clientStrategy = dir as ClientStrategy;
+  };
   for (const a of attrs) {
     const name =
       a.kind === 'static' || a.kind === 'boolean' || a.kind === 'dynamic' ? a.name : '';
@@ -197,46 +213,52 @@ export function takeClientDirectives(
       continue;
     }
     if (dir === 'media') {
-      if (a.kind === 'static') clientMedia = a.value;
-      else if (a.kind === 'dynamic') clientMedia = a.expr.raw;
+      // Astro parity: the media query is the *evaluated* value, not source text.
+      if (a.kind === 'static') clientValueStatic = a.value;
+      else if (a.kind === 'dynamic') clientValue = a.expr;
       else fail('PF4026', 'client:media requires a value: client:media="(max-width: 600px)"', ctx.file, ctx.source, loc.start);
-      if (clientStrategy) fail('PF4026', `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`, ctx.file, ctx.source, loc.start);
-      clientStrategy = 'media';
+      takeStrategy('media');
       continue;
     }
     if (dir === 'only') {
-      if (a.kind === 'static') clientOnly = a.value;
-      else if (a.kind === 'boolean') clientOnly = 'deshi';
-      else if (a.kind === 'dynamic') clientOnly = a.expr.raw || 'deshi';
-      if (clientStrategy) fail('PF4026', `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`, ctx.file, ctx.source, loc.start);
-      clientStrategy = 'only';
+      if (a.kind === 'static') clientValueStatic = a.value;
+      else if (a.kind === 'dynamic') clientValue = a.expr;
+      // boolean client:only lets the framework come from the component file
+      takeStrategy('only');
       continue;
     }
-    if (CLIENT_STRATEGIES.has(dir)) {
+    if (dir === 'idle' || dir === 'visible') {
+      // Astro parity: client:idle={{ timeout }} / client:visible={{ rootMargin }}
+      if (a.kind === 'dynamic') clientValue = a.expr;
+      else if (a.kind !== 'boolean') {
+        const hint = dir === 'idle' ? '{{ timeout: 500 }}' : "{{ rootMargin: '200px' }}";
+        fail(
+          'PF4026',
+          `client:${dir} takes an options object: client:${dir}=${hint}`,
+          ctx.file,
+          ctx.source,
+          loc.start,
+        );
+      }
+      takeStrategy(dir);
+      continue;
+    }
+    if (dir === 'load') {
       if (a.kind !== 'boolean') {
         fail(
           'PF4026',
-          `Directive client:${dir} must not have a value (use client:${dir} not client:${dir}="...")`,
+          'Directive client:load must not have a value (use client:load not client:load="...")',
           ctx.file,
           ctx.source,
           loc.start,
         );
       }
-      if (clientStrategy) {
-        fail(
-          'PF4026',
-          `Two hydration strategies on one usage (client:${clientStrategy} and client:${dir})`,
-          ctx.file,
-          ctx.source,
-          loc.start,
-        );
-      }
-      clientStrategy = dir as ClientStrategy;
+      takeStrategy('load');
       continue;
     }
     fail('PF4026', `Unknown client:* directive "client:${dir}"`, ctx.file, ctx.source, loc.start);
   }
-  return { attrs: rest, clientStrategy, clientProps, clientMedia, clientOnly };
+  return { attrs: rest, clientStrategy, clientProps, clientValue, clientValueStatic };
 }
 
 export function checkAttrName(name: string, offset: number, ctx: TemplateContext): void {
@@ -344,8 +366,8 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
       slots: bucketSlots(children, ctx),
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
-      clientMedia: taken.clientMedia,
-      clientOnly: taken.clientOnly,
+      clientValue: taken.clientValue,
+      clientValueStatic: taken.clientValueStatic,
       loc,
     };
     return [comp];
@@ -370,7 +392,6 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
     children,
     loc,
     scoped: ctx.scoped,
-    clientRoot: false,
   };
   return [el];
 }

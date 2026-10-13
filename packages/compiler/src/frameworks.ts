@@ -179,76 +179,112 @@ export async function renderFrameworkComponent(
   return `<div data-deshi-framework="${escapeAttr(file || 'component')}" style="display:contents"></div>`;
 }
 /**
- * Generates the client-side hydration chunk (/_deshi/c/<Component>.<hash>.js).
- * Matches Astro's client hydration wrappers.
+ * Generates the client-side island chunk (/_deshi/c/<Component>.<hash>.js).
+ *
+ * Astro renderer contract: the chunk default-exports `(element) => (Component,
+ * props, slots, { client }) => …` and every renderer gates on the `ssr`
+ * attribute (`!element.hasAttribute('ssr')` → already hydrated). The component
+ * and the framework runtime live in the same chunk so hooks/context share one
+ * framework instance; build.ts bundles the chunk with esbuild when the
+ * framework is installed, otherwise the import specifiers are left for Vite.
  */
-export function generateFrameworkClientMount(file: string, source: string = ''): string {
+export function generateFrameworkIslandChunk(file: string, source: string = ''): string {
   const fw = detectFramework(file, source);
   const spec = JSON.stringify('/' + file.replace(/^\//, ''));
 
   switch (fw) {
     case 'vue':
-      return `// \\0deshi:client:${file}
+      return `// deshi island chunk for ${file}
 import { createSSRApp, createApp, h } from 'vue';
 import Component from ${spec};
 
-export default function mount(root, ctx) {
-  const props = ctx.props || {};
-  const isClientOnly = !root.hasChildNodes() || root.dataset.deshiClientOnly;
-  const app = isClientOnly
-    ? createApp({ render: () => h(Component, props) })
-    : createSSRApp({ render: () => h(Component, props) });
-  app.mount(root);
+const appMap = new WeakMap();
+
+export default function islandRenderer(element) {
+  return function ($Component, props, slots, ctx) {
+    if (!element.hasAttribute('ssr')) return;
+    const isOnly = ctx && ctx.client === 'only';
+    let app = appMap.get(element);
+    if (!app) {
+      const bootstrap = isOnly ? createApp : createSSRApp;
+      app = bootstrap({ render: () => h(Component, props) });
+      appMap.set(element, app);
+      app.mount(element, !isOnly);
+      element.addEventListener('deshi:unmount', () => app.unmount(), { once: true });
+    }
+  };
 }
 `;
 
     case 'svelte':
-      return `// \\0deshi:client:${file}
+      return `// deshi island chunk for ${file}
 import * as Svelte from 'svelte';
 import Component from ${spec};
 
-export default function mount(root, ctx) {
-  const props = ctx.props || {};
-  if (typeof Svelte.hydrate === 'function' && root.hasChildNodes() && !root.dataset.deshiClientOnly) {
-    return Svelte.hydrate(Component, { target: root, props });
-  }
-  if (typeof Svelte.mount === 'function') {
-    return Svelte.mount(Component, { target: root, props });
-  }
-  return new Component({ target: root, props, hydrate: root.hasChildNodes() && !root.dataset.deshiClientOnly });
+export default function islandRenderer(element) {
+  return function ($Component, props, slots, ctx) {
+    if (!element.hasAttribute('ssr')) return;
+    const isOnly = ctx && ctx.client === 'only';
+    let instance;
+    if (isOnly) {
+      instance = typeof Svelte.mount === 'function'
+        ? Svelte.mount(Component, { target: element, props })
+        : new Component({ target: element, props });
+    } else {
+      instance = typeof Svelte.hydrate === 'function'
+        ? Svelte.hydrate(Component, { target: element, props })
+        : new Component({ target: element, props, hydrate: true });
+    }
+    element.addEventListener('deshi:unmount', () => {
+      if (instance && typeof instance.$destroy === 'function') instance.$destroy();
+      else if (instance && typeof Svelte.unmount === 'function') Svelte.unmount(instance);
+    }, { once: true });
+  };
 }
 `;
 
     case 'preact':
-      return `// \\0deshi:client:${file}
+      return `// deshi island chunk for ${file}
 import { h, hydrate, render } from 'preact';
 import Component from ${spec};
 
-export default function mount(root, ctx) {
-  const props = ctx.props || {};
-  if (root.hasChildNodes() && !root.dataset.deshiClientOnly) {
-    hydrate(h(Component, props), root);
-  } else {
-    render(h(Component, props), root);
-  }
+export default function islandRenderer(element) {
+  return function ($Component, props, slots, ctx) {
+    if (!element.hasAttribute('ssr')) return;
+    const child = h(Component, props);
+    if (ctx && ctx.client === 'only') {
+      element.innerHTML = '';
+      render(child, element);
+    } else {
+      hydrate(child, element);
+    }
+    element.addEventListener('deshi:unmount', () => render(null, element), { once: true });
+  };
 }
 `;
 
     case 'react':
     default:
-      return `// \\0deshi:client:${file}
-import React from 'react';
+      return `// deshi island chunk for ${file}
+import { createElement, startTransition } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import Component from ${spec};
 
-export default function mount(root, ctx) {
-  const props = ctx.props || {};
-  const el = React.createElement(Component, props);
-  if (root.hasChildNodes() && !root.dataset.deshiClientOnly) {
-    hydrateRoot(root, el);
-  } else {
-    createRoot(root).render(el);
-  }
+const rootMap = new WeakMap();
+
+export default function islandRenderer(element) {
+  return function ($Component, props, slots, ctx) {
+    if (!element.hasAttribute('ssr')) return;
+    const node = createElement(Component, props);
+    const isOnly = ctx && ctx.client === 'only';
+    let root = rootMap.get(element);
+    if (!root) {
+      root = isOnly ? createRoot(element) : hydrateRoot(element, node);
+      rootMap.set(element, root);
+      element.addEventListener('deshi:unmount', () => root.unmount(), { once: true });
+    }
+    startTransition(() => root.render(node));
+  };
 }
 `;
   }

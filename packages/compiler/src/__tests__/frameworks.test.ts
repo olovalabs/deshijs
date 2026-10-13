@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { build } from '../build';
 import { __clearCompileMemoForTests } from '../index';
-import { detectFramework, generateFrameworkClientMount, serializeVNode } from '../frameworks';
+import { detectFramework, generateFrameworkIslandChunk, serializeVNode } from '../frameworks';
 
 describe('Multi-framework component detection & client chunk generation', () => {
   it('detects frameworks accurately by extension and content', () => {
@@ -11,25 +11,38 @@ describe('Multi-framework component detection & client chunk generation', () => 
     expect(detectFramework('src/components/PreactWidget.tsx', "import { h } from 'preact';")).toBe('preact');
   });
 
-  it('generates React client hydration mount code', () => {
-    const code = generateFrameworkClientMount('src/components/Counter.jsx', '');
-    expect(code).toContain("import React from 'react';");
+  it('generates React island chunk code in the Astro renderer shape', () => {
+    const code = generateFrameworkIslandChunk('src/components/Counter.jsx', '');
+    expect(code).toContain("import { createElement, startTransition } from 'react';");
     expect(code).toContain("import { createRoot, hydrateRoot } from 'react-dom/client';");
-    expect(code).toContain('export default function mount(root, ctx)');
-    expect(code).toContain('hydrateRoot(root, el)');
+    expect(code).toContain('export default function islandRenderer(element)');
+    expect(code).toContain("if (!element.hasAttribute('ssr')) return;");
+    expect(code).toContain('hydrateRoot(element, node)');
+    expect(code).toContain("ctx.client === 'only'");
+    expect(code).toContain("'deshi:unmount'");
   });
 
-  it('generates Vue client hydration mount code', () => {
-    const code = generateFrameworkClientMount('src/components/Widget.vue', '');
+  it('generates Vue island chunk code in the Astro renderer shape', () => {
+    const code = generateFrameworkIslandChunk('src/components/Widget.vue', '');
     expect(code).toContain("import { createSSRApp, createApp, h } from 'vue';");
-    expect(code).toContain('export default function mount(root, ctx)');
-    expect(code).toContain('app.mount(root)');
+    expect(code).toContain('export default function islandRenderer(element)');
+    expect(code).toContain("if (!element.hasAttribute('ssr')) return;");
+    expect(code).toContain('app.mount(element, !isOnly)');
   });
 
-  it('generates Svelte client hydration mount code', () => {
-    const code = generateFrameworkClientMount('src/components/Button.svelte', '');
+  it('generates Svelte island chunk code in the Astro renderer shape', () => {
+    const code = generateFrameworkIslandChunk('src/components/Button.svelte', '');
     expect(code).toContain("import * as Svelte from 'svelte';");
-    expect(code).toContain('export default function mount(root, ctx)');
+    expect(code).toContain('export default function islandRenderer(element)');
+    expect(code).toContain("if (!element.hasAttribute('ssr')) return;");
+    expect(code).toContain('Svelte.hydrate');
+  });
+
+  it('generates Preact island chunk code in the Astro renderer shape', () => {
+    const code = generateFrameworkIslandChunk('src/components/PreactWidget.tsx', "import { h } from 'preact';");
+    expect(code).toContain("import { h, hydrate, render } from 'preact';");
+    expect(code).toContain('export default function islandRenderer(element)');
+    expect(code).toContain('element.innerHTML = ');
   });
 
   it('serializes standard VNode / JSX object trees to HTML', () => {
@@ -97,19 +110,18 @@ import ReactCounter from './components/ReactCounter.jsx';
     expect(res.ok).toBe(true);
     expect(res.diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
     const page = res.pages[0];
-    // Island attributes stamped and wrapped with display:contents
-    expect(page.html).toContain('style="display:contents"');
-    expect(page.html).toContain('data-deshi-c=');
-    expect(page.html).toContain('data-deshi-props="{&quot;initial&quot;:42}"');
+    // Astro-parity island wrapper with the serialized props
+    expect(page.html).toContain('<deshi-island');
+    expect(page.html).toContain('client="load"');
+    expect(page.html).toContain('props="{&quot;initial&quot;:[0,42]}"');
     expect(page.html).toContain('Count: 42');
-    // Hydration script emitted
-    expect(page.html).toContain('import(');
     expect(page.html).toContain('/_deshi/c/ReactCounter.');
 
-    // Client chunk emitted in output files
+    // Client chunk emitted in output files, in the Astro renderer shape
     const clientChunk = res.files.find((f) => f.path.startsWith('_deshi/c/ReactCounter.'));
     expect(clientChunk).toBeDefined();
-    expect(clientChunk?.content).toContain("import React from 'react';");
+    expect(clientChunk?.content).toContain("import { createElement, startTransition } from 'react';");
+    expect(clientChunk?.content).toContain('export default function islandRenderer(element)');
   });
 
   it('resolves extension-less imports dynamically for framework components', async () => {
@@ -158,9 +170,11 @@ import ClientOnlyWidget from './components/ClientOnlyWidget.jsx';
     const html = res.pages[0].html;
     // SSR text is skipped
     expect(html).not.toContain('SSR text that should not appear');
-    // But island container and hydration script are present
-    expect(html).toContain('style="display:contents"');
-    expect(html).toContain('data-deshi-c=');
+    // But the island wrapper and its hydrate chunk are present
+    expect(html).toContain('client="only"');
+    expect(html).toContain('props="{}"');
     expect(html).toContain('/_deshi/c/ClientOnlyWidget.');
+    // client:only has no SSR children, so it never needs await-children
+    expect(html).not.toMatch(/<deshi-island[^>]*await-children/);
   });
 });

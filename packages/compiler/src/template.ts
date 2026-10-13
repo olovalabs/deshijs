@@ -602,8 +602,8 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx, clip: Range): Node[] {
       slots: bucketSlots(kids('div'), ctx),
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
-      clientMedia: taken.clientMedia,
-      clientOnly: taken.clientOnly,
+      clientValue: taken.clientValue,
+      clientValueStatic: taken.clientValueStatic,
       loc,
     };
     return done([comp]);
@@ -638,7 +638,7 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx, clip: Range): Node[] {
     }
     const headEl: Element = {
       type: 'Element', name: 'head', attrs: convertAttrs(el, ctx), children, loc,
-      scoped: false, clientRoot: false, isDocHead: true,
+      scoped: false, isDocHead: true,
     };
     return done([headEl]);
   }
@@ -661,7 +661,6 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx, clip: Range): Node[] {
     children: setHtml ? [] : children,
     loc,
     scoped: ctx.scoped && !NO_SCOPE.has(lower),
-    clientRoot: false,
   };
   return done([element]);
 }

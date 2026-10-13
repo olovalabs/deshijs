@@ -3,7 +3,7 @@
 // `{ }` expressions is spliced back into the expression source as `$r(...)` calls.
 import type { Component, Element, Expression, Node, Root, Slot } from './types';
 import type { ImportInfo, ScriptInfo } from './script';
-import { escapeHtml } from './runtime';
+import { escapeHtml } from './escape';
 import { planAttributes, planPropsObject } from './attrs';
 import { printExpression } from './ast/print';
 import { scopeAttribute } from './css';
@@ -60,8 +60,6 @@ class Em {
 
 interface G extends CodegenInput {
   heads: string[];
-  /** island markers for a component with a `<script client>` block */
-  island: { hash: string } | null;
 }
 
 /** Render a run of template nodes to a JS expression that produces its HTML. */
@@ -89,14 +87,12 @@ function genElement(el: Element, em: Em, g: G): void {
     return;
   }
   em.str('<' + el.name);
-  // The attribute planner folds class/class:list, style/define:vars, spreads and
-  // the island markers into one literal prefix plus at most one attrs() call, so
-  // a fully static element costs nothing at runtime and nothing is ever emitted
-  // twice.
+  // The attribute planner folds class/class:list, style/define:vars and spreads
+  // into one literal prefix plus at most one attrs() call, so a fully static
+  // element costs nothing at runtime and nothing is ever emitted twice.
   const plan = planAttributes(el.attrs, {
     print: (expr) => genExprCode(expr, g),
     scopeAttr: el.scoped ? scopeAttribute(g.hash) : undefined,
-    island: el.clientRoot ? g.island : null,
   });
   for (const part of plan.parts) {
     if (typeof part === 'string') em.str(part);
@@ -148,14 +144,15 @@ function genComponent(c: Component, em: Em, g: G): void {
       ? props
       : 'undefined';
   const strat = c.clientStrategy ? JSON.stringify(c.clientStrategy) : 'undefined';
-  const media = c.clientMedia ? JSON.stringify(c.clientMedia) : 'undefined';
-  const only = c.clientOnly ? JSON.stringify(c.clientOnly) : 'undefined';
-  // renderComponent signature includes media/only for islands
-  if (c.clientMedia || c.clientOnly) {
-    em.expr(`(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}, ${media}, ${only}))`, true);
-  } else {
-    em.expr(`(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}))`, true);
-  }
+  const value = c.clientValue
+    ? genExprCode(c.clientValue, g)
+    : c.clientValueStatic !== undefined
+      ? JSON.stringify(c.clientValueStatic)
+      : 'undefined';
+  em.expr(
+    `(await renderComponent(${c.ident}, ${props}, { ${slots} }, $ctx, ${cp}, ${strat}, ${value}))`,
+    true,
+  );
 }
 
 function genSlot(s: Slot, em: Em, g: G): void {
@@ -244,23 +241,15 @@ function evalImport(imp: ImportInfo): string {
 }
 
 export function generate(input: CodegenInput): CodegenOutput {
-  // A component with a `<script client>` block renders island markers on its
-  // root element. When it has no root element (it starts with text or a
-  // comment) the output is wrapped, so the boot script always has a node to
-  // attach to — decided here, at compile time, instead of by re-parsing the
-  // rendered HTML at runtime.
-  const hasClientRoot = input.hasClient;
-  const wrapIslandRoot = hasClientRoot && !input.root.children.some((c) => c.type === 'Element');
-  const g: G = { ...input, heads: [], island: hasClientRoot ? { hash: input.hash } : null };
+  // Islands are wrapped in <deshi-island> at render time (runtime.ts) — exactly
+  // like Astro's <astro-island>: the component's own markup is never stamped or
+  // re-parsed, so a component with zero or many root elements behaves the same.
+  const g: G = { ...input, heads: [] };
   const statements: string[] = [];
   for (const child of input.root.children) {
     const em = new Em();
     genNodes([child], em, g);
     if (em.parts.length) statements.push(`  $o += ${em.code()};`);
-  }
-  if (wrapIslandRoot) {
-    statements.unshift(`  $o += '<div' + islandAttrs() + ' style="display:contents">';`);
-    statements.push(`  $o += '</div>';`);
   }
 
   const body = input.script.body
@@ -271,12 +260,9 @@ export function generate(input: CodegenInput): CodegenOutput {
   // Astro global parity: expose Astro alongside props/params/url/route/env.
   // Template expressions can use `Astro.props`, `Astro.params`, `Astro.url`, etc.
   const renderFn = [
-    `async function render({ props, slots, params, url, route, env, Deshi, Astro }, $slotFns, $ctx, $cp, $island) {`,
+    `async function render({ props, slots, params, url, route, env, Deshi, Astro }, $slotFns, $ctx) {`,
     `  if (!Deshi) { Deshi = Astro || { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: ${JSON.stringify('Deshi ' + DESHI_VERSION)}, slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null, setContext, getContext, hasContext }; }`,
     `  if (!Astro) { Astro = Deshi; }`,
-    hasClientRoot
-      ? `  const islandAttrs = () => attrs($island ? { id: $island.id, "data-deshi-c": ${JSON.stringify(input.hash)}, "data-deshi-props": $cp } : {});`
-      : '',
     body.trimEnd(),
     heads,
     `  let $o = '';`,

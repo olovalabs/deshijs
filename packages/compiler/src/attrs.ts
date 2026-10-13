@@ -7,12 +7,11 @@
 //     HTML parser already reported, which makes repeat attributes detectable
 //     (the HTML spec silently drops them) without any offset bookkeeping.
 //   • `planAttributes` folds the special attributes — `class` + `class:list`,
-//     `style` + `define:vars`, spreads, the island root markers — into exactly
-//     one static string and one dynamic object, so nothing is ever emitted
-//     twice (the historical `class` + `class:list` bug) and a fully static
-//     element costs zero runtime work.
+//     `style` + `define:vars`, spreads — into exactly one static string and one
+//     dynamic object, so nothing is ever emitted twice (the historical `class` +
+//     `class:list` bug) and a fully static element costs zero runtime work.
 import type { Attr, Expression } from './types';
-import { escapeAttr } from './runtime';
+import { escapeAttr } from './escape';
 import { scopeAttribute } from './css';
 
 // ─── start-tag scanning ─────────────────────────────────────────────────────
@@ -178,12 +177,6 @@ export interface PlanOptions {
   print: (expr: Expression) => string;
   /** scoped-style attribute to append, when the element is scoped */
   scopeAttr?: string;
-  /**
-   * Island markers for the root element of a component that hydrates. The
-   * element receives the island id plus `data-deshi-c` / `data-deshi-props`,
-   * all absent when the render has no island (a server-only render).
-   */
-  island?: { hash: string } | null;
 }
 
 interface Entry {
@@ -349,17 +342,6 @@ export function planAttributes(attrs: Attr[], opts: PlanOptions): AttrPlan {
   emitClass();
   emitStyle();
 
-  if (opts.island) {
-    const { hash } = opts.island;
-    // Never clobber a user id: fall back to `data-deshi-i`, which the boot
-    // script looks up as well. Markers and attributes stay in one attrs() call.
-    const hasId = attrs.some((a) => 'name' in a && (a as { name: string }).name === 'id');
-    const marker = hasId ? 'data-deshi-i' : 'id';
-    addEntry(
-      '...',
-      `$island ? { ${JSON.stringify(marker)}: $island.id, "data-deshi-c": ${JSON.stringify(hash)}, "data-deshi-props": $cp } : {}`,
-    );
-  }
   if (opts.scopeAttr) scopeAttr = opts.scopeAttr;
   closeRun();
   flush();

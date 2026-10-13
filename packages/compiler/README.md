@@ -234,7 +234,7 @@ Everything is AST-based, from source text to output:
 | Props | `props.ts`, `tsprops.ts` | contract extraction and per-usage checking |
 | Attributes | `attrs.ts` | attribute analysis and the start-tag code plan |
 | Codegen | `codegen.ts`, `ast/print.ts` | expressions printed from the AST; attributes planned, not concatenated |
-| Islands | `runtime.ts`, `islands.ts` | the island root is stamped by codegen, so rendered HTML is never re-parsed |
+| Islands | `runtime.ts`, `islands.ts`, `serialize.ts` | `<deshi-island>` wrapper + Astro-parity prescripts, directives, props encoding and hydrate lifecycle |
 
 `ast/walk.ts` is the single traversal primitive; `ast/estree.ts` is the single
 ESTree toolkit. Adding a node type touches one file.

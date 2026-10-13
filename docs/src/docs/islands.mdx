@@ -17,7 +17,7 @@ Deshijs implements the **Islands Architecture**:
 - Static HTML is generated on the server at build time.
 - Only components carrying a `client:*` directive are bundled into browser JavaScript chunks (`/_deshi/c/<Component>.<hash>.js`).
 - Pages without islands ship **0 bytes of client JS**.
-- Each island receives an ultra-compact inline bootstrap script matching its exact hydration strategy.
+- Every island is wrapped in a `<deshi-island>` element (the equivalent of Astro's `<astro-island>`) and hydrated by the same lifecycle mechanics as Astro: once-per-page prescripts, top-down hydration, Astro-format props and the `deshi:hydrate` / `deshi:unmount` events.
 
 ---
 
@@ -44,7 +44,13 @@ Hydrates immediately as soon as the page loads. The build engine also injects a 
 ```html
 <ImageCarousel client:visible />
 ```
-Hydrates only when the component enters the visible viewport. If `IntersectionObserver` is not supported, it falls back to immediate execution.
+Hydrates only when the component enters the visible viewport. Matches Astro exactly: an
+`IntersectionObserver` watches the island's **children** (the island element itself is
+`display: contents` and never intersects) with an optional root margin:
+
+```html
+<ImageCarousel client:visible={{ rootMargin: '200px' }} />
+```
 
 ---
 
@@ -52,7 +58,15 @@ Hydrates only when the component enters the visible viewport. If `IntersectionOb
 ```html
 <NewsletterSignup client:idle />
 ```
-Hydrates during idle time via `requestIdleCallback`. Combines with an IntersectionObserver so hidden elements do not hydrate unnecessarily.
+Hydrates during idle time via `requestIdleCallback` — exactly like Astro, with no viewport
+gate. Options are passed through:
+
+```html
+<NewsletterSignup client:idle={{ timeout: 500 }} />
+```
+
+`requestIdleCallback` runs with the given `timeout` (browsers without it fall back to
+`setTimeout(200)`).
 
 ---
 
@@ -86,7 +100,11 @@ Like Astro, any standard props passed to an island component are automatically s
 <Counter initialCount={42} step={2} client:visible />
 ```
 
-The compiler automatically serializes the props into `data-deshi-props` on the island's root element. During hydration, they are parsed and passed to the component's `<script client>` mount function as `ctx.props`.
+The compiler automatically serializes the props into the `props` attribute of the
+`<deshi-island>` wrapper using Astro's typed-tuple format (`[type, payload]`), so `Date`,
+`Map`, `Set`, `RegExp`, `BigInt`, `URL`, typed arrays, `Infinity` and `undefined` all survive.
+During hydration they are revived and passed to the component's `<script client>` mount
+function as `ctx.props`.
 
 ---
 
@@ -151,13 +169,19 @@ Deshijs natively supports importing and hydrating UI framework components direct
 ### How It Works:
 - **Zero-Config Detection**: The compiler recognizes `.jsx`, `.tsx`, `.vue`, and `.svelte` files automatically.
 - **Server Rendering (SSR)**: At build time, the component is rendered to static HTML using the framework's SSR renderer (`react-dom/server`, `@vue/server-renderer`, `svelte/server`, or `preact-render-to-string`).
-- **Client Hydration**: When a `client:*` directive is attached, Deshijs generates an ultra-compact island chunk (`/_deshi/c/<Component>.<hash>.js`) that mounts the component into the DOM.
-- **Props Passing**: Standard props are serialized into `data-deshi-props` automatically and passed to both the server renderer and client hydration.
+- **Client Hydration**: When a `client:*` directive is attached, Deshijs wraps the SSR output in a
+  `<deshi-island>` custom element (Astro's `<astro-island>` equivalent) and generates a
+  self-contained island chunk (`/_deshi/c/<Component>.<hash>.js`) that mounts the component into
+  the DOM. The chunk bundles the framework runtime so hooks and context work exactly as in Astro.
+- **Props Passing**: Standard props are serialized into the island's `props` attribute
+  automatically and passed to both the server renderer and client hydration.
 ---
 
 ## Runtime Internals (islands.ts)
 
 In `packages/compiler/src/islands.ts`:
-- `stampIslandRoot(html, id)`: Injects `id="{id}"` or `data-deshi-i="{id}"` onto the component's outermost element.
-- `islandInlineScript(id, src, strategy, media)`: Generates the `<script type="module">` bootstrapper.
-- `r.dataset.deshiHydrated = "1"`: Guard flag preventing duplicate hydrations during client-router page transitions.
+- `renderIsland(...)`: wraps the SSR output in `<deshi-island uid component-url component-export renderer-url props ssr client opts await-children>` — Astro's `<astro-island>` attribute contract, including the `<!--deshi:end-->` completion marker for streamed children.
+- `islandPrescripts(state, strategy, dev)`: emits the once-per-page prescripts immediately before the first island — the `deshi-island,deshi-slot{display:contents}` style, the directive function (`(self.Deshi||(self.Deshi={})).load=…` plus a `deshi:load` event), and the `deshi-island` custom element definition. All classic scripts, like Astro; dev builds keep them readable, production minifies them.
+- The `deshi-island` custom element loads `component-url` and `renderer-url` in parallel, hydrates **top-down** (a child waits for its parent island's `deshi:hydrate`), revives props, collects `deshi-slot` / `template[data-deshi-template]` slots, removes `ssr` when done, and fires `deshi:hydrate` / `deshi:unmount` / `deshi:hydration-error` events.
+
+Props are serialized with Astro's typed-tuple encoding in `packages/compiler/src/serialize.ts` and revived on the client by the same module's `reviveProps` (inlined into the prescript via `toString()`).

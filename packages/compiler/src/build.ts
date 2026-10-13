@@ -3,7 +3,7 @@
 // merge <head>, inject CSS / client bootstrap, write the output tree + manifest,
 // and enforce the zero-JS gate.
 import * as acorn from 'acorn';
-import { transformSync } from 'esbuild';
+import { build as esbuildBuild, transformSync } from 'esbuild';
 import { compile, type CompileResult } from './index';
 import { scopedCssUrl } from './css';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
@@ -38,6 +38,7 @@ import {
   type SlotFns,
 } from './runtime';
 import { DeshiError, hashString, type Diagnostic } from './types';
+import { detectFramework } from './frameworks';
 import { walk } from './ast/walk';
 import { resolverFromCompiled, type ComponentResolver } from './props';
 import { prepareHighlight } from './highlight';
@@ -54,7 +55,7 @@ import {
   isSourceFile,
   splitFilename,
 } from './filetype';
-import { ensureJsxRuntime, generateFrameworkClientMount } from './frameworks';
+import { ensureJsxRuntime, generateFrameworkIslandChunk } from './frameworks';
 
 export interface Project {
   /** file path (project-relative, e.g. "src/app/page.html") → source */
@@ -74,6 +75,12 @@ export interface BuildOptions {
   stableCssUrl?: boolean;
   /** Build-time Shiki highlighting for markdown code fences. Falsy = plain blocks. */
   highlight?: { theme?: string; langs?: string[] };
+  /**
+   * Project root for island chunk bundling (esbuild resolves framework peer
+   * dependencies from here). When omitted, chunks keep their import specifiers
+   * (unit tests / no-framework projects).
+   */
+  projectRoot?: string;
 }
 
 export interface PageOutput {
@@ -228,6 +235,45 @@ if (typeof h === 'undefined') {
   return out.join('\n');
 }
 
+/**
+ * Bundle an island chunk into self-contained ESM when its imports resolve from
+ * the project (framework peer deps, the component file itself). On any
+ * resolution/compile failure the original code is kept — that is the graceful
+ * path for projects without the framework installed, and for .vue/.svelte,
+ * whose SFC compilers live in Vite plugins.
+ */
+async function bundleIslandChunk(
+  code: string,
+  file: string,
+  projectRoot: string,
+  minify: boolean,
+): Promise<string> {
+  if (!/(^|[\s;])import[\s("]/.test(code)) return code;
+  try {
+    const path = await import('node:path');
+    const abs = path.resolve(projectRoot, file);
+    // Rewrite the chunk's component import to an absolute path esbuild can
+    // resolve; the served (unbundled) form keeps the Vite-style URL specifier.
+    const entry = code.replace(JSON.stringify('/' + file.replace(/^\//, '')), JSON.stringify(abs));
+    const result = await esbuildBuild({
+      stdin: { contents: entry, resolveDir: projectRoot, sourcefile: 'deshi-island.js', loader: 'js' },
+      bundle: true,
+      format: 'esm',
+      platform: 'browser',
+      target: 'es2020',
+      minify,
+      write: false,
+      logLevel: 'silent',
+      external: ['*.vue', '*.svelte'],
+      jsx: 'automatic',
+      jsxImportSource: detectFramework(file) === 'preact' ? 'preact' : 'react',
+    });
+    return result.outputFiles?.[0]?.text ?? code;
+  } catch {
+    return code;
+  }
+}
+
 export async function build(project: Project, options: BuildOptions = {}): Promise<BuildResult> {
   const opts = {
     output: options.output ?? ('index' as const),
@@ -238,6 +284,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     appDir: options.appDir,
     stableCssUrl: options.stableCssUrl,
     maxDepth: options.maxDepth,
+    projectRoot: options.projectRoot,
   };
   const t0 = performance.now();
   resetCache();
@@ -278,7 +325,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
 
     if (isFrameworkComponent(file)) {
       const hash = hashString(source);
-      const clientMount = generateFrameworkClientMount(file, source);
+      const clientMount = generateFrameworkIslandChunk(file, source);
       const res: CompileResult = {
         code: source,
         evalBody: '',
@@ -526,6 +573,16 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     if (res.client) clientByHash[res.meta.hash] = { code: res.client.code, body: res.client.body, file: f, chunk: `/_deshi/c/${basename(f)}.${res.meta.hash}.js` };
   }
 
+  // Island chunks: bundle framework/component imports with esbuild so the
+  // browser receives self-contained ESM — the equivalent of Astro's Vite-built
+  // island chunks. Without a project root (unit tests) chunks keep their
+  // import specifiers and Vite resolves them in dev.
+  if (opts.projectRoot) {
+    for (const entry of Object.values(clientByHash)) {
+      entry.code = await bundleIslandChunk(entry.code, entry.file, opts.projectRoot, opts.minify ?? false);
+    }
+  }
+
   // Split CSS (Astro-style): one shared global bundle for all <style global>
   // blocks + one immutable file per scoped owner. Filenames are content-hashed
   // so layout CSS is downloaded once and shared across pages.
@@ -578,6 +635,8 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
       maxDepth,
       segments: opts.router,
       islands: 0,
+      dev: !opts.minify,
+      island: { islandStyle: false, islandRuntime: false, islandDirectives: new Set<string>() },
       preloads: new Set<string>(),
     };
     const run = async (i: number): Promise<string> => {
@@ -915,6 +974,7 @@ export async function buildToDisk(
       site: options.site,
       highlight: options.highlight,
       maxDepth: options.maxDepth,
+      projectRoot,
     }
   );
 
