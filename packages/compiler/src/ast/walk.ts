@@ -146,7 +146,7 @@ export function cloneNode(node: Node): Node {
     case 'Slot':
       return { ...node, fallback: cloneNodes(node.fallback) };
     case 'Component': {
-      const slots: Record<string, Node[]> = {};
+      const slots: Record<string, Node[]> = Object.create(null);
       for (const [k, v] of Object.entries(node.slots)) slots[k] = cloneNodes(v);
       return { ...node, props: node.props.map(cloneAttr), slots };
     }

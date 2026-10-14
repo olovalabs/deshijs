@@ -159,10 +159,17 @@ function splitBlocksInternal(source: string, file: string, frontmatter: { conten
   };
 
   tokenizer = new Tokenizer({ sourceCodeLocationInfo: true }, handler);
-  tokenizer.write(source, true);
+  // Frontmatter is JavaScript, not HTML: tag-like strings must not change the
+  // tokenizer's stack or create blocks. Keep offsets/newlines aligned.
+  const htmlSource = frontmatter
+    ? source.slice(0, frontmatter.start)
+      + source.slice(frontmatter.start, frontmatter.end).replace(/[^\r\n]/g, ' ')
+      + source.slice(frontmatter.end)
+    : source;
+  tokenizer.write(htmlSource, true);
 
   // If frontmatter fence exists and no <script> was found, synthesize script
-  if (frontmatter && !script && !client) {
+  if (frontmatter && !script) {
     script = {
       kind: 'script',
       attrs: {},

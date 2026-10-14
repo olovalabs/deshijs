@@ -91,6 +91,19 @@ export function hoistedNames(body: AnyNode[]): string[] {
   return out;
 }
 
+/** `var` bindings belong to the enclosing function/program, not a block. */
+export function functionVarNames(body: AnyNode): string[] {
+  const out: string[] = [];
+  walkEstree(body, (node) => {
+    // Nested functions and class static blocks own their var declarations.
+    if (isFunctionLike(node) || node.type === 'ClassDeclaration' || node.type === 'ClassExpression') return false;
+    if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+      for (const d of node.declarations) patternNames(d.id, out);
+    }
+  });
+  return out;
+}
+
 /**
  * Every identifier reference inside `node` that resolves to nothing, i.e. a
  * template expression using a name that is neither a `<script>` binding, an
@@ -163,13 +176,18 @@ export function unresolvedIdentifiers(root: AnyNode, opts: ScopeOptions): Unreso
       if (node.id && node.type === 'FunctionExpression') scope.add(node.id.name);
       scopes.push(scope);
       for (const p of node.params) bind(p, scope);
-      if (node.body.type === 'BlockStatement') for (const n of hoistedNames(node.body.body)) scope.add(n);
+      if (node.body.type === 'BlockStatement') {
+        for (const n of [...hoistedNames(node.body.body), ...functionVarNames(node.body)]) scope.add(n);
+      }
       step(node.body, node, 'body');
       scopes.pop();
       return;
     }
     if (node.type === 'BlockStatement' || node.type === 'Program') {
-      scopes.push(new Set(hoistedNames(node.body)));
+      scopes.push(new Set([
+        ...hoistedNames(node.body),
+        ...(node.type === 'Program' ? functionVarNames(node) : []),
+      ]));
       step(node.body, node, 'body');
       scopes.pop();
       return;

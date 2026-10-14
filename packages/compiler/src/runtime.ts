@@ -221,7 +221,7 @@ export function runWithContext<R>(store: Map<unknown, unknown>, fn: () => R): R 
 }
 
 export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns: SlotFns): Bindings {
-  const slots: Record<string, true> = {};
+  const slots: Record<string, true> = Object.create(null);
   for (const k of Object.keys(slotFns)) slots[k] = true;
   const Astro = {
     props,
@@ -252,7 +252,7 @@ export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns
 }
 
 export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<string>): Promise<string> {
-  const fn = fns[name];
+  const fn = Object.hasOwn(fns, name) ? fns[name] : undefined;
   if (fn) return await fn();
   if (fallback) return await fallback();
   return '';
@@ -267,7 +267,7 @@ function componentBaseName(file: string): string {
 /** Wrap each rendered slot in `<deshi-slot>` so the client island can recover
  * the slot HTML (display:contents, invisible in the page). */
 function wrapIslandSlots(slotFns: SlotFns): SlotFns {
-  const wrapped: SlotFns = {};
+  const wrapped: SlotFns = Object.create(null);
   for (const [name, fn] of Object.entries(slotFns)) {
     wrapped[name] = async () => `<deshi-slot name="${escapeAttr(name)}">${await fn()}</deshi-slot>`;
   }

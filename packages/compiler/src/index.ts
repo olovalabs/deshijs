@@ -87,8 +87,12 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   const file = opts.file;
   const minify = opts.minify ?? true;
   const isMarkdownDoc = isDocumentFile(file);
-  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${opts.resolveComponent ? 'l' : ''}\0${highlightStateToken()}\0${hashString(source)}`;
-  const cached = compileMemo.get(memoKey);
+  // Source hashes can collide; cache identity must include the exact source.
+  const memoKey = `${file}\0${minify}\0${opts.isLayout ?? ''}\0${opts.segment ?? ''}\0${opts.runtimeImport ?? ''}\0${opts.stableCssUrl ? '1' : '0'}\0${opts.resolveComponent ? 'l' : ''}\0${highlightStateToken()}\0${source}`;
+  // Resolver results depend on other files (and can change even when the
+  // callback identity does not). Do not memoize cross-file validation.
+  const cacheable = !opts.resolveComponent;
+  const cached = cacheable ? compileMemo.get(memoKey) : undefined;
   if (cached) {
     return {
       ...cached,
@@ -298,7 +302,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
     ast: root,
     script,
   };
-  compileMemo.set(memoKey, result);
+  if (cacheable) compileMemo.set(memoKey, result);
   return result;
 }
 

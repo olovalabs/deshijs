@@ -469,7 +469,9 @@ function convertAttrs(el: P5.Element, ctx: ConvCtx, restoreCase = false): Attr[]
       attrs.push({ kind: 'transition', name: a.name, value: a.value });
       continue;
     }
-    if (a.value === '') attrs.push({ kind: 'boolean', name: a.name });
+    // parse5 represents both a bare attribute and an explicit empty value as ''.
+    const hasValue = loc && /^\s*=/.test(src.slice(loc.start + a.name.length, loc.end));
+    if (a.value === '' && !hasValue) attrs.push({ kind: 'boolean', name: a.name });
     else attrs.push({ kind: 'static', name: a.name, value: a.value });
   }
   return attrs;
@@ -550,6 +552,12 @@ function convertNode(n: P5.ChildNode, ctx: ConvCtx, clip: Range): Node[] {
     const start = Math.max(l.startOffset, clip.start);
     const end = Math.min(l.endOffset, clip.end);
     if (end <= start) return [];
+    // HTML raw-text elements do not decode character references. Their bodies
+    // are JS/CSS (including literal braces), not template expressions.
+    const parent = (n as P5.TextNode).parentNode;
+    if (parent && 'tagName' in parent && (parent.tagName === 'script' || parent.tagName === 'style')) {
+      return [{ type: 'Text', value: ctx.pre.text.slice(start, end), loc: locAt(ctx.source, start, end) }];
+    }
     return splitText(ctx.pre.text, start, end, ctx);
   }
   if (n.nodeName === '#comment') {
