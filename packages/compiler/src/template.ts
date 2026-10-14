@@ -50,6 +50,10 @@ const BLOCK = new Set([
   'td', 'th', 'title', 'meta', 'link', 'script', 'style', 'pre', 'blockquote', 'form',
   'fieldset', 'figure', 'figcaption', 'aside', 'hr', 'dl', 'dt', 'dd', 'details', 'summary',
   'template', 'slot', 'option', 'select', 'br',
+  // SVG structural & graphical elements — drop interstitial whitespace, Astro-style:
+  'svg', 'g', 'defs', 'symbol', 'mask', 'pattern', 'clippath', 'lineargradient',
+  'radialgradient', 'filter', 'marker', 'path', 'circle', 'rect', 'line',
+  'polyline', 'polygon', 'ellipse', 'use', 'stop', 'image',
 ]);
 const PRESERVE = new Set(['pre', 'textarea', 'script', 'style']);
 const HEAD_OK = new Set(['base', 'link', 'meta', 'title', 'noscript', 'style', 'script', 'template']);
@@ -380,7 +384,9 @@ function convertAttrs(el: P5.Element, ctx: ConvCtx, restoreCase = false): Attr[]
   const attrs: Attr[] = [];
   const elLoc = nodeLoc(el, ctx);
   const src = ctx.source;
-  const written = restoreCase ? originalAttrNames(el, ctx) : null;
+  const isSvg = el.namespaceURI === 'http://www.w3.org/2000/svg';
+  const shouldRestoreCase = restoreCase || isSvg;
+  const written = shouldRestoreCase ? originalAttrNames(el, ctx) : null;
 
   // The HTML parser drops a repeated attribute silently; report it instead.
   // The masked text is scanned (not the raw source) so an unquoted expression
@@ -406,9 +412,10 @@ function convertAttrs(el: P5.Element, ctx: ConvCtx, restoreCase = false): Attr[]
 
   for (const parsed of el.attrs) {
     const a = { ...parsed, name: '' } as typeof parsed;
-    const parsedLoc = attrLocation(el, parsed.name);
-    a.name = (written && parsedLoc ? written.get(parsedLoc.start) : null) ?? parsed.name;
-    const loc = attrLocation(el, parsed.name);
+    const rawName = parsed.prefix ? `${parsed.prefix}:${parsed.name}` : parsed.name;
+    const parsedLoc = attrLocation(el, rawName) ?? attrLocation(el, parsed.name);
+    a.name = (written && parsedLoc ? written.get(parsedLoc.start) : null) ?? rawName;
+    const loc = parsedLoc;
     // Astro-style directive names are not HTML attribute names; let them through.
     const allowColon =
       a.name.includes(':') &&
@@ -691,7 +698,7 @@ export function parseTemplate(
     if (!head.children.some((c) => c.type === 'Slot' && c.name === 'head')) {
       head.children.push({ type: 'Slot', name: 'head', fallback: [], loc: head.loc, headMarker: true });
     }
-    if (!containsDefaultSlot(body.children)) {
+    if (opts.isLayout && !containsDefaultSlot(body.children)) {
       fail('PF2002', 'Root layout must render a <slot /> for the page content', ctx.file, ctx.source, body.loc.start);
     }
   } else {

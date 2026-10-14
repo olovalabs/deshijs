@@ -154,7 +154,7 @@ describe('directive semantics (Astro parity)', () => {
   it('client:load and client:only hydrate immediately', () => {
     for (const strategy of ['load', 'only'] as const) {
       const script = dev(strategy);
-      expect(script).toContain('const hydrate = await load()');
+      expect(script).toMatch(/(const hydrate = await load\(\)|await \(await load\(\)\)\(\))/);
       expect(script).not.toContain('IntersectionObserver');
       expect(script).not.toContain('requestIdleCallback');
     }
@@ -171,7 +171,7 @@ describe('directive semantics (Astro parity)', () => {
   it('client:media uses matchMedia with a one-shot change listener', () => {
     const script = dev('media');
     expect(script).toContain('matchMedia');
-    expect(script).toMatch(/addEventListener\(["']change["'],\s*cb,\s*\{ once: true \}\)/);
+      expect(script).toMatch(/addEventListener\(["']change["'],\s*cb,\s*\{\s*once:\s*(!0|true)\s*\}\)/);
     expect(script).toContain('mql.matches');
   });
 

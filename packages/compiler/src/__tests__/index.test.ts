@@ -36,4 +36,38 @@ describe('compile', () => {
     const res = compile(`---\ntitle: Hello\n---\n# Hi\n`, { file: 'src/post.md' });
     expect(res.script.bindings).toContain('title');
   });
+
+  it('preserves SVG casing, namespaces, and eliminates interstitial whitespace', () => {
+    __clearCompileMemoForTests();
+    const svg = `<svg viewBox="0 0 100 100" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <linearGradient id="g1">
+      <stop stopColor="red" xlink:href="#icon" xml:space="preserve" />
+    </linearGradient>
+  </defs>
+</svg>`;
+    const res = compile(svg, { file: 'src/icon.deshi' });
+    expect(res.code).toContain('viewBox=\\"0 0 100 100\\"');
+    expect(res.code).toContain('xmlns:xlink=\\"http://www.w3.org/1999/xlink\\"');
+    expect(res.code).toContain('stopColor=\\"red\\"');
+    expect(res.code).toContain('xlink:href=\\"#icon\\"');
+    expect(res.code).toContain('xml:space=\\"preserve\\"');
+    expect(res.code).not.toContain('<svg viewBox="0 0 100 100"> <defs>');
+  });
+
+  it('supports standalone full-document pages without requiring a slot (Astro parity)', () => {
+    __clearCompileMemoForTests();
+    const doc = `<!doctype html><html><head><title>Astro</title></head><body><h1>Hello</h1></body></html>`;
+    const res = compile(doc, { file: 'src/page.deshi', isLayout: false });
+    expect(res.meta.isDocument).toBe(true);
+    expect(res.code).toContain('<h1>Hello</h1>');
+  });
+
+  it('preserves @font-face rules in scoped component styles without mangling', () => {
+    __clearCompileMemoForTests();
+    const src = `<div>Font test</div><style>@font-face { font-family: 'Custom'; src: url('/fonts/custom.woff2'); } .text { font-family: 'Custom'; }</style>`;
+    const res = compile(src, { file: 'src/font.deshi' });
+    expect(res.css.scoped).toContain("@font-face{font-family:'Custom';src:url('/fonts/custom.woff2')}");
+    expect(res.css.scoped).not.toContain('@font-face[data-deshi');
+  });
 });

@@ -154,10 +154,16 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           },
         },
         base: dc.base ?? cfg.base,
-        // Astro parity: src/public/ is served at / and copied to dist/.
+        // Astro parity: public/ or src/public/ is served at / and copied to dist/.
         // Without this, /favicon.ico falls through to the SPA fallback
         // and downloads "/" HTML on every page (browser auto-requests it).
-        publicDir: cfg.publicDir ?? 'src/public',
+        publicDir:
+          cfg.publicDir ??
+          (fs.existsSync(path.join(cfg.root || process.cwd(), 'src/public'))
+            ? 'src/public'
+            : fs.existsSync(path.join(cfg.root || process.cwd(), 'public'))
+              ? 'public'
+              : 'src/public'),
       };
     },
     configResolved(resolvedConfig) {

@@ -881,6 +881,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   }
   for (const f of Object.keys(files)) {
     if (f.startsWith('src/public/')) out.push({ path: f.slice('src/public/'.length), content: files[f], kind: 'text' });
+    else if (f.startsWith('public/')) out.push({ path: f.slice('public/'.length), content: files[f], kind: 'text' });
   }
 
   const manifest = {
