@@ -1,12 +1,10 @@
 /**
  * Deshi Client Router — Ultra-fast, zero-dependency SPA navigation.
- * Served as /_deshi/router.4f1a9c2e.js.
  */
-
-export const CLIENT_ROUTER_SCRIPT = `(()=>{if(window.deshi)return;let D=document,L=location,C=new Map,I=0,S=p=>p.length>1&&p.endsWith('/')?p.slice(0,-1):p,B=()=>S(L.pathname)+L.search,U=B(),N=u=>{try{let a=new URL(u,L);return a.origin==L.origin&&/^https?:$/.test(a.protocol)?S(a.pathname)+a.search+a.hash:0}catch{return 0}},K=m=>m.getAttribute('name')?'n:'+m.getAttribute('name'):m.getAttribute('property')?'p:'+m.getAttribute('property'):m.getAttribute('http-equiv')?'h:'+m.getAttribute('http-equiv'):m.hasAttribute('charset')?'c':0,A=(t,s)=>{if(!t||!s)return;for(let a of[...t.attributes])s.hasAttribute(a.name)||t.removeAttribute(a.name);for(let a of s.attributes)t.getAttribute(a.name)!==a.value&&t.setAttribute(a.name,a.value)},V=()=>history.replaceState({...history.state,x:scrollX,y:scrollY},''),G=h=>{if(!h)return 0;let d=h;try{d=decodeURIComponent(h)}catch{}return D.getElementById(d)||D.getElementById(h)||D.getElementsByName(d)[0]},F=u=>{let k=u.split('#')[0];if(C.has(k))return C.get(k);if(C.size>50)C.delete(C.keys().next().value);let p=fetch(k,{headers:{'X-Deshi-Router':'1',Accept:'text/html,application/xhtml+xml'}}).then(async r=>{if(!r.ok||!(r.headers.get('content-type')||'').includes('html'))throw 0;let f=r.redirected?N(r.url):k;if(!f)throw 0;return{t:await r.text(),u:f.split('#')[0]}}).catch(e=>{C.delete(k);throw e});C.set(k,p);return p},Y=q=>{for(let l of q.querySelectorAll('link[rel="stylesheet"][href]')){let h=l.getAttribute('href');if(h&&![...D.head.querySelectorAll('link')].some(e=>e.getAttribute('href')===h)){let p=D.createElement('link');p.rel='prefetch';p.as='style';p.href=h;D.head.append(p)}}},H=async q=>{if(q.title!=null)D.title=q.title;A(D.documentElement,q.documentElement);let om=new Map;D.head.querySelectorAll('meta').forEach(m=>{let k=K(m);if(k)om.set(k,m)});q.head.querySelectorAll('meta').forEach(m=>{let k=K(m);if(k){let o=om.get(k);if(o){o.replaceWith(m);om.delete(k)}else D.head.append(m)}});om.forEach(m=>m.remove());D.head.querySelectorAll('style[data-d]').forEach(s=>s.remove());q.head.querySelectorAll('style').forEach(s=>{s.setAttribute('data-d','');D.head.append(s)});let w=[];q.head.querySelectorAll('link[href]').forEach(l=>{let r=l.getAttribute('rel')||'',h=l.getAttribute('href');if(r==='canonical'){let o=D.head.querySelector('link[rel="canonical"]');o?o.replaceWith(l):D.head.append(l)}else if(r!=='prefetch'&&![...D.head.querySelectorAll('link')].some(e=>e.getAttribute('rel')===r&&e.getAttribute('href')===h)){if(r==='stylesheet')w.push(new Promise(v=>{l.onload=l.onerror=v;setTimeout(v,1e3)}));D.head.append(l)}});if(w.length)await Promise.all(w)},W=q=>{A(D.body,q.body);let pm=new Map;D.querySelectorAll('[data-deshi-persist]').forEach(el=>{let id=el.getAttribute('data-deshi-persist')||el.id;if(id)pm.set(id,el)});let e=D.querySelector('main'),t=q.querySelector('main'),r=D.body;if(e&&t){A(e,t);e.replaceChildren(...t.childNodes);r=e}else D.body.replaceChildren(...q.body.childNodes);if(pm.size)r.querySelectorAll('[data-deshi-persist]').forEach(el=>{let id=el.getAttribute('data-deshi-persist')||el.id,o=pm.get(id);if(o)el.replaceWith(o)});return r},X=(r,q)=>{let run=o=>{let t=o.type,s=o.getAttribute('src')||'';if(o.hasAttribute('data-deshi-no-rerun')||s.includes('/_deshi/router')||t&&!/^(text|application)\\/javascript$|^module$/i.test(t))return;let n=D.createElement('script');for(let a of o.attributes)n.setAttribute(a.name,a.value);n.textContent=o.textContent;o.replaceWith(n)};r.querySelectorAll('script').forEach(run);q.head.querySelectorAll('script[data-deshi-rerun],script[data-astro-rerun]').forEach(o=>{let n=D.createElement('script');for(let a of o.attributes)n.setAttribute(a.name,a.value);n.textContent=o.textContent;D.head.append(n)})},P=u=>{let c=navigator.connection;if(c&&(c.saveData||/2g/.test(c.effectiveType)))return;let n=N(u);if(!n||C.has(n.split('#')[0]))return;F(n).then(({t})=>Y(new DOMParser().parseFromString(t,'text/html'))).catch(()=>{})},R=()=>{if(L.pathname.length>1&&L.pathname.endsWith('/'))history.replaceState(history.state,'',B()+L.hash)},T=async(u,k=1,st=0)=>{let n=N(u);if(!n)return;let[b,h]=n.split('#');if(b===U&&k!==2){V();if(k===1)history.pushState({x:scrollX,y:scrollY},'',n);if(h)G(h)?.scrollIntoView();else if(st&&st.y!=null)scroll(st.x||0,st.y);else scroll(0,0);dispatchEvent(new CustomEvent('deshi:navigated',{detail:n}));return}if(!D.dispatchEvent(new CustomEvent('deshi:before-navigate',{detail:n,cancelable:true})))return;let id=++I;try{V();let{t,u:fu}=await F(n);if(id!==I)return;let fn=fu+(h?'#'+h:''),q=new DOMParser().parseFromString(t,'text/html');D.dispatchEvent(new CustomEvent('deshi:before-swap',{detail:{newDocument:q,url:fn}}));let sw=async()=>{await H(q);let r=W(q);X(r,q)};if(D.startViewTransition&&D.querySelector('meta[name="view-transition"],[data-deshi-transition]'))await D.startViewTransition(sw).updateCallbackDone;else await sw();if(id!==I)return;U=fu;R();if(k===1)history.pushState({x:0,y:0},'',fn);else if(k===2)history.replaceState({x:0,y:0},'',fn);D.dispatchEvent(new Event('deshi:after-swap'));let el=h&&G(h);if(el)el.scrollIntoView();else if(!k&&st&&st.y!=null)scroll(st.x||0,st.y);else scroll(0,0);(D.querySelector('[autofocus]')||D.body)?.focus?.({preventScroll:true});dispatchEvent(new CustomEvent('deshi:navigated',{detail:fn}));D.dispatchEvent(new Event('deshi:page-load'))}catch{if(id===I)L.href=n||u}};D.addEventListener('click',e=>{if(e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;let a=e.target?.closest?.('a');if(!a)return;let hr=a.getAttribute('href');if(!hr||a.target&&a.target!=='_self'||a.hasAttribute('download')||/\\bexternal\\b/i.test(a.getAttribute('rel')||'')||a.hasAttribute('data-deshi-reload')||a.hasAttribute('data-astro-reload'))return;let n=N(hr);if(!n||n===B()+L.hash)return;e.preventDefault();T(n,a.hasAttribute('data-deshi-replace')?2:1)});let pre=e=>{let a=e.target?.closest?.('a');if(!a||a.hasAttribute('data-no-prefetch'))return;let hr=a.getAttribute('href');if(hr)P(hr)};D.addEventListener('pointerover',pre,{passive:true});D.addEventListener('touchstart',pre,{passive:true});D.addEventListener('focusin',pre,{passive:true});D.head.querySelectorAll('style').forEach(s=>s.setAttribute('data-d',''));R();U=B();addEventListener('popstate',e=>T(B()+L.hash,0,e.state));window.deshi={navigate:(u,o={})=>T(u,o.replace?2:1),prefetch:P,clearCache:u=>u?C.delete(N(u)?.split('#')[0]):C.clear()};D.dispatchEvent(new Event('deshi:page-load'))})()`;
 
 export interface DeshiNavigateOptions {
   replace?: boolean;
+  forceFresh?: boolean;
 }
 
 export interface DeshiRouterAPI {
@@ -21,6 +19,17 @@ declare global {
   }
 }
 
+interface CacheEntry {
+  p: Promise<{ t: string; u: string }>;
+  ts: number;
+}
+
+interface DeshiHistoryState {
+  x: number;
+  y: number;
+  i: number;
+}
+
 export function initDeshiRouter(): DeshiRouterAPI | undefined {
   if (typeof window === 'undefined') return undefined;
   if (window.deshi) return window.deshi;
@@ -28,39 +37,68 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
   const D = document;
   const L = location;
   const CACHE_LIMIT = 50;
-  const C = new Map<string, Promise<{ t: string; u: string }>>();
+  const CACHE_TTL = 30_000;
+  const C = new Map<string, CacheEntry>();
+  const loadedScripts = new Set<string>();
   let navId = 0;
+  let historyIndex = (history.state && typeof history.state.i === 'number') ? history.state.i : 0;
+  let ignoreNextPopstate = false;
 
-  const stripSlash = (p: string): string =>
-    p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
 
-  const getBase = (): string => stripSlash(L.pathname) + L.search;
+  const NON_HTML_EXT = /\.(?:pdf|zip|tar|gz|tgz|rar|7z|mp4|webm|ogg|mp3|wav|flac|aac|m4a|avi|mov|png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|json|xml|rss|atom|csv|txt|wasm|woff2?|ttf|otf|eot|dmg|exe|apk|iso)$/i;
+
+  const getBase = (): string => L.pathname + L.search;
   let currentBase = getBase();
+  let currentUrl = currentBase + L.hash;
 
-  const normalizeUrl = (u: string): string | 0 => {
+  let serverHtmlClasses = new Set<string>(Array.from(D.documentElement.classList));
+  let serverBodyClasses = new Set<string>(Array.from(D.body ? D.body.classList : []));
+
+  D.querySelectorAll<HTMLScriptElement>('script[src]').forEach((s) => {
+    const src = s.getAttribute('src');
+    if (src) loadedScripts.add(new URL(src, L.href).href);
+  });
+
+  const normalizeUrl = (u: string): string | null => {
     try {
       const a = new URL(u, L.href);
-      return a.origin === L.origin && /^https?:$/.test(a.protocol)
-        ? stripSlash(a.pathname) + a.search + a.hash
-        : 0;
+      if (a.origin !== L.origin || !/^https?:$/.test(a.protocol)) return null;
+      if (NON_HTML_EXT.test(a.pathname)) return null;
+      return a.pathname + a.search + a.hash;
     } catch {
-      return 0;
+      return null;
     }
   };
 
-  const getMetaKey = (m: Element): string | 0 =>
-    m.getAttribute('name')
-      ? 'n:' + m.getAttribute('name')
-      : m.getAttribute('property')
-        ? 'p:' + m.getAttribute('property')
-        : m.getAttribute('http-equiv')
-          ? 'h:' + m.getAttribute('http-equiv')
-          : m.hasAttribute('charset')
-            ? 'c'
-            : 0;
+  const getEligibleAnchorUrl = (anchor: HTMLAnchorElement | null, forPrefetch: boolean): string | null => {
+    if (!anchor) return null;
 
+    const href = anchor.getAttribute('href');
+    if (
+      !href ||
+      (anchor.target && anchor.target !== '_self') ||
+      anchor.hasAttribute('download') ||
+      /\bexternal\b/i.test(anchor.getAttribute('rel') || '') ||
+      anchor.hasAttribute('data-deshi-reload') ||
+      anchor.hasAttribute('data-astro-reload') ||
+      (forPrefetch && anchor.hasAttribute('data-no-prefetch'))
+    ) {
+      return null;
+    }
+    const normalized = normalizeUrl(href);
+    if (!normalized) return null;
 
-  const syncAttributes = (target: Element | null, source: Element | null): void => {
+    if (forPrefetch) {
+      const base = normalized.split('#')[0];
+      if (base === currentBase) return null;
+    }
+    return normalized;
+  };
+
+  const syncAllAttributes = (target: Element | null, source: Element | null): void => {
     if (!target || !source) return;
     for (const attr of Array.from(target.attributes)) {
       if (!source.hasAttribute(attr.name)) {
@@ -74,8 +112,38 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
     }
   };
 
+  const syncRootElement = (
+    target: HTMLElement | null,
+    source: HTMLElement | null,
+    prevServerClasses: Set<string>
+  ): Set<string> => {
+    if (!target || !source) return prevServerClasses;
+
+    for (const attrName of ['lang', 'dir']) {
+      const val = source.getAttribute(attrName);
+      if (val !== null) {
+        if (target.getAttribute(attrName) !== val) target.setAttribute(attrName, val);
+      } else if (target.hasAttribute(attrName)) {
+        target.removeAttribute(attrName);
+      }
+    }
+
+    const nextServerClasses = new Set<string>(Array.from(source.classList));
+    prevServerClasses.forEach((cls) => {
+      if (!nextServerClasses.has(cls)) target.classList.remove(cls);
+    });
+    nextServerClasses.forEach((cls) => {
+      if (!target.classList.contains(cls)) target.classList.add(cls);
+    });
+
+    return nextServerClasses;
+  };
+
   const saveScrollState = (): void => {
-    history.replaceState({ ...history.state, x: scrollX, y: scrollY }, '');
+    history.replaceState(
+      { ...history.state, x: scrollX, y: scrollY, i: historyIndex } as DeshiHistoryState,
+      ''
+    );
   };
 
   const findHashElement = (hash: string): Element | null => {
@@ -84,7 +152,6 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
     try {
       decoded = decodeURIComponent(hash);
     } catch {
-      // Keep raw hash if malformed percent encoding
     }
     return (
       D.getElementById(decoded) ||
@@ -94,12 +161,17 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
     );
   };
 
-  const fetchPage = (u: string): Promise<{ t: string; u: string }> => {
+  const fetchPage = (u: string, forceFresh = false): Promise<{ t: string; u: string }> => {
     const key = u.split('#')[0];
+    const now = Date.now();
     const cached = C.get(key);
-    if (cached) return cached;
 
-    if (C.size > CACHE_LIMIT) {
+    if (!forceFresh && cached && now - cached.ts < CACHE_TTL) {
+      return cached.p;
+    }
+    if (cached) C.delete(key);
+
+    if (C.size >= CACHE_LIMIT) {
       const oldestKey = C.keys().next().value;
       if (oldestKey) C.delete(oldestKey);
     }
@@ -112,7 +184,11 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
     })
       .then(async (res) => {
         const contentType = res.headers.get('content-type') || '';
-        if (!res.ok || !contentType.includes('html')) {
+        if (!res.ok || !/text\/html|application\/xhtml\+xml/i.test(contentType)) {
+          try {
+            await res.body?.cancel?.();
+          } catch {
+          }
           throw new Error('Non-HTML or error response');
         }
         const finalUrl = res.redirected ? normalizeUrl(res.url) : key;
@@ -129,7 +205,7 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
         throw err;
       });
 
-    C.set(key, promise);
+    C.set(key, { p: promise, ts: now });
     return promise;
   };
 
@@ -142,60 +218,73 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
       ) {
         const prefetchLink = D.createElement('link');
         prefetchLink.rel = 'prefetch';
-        prefetchLink.as = 'style';
         prefetchLink.href = href;
+        const cleanup = () => prefetchLink.remove();
+        prefetchLink.addEventListener('load', cleanup, { once: true });
+        prefetchLink.addEventListener('error', cleanup, { once: true });
+        setTimeout(cleanup, 10_000);
         D.head.append(prefetchLink);
       }
     }
   };
 
+  const getMetaSignature = (m: Element): string => {
+    const parts: string[] = [];
+    for (const attr of Array.from(m.attributes)) {
+      parts.push(`${attr.name}=${attr.value}`);
+    }
+    parts.sort();
+    return parts.join('&');
+  };
+
   const syncHead = async (doc: Document): Promise<void> => {
-    if (doc.title != null) D.title = doc.title;
-    syncAttributes(D.documentElement, doc.documentElement);
+    const titleEl = doc.querySelector('title');
+    if (titleEl && doc.title) {
+      D.title = doc.title;
+    }
 
-    // Diff & sync <meta> tags
-    const oldMetas = new Map<string, Element>();
-    D.head.querySelectorAll('meta').forEach((m) => {
-      const k = getMetaKey(m);
-      if (k) oldMetas.set(k, m);
-    });
+    serverHtmlClasses = syncRootElement(D.documentElement, doc.documentElement, serverHtmlClasses);
 
-    doc.head.querySelectorAll('meta').forEach((m) => {
-      const k = getMetaKey(m);
-      if (k) {
-        const existing = oldMetas.get(k);
-        if (existing) {
-          existing.replaceWith(m);
-          oldMetas.delete(k);
-        } else {
-          D.head.append(m);
-        }
+    const existingMetas = Array.from(D.head.querySelectorAll('meta:not([data-deshi-persist])'));
+    const keptMetas = new Set<Element>();
+
+    doc.head.querySelectorAll('meta').forEach((newMeta) => {
+      const sig = getMetaSignature(newMeta);
+      const match = existingMetas.find((oldMeta) => !keptMetas.has(oldMeta) && getMetaSignature(oldMeta) === sig);
+      if (match) {
+        keptMetas.add(match);
+      } else {
+        D.head.append(newMeta);
       }
     });
-    oldMetas.forEach((m) => m.remove());
 
-    D.head.querySelectorAll('style[data-d]').forEach((s) => s.remove());
-    doc.head.querySelectorAll('style').forEach((s) => {
-      s.setAttribute('data-d', '');
-      D.head.append(s);
+    existingMetas.forEach((oldMeta) => {
+      if (!keptMetas.has(oldMeta)) oldMeta.remove();
     });
 
+    const existingStylesheets = Array.from(
+      D.head.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]:not([data-deshi-persist])')
+    );
+    const keptStylesheets = new Set<HTMLLinkElement>();
     const pendingStyles: Promise<unknown>[] = [];
-    doc.head.querySelectorAll('link[href]').forEach((l) => {
-      const rel = l.getAttribute('rel') || '';
+
+    doc.head.querySelectorAll<HTMLLinkElement>('link[href]').forEach((l) => {
+      const rel = (l.getAttribute('rel') || '').trim().toLowerCase();
       const href = l.getAttribute('href');
+      if (!href || rel === 'prefetch') return;
 
       if (rel === 'canonical') {
         const existingCanonical = D.head.querySelector('link[rel="canonical"]');
         if (existingCanonical) existingCanonical.replaceWith(l);
         else D.head.append(l);
-      } else if (
-        rel !== 'prefetch' &&
-        !Array.from(D.head.querySelectorAll('link')).some(
-          (el) => el.getAttribute('rel') === rel && el.getAttribute('href') === href
-        )
-      ) {
-        if (rel === 'stylesheet') {
+        return;
+      }
+
+      if (rel === 'stylesheet') {
+        const existing = existingStylesheets.find((el) => el.getAttribute('href') === href);
+        if (existing) {
+          keptStylesheets.add(existing);
+        } else {
           pendingStyles.push(
             new Promise((resolve) => {
               l.addEventListener('load', resolve, { once: true });
@@ -203,80 +292,230 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
               setTimeout(resolve, 1000);
             })
           );
+          D.head.append(l);
         }
+        return;
+      }
+
+      const duplicateLink = Array.from(D.head.querySelectorAll('link')).some(
+        (el) => el.getAttribute('rel') === rel && el.getAttribute('href') === href
+      );
+      if (!duplicateLink) {
         D.head.append(l);
       }
+    });
+
+    const oldStyles = Array.from(D.head.querySelectorAll('style[data-d]'));
+    doc.head.querySelectorAll('style').forEach((s) => {
+      s.setAttribute('data-d', '');
+      D.head.append(s);
     });
 
     if (pendingStyles.length > 0) {
       await Promise.all(pendingStyles);
     }
+
+    oldStyles.forEach((s) => s.remove());
+    existingStylesheets.forEach((el) => {
+      if (!keptStylesheets.has(el)) el.remove();
+    });
   };
 
-
   const swapBodyOrMain = (doc: Document): HTMLElement => {
-    syncAttributes(D.body, doc.body);
+    serverBodyClasses = syncRootElement(D.body, doc.body, serverBodyClasses);
+
+    const currentMain = D.querySelector('main');
+    const nextMain = doc.querySelector('main');
+    const swappedRoot: HTMLElement = currentMain && nextMain ? currentMain : D.body;
+    const incomingRoot: HTMLElement = currentMain && nextMain ? nextMain : doc.body;
+
+    if (currentMain && nextMain) {
+      syncAllAttributes(currentMain, nextMain);
+    }
 
     const persistedNodes = new Map<string, Element>();
-    D.querySelectorAll('[data-deshi-persist]').forEach((el) => {
+    swappedRoot.querySelectorAll('[data-deshi-persist]').forEach((el) => {
       const id = el.getAttribute('data-deshi-persist') || el.id;
       if (id) persistedNodes.set(id, el);
     });
 
-    const currentMain = D.querySelector('main');
-    const nextMain = doc.querySelector('main');
-    let swappedRoot: HTMLElement = D.body;
-
-    if (currentMain && nextMain) {
-      syncAttributes(currentMain, nextMain);
-      currentMain.replaceChildren(...Array.from(nextMain.childNodes));
-      swappedRoot = currentMain;
-    } else {
-      D.body.replaceChildren(...Array.from(doc.body.childNodes));
+    const announcer = D.getElementById('deshi-announcer');
+    if (announcer && swappedRoot === D.body) {
+      persistedNodes.set('__deshi_announcer__', announcer);
     }
 
-    if (persistedNodes.size > 0) {
-      swappedRoot.querySelectorAll('[data-deshi-persist]').forEach((el) => {
-        const id = el.getAttribute('data-deshi-persist') || el.id;
-        const saved = id ? persistedNodes.get(id) : undefined;
-        if (saved) el.replaceWith(saved);
-      });
+    if (persistedNodes.size === 0) {
+      swappedRoot.replaceChildren(...Array.from(incomingRoot.childNodes));
+      return swappedRoot;
+    }
+
+    const directPersisted = new Set<Element>();
+    persistedNodes.forEach((el) => {
+      if (el.parentElement === swappedRoot) directPersisted.add(el);
+    });
+
+    for (const child of Array.from(swappedRoot.childNodes)) {
+      if (!(child instanceof Element && directPersisted.has(child))) {
+        child.remove();
+      }
+    }
+
+    for (const incomingChild of Array.from(incomingRoot.childNodes)) {
+      if (incomingChild instanceof Element) {
+        const persistId = incomingChild.getAttribute('data-deshi-persist') || incomingChild.id;
+        if (incomingChild.hasAttribute('data-deshi-persist') && persistId && persistedNodes.has(persistId)) {
+          const liveNode = persistedNodes.get(persistId)!;
+          const rootWithMove = swappedRoot as HTMLElement & {
+            moveBefore?: (node: Node, child: Node | null) => void;
+          };
+          if (liveNode.parentElement === swappedRoot && typeof rootWithMove.moveBefore === 'function') {
+            rootWithMove.moveBefore(liveNode, null);
+          } else if (liveNode.parentElement !== swappedRoot) {
+            swappedRoot.append(liveNode);
+          }
+          continue;
+        }
+      }
+      swappedRoot.append(incomingChild);
+    }
+
+    swappedRoot.querySelectorAll('[data-deshi-persist]').forEach((placeholder) => {
+      const id = placeholder.getAttribute('data-deshi-persist') || placeholder.id;
+      const saved = id ? persistedNodes.get(id) : undefined;
+      if (saved && saved !== placeholder) {
+        const parentWithMove = placeholder.parentElement as (HTMLElement & {
+          moveBefore?: (node: Node, child: Node | null) => void;
+        }) | null;
+        if (parentWithMove && typeof parentWithMove.moveBefore === 'function' && saved.isConnected) {
+          parentWithMove.moveBefore(saved, placeholder);
+          placeholder.remove();
+        } else {
+          placeholder.replaceWith(saved);
+        }
+      }
+    });
+
+    directPersisted.forEach((el) => {
+      if (el.id === 'deshi-announcer') return;
+      const id = el.getAttribute('data-deshi-persist') || el.id;
+      const stillPresent =
+        id &&
+        Array.from(incomingRoot.querySelectorAll('[data-deshi-persist]')).some(
+          (n) => (n.getAttribute('data-deshi-persist') || n.id) === id
+        );
+      if (!stillPresent && !el.hasAttribute('data-deshi-keep')) {
+        el.remove();
+      }
+    });
+
+    if (announcer && !announcer.isConnected) {
+      D.body.append(announcer);
     }
 
     return swappedRoot;
   };
 
   const executeScripts = (container: HTMLElement, doc: Document): void => {
-    const runScript = (oldScript: HTMLScriptElement) => {
-      const type = oldScript.type;
+    const createRunnableScript = (oldScript: HTMLScriptElement): HTMLScriptElement | null => {
+      const type = (oldScript.type || '').trim();
       const src = oldScript.getAttribute('src') || '';
+      const forceRerun =
+        oldScript.hasAttribute('data-deshi-rerun') || oldScript.hasAttribute('data-astro-rerun');
+
       if (
         oldScript.hasAttribute('data-deshi-no-rerun') ||
         src.includes('/_deshi/router') ||
         (type && !/^(text|application)\/javascript$|^module$/i.test(type))
       ) {
-        return;
+        return null;
       }
+
+      if (src) {
+        const absSrc = new URL(src, L.href).href;
+        if (loadedScripts.has(absSrc) && !forceRerun) {
+          return null;
+        }
+        loadedScripts.add(absSrc);
+      }
+
       const freshScript = D.createElement('script');
       for (const attr of Array.from(oldScript.attributes)) {
         freshScript.setAttribute(attr.name, attr.value);
       }
-      freshScript.textContent = oldScript.textContent;
-      oldScript.replaceWith(freshScript);
+
+      if (!oldScript.hasAttribute('async')) {
+        freshScript.async = false;
+      }
+
+      const isModule = /^module$/i.test(type);
+      const code = oldScript.textContent || '';
+      if (!src && code.trim() && !isModule) {
+        freshScript.textContent = `{\n${code}\n}`;
+      } else {
+        freshScript.textContent = code;
+      }
+
+      return freshScript;
     };
 
-    container.querySelectorAll('script').forEach(runScript);
+    container.querySelectorAll<HTMLScriptElement>('script').forEach((oldScript) => {
+      if (oldScript.closest('[data-deshi-persist]')) return;
+      const freshScript = createRunnableScript(oldScript);
+      if (freshScript) {
+        oldScript.replaceWith(freshScript);
+      }
+    });
+
+    D.head.querySelectorAll('script[data-d-rerun]').forEach((s) => s.remove());
 
     doc.head
       .querySelectorAll<HTMLScriptElement>('script[data-deshi-rerun],script[data-astro-rerun]')
       .forEach((oldScript) => {
-        const freshScript = D.createElement('script');
-        for (const attr of Array.from(oldScript.attributes)) {
-          freshScript.setAttribute(attr.name, attr.value);
+        const freshScript = createRunnableScript(oldScript);
+        if (freshScript) {
+          freshScript.setAttribute('data-d-rerun', '');
+          D.head.append(freshScript);
         }
-        freshScript.textContent = oldScript.textContent;
-        D.head.append(freshScript);
       });
+  };
+
+  const manageFocusAndAnnounce = (): void => {
+    const autoFocusEl = D.querySelector<HTMLElement>('[autofocus]');
+    if (autoFocusEl) {
+      autoFocusEl.focus({ preventScroll: true });
+    } else {
+      const target = D.querySelector<HTMLElement>('main') || D.body;
+      if (target) {
+        const hadTabIndex = target.hasAttribute('tabindex');
+        if (!hadTabIndex) {
+          target.setAttribute('tabindex', '-1');
+          target.addEventListener(
+            'blur',
+            () => {
+              target.removeAttribute('tabindex');
+            },
+            { once: true }
+          );
+        }
+        target.focus({ preventScroll: true });
+      }
+    }
+
+    let announcer = D.getElementById('deshi-announcer');
+    if (!announcer && D.body) {
+      announcer = D.createElement('div');
+      announcer.id = 'deshi-announcer';
+      announcer.setAttribute('aria-live', 'polite');
+      announcer.setAttribute('aria-atomic', 'true');
+      announcer.setAttribute('data-deshi-persist', '__deshi_announcer__');
+      announcer.style.cssText =
+        'position:fixed;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;';
+      D.body.append(announcer);
+    }
+    if (announcer) {
+      const heading = D.querySelector('h1')?.textContent?.trim();
+      announcer.textContent = D.title || heading || '';
+    }
   };
 
   const prefetch = (u: string): void => {
@@ -286,7 +525,12 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
     if (conn && (conn.saveData || /2g/.test(conn.effectiveType || ''))) return;
 
     const normalized = normalizeUrl(u);
-    if (!normalized || C.has(normalized.split('#')[0])) return;
+    if (!normalized) return;
+    const key = normalized.split('#')[0];
+    if (key === currentBase) return;
+
+    const cached = C.get(key);
+    if (cached && Date.now() - cached.ts < CACHE_TTL) return;
 
     fetchPage(normalized)
       .then(({ t }) => {
@@ -296,37 +540,43 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
       .catch(() => {});
   };
 
-
-  const normalizeCurrentHistory = (): void => {
-    if (L.pathname.length > 1 && L.pathname.endsWith('/')) {
-      history.replaceState(history.state, '', getBase() + L.hash);
-    }
-  };
-
-  /**
-   * Core navigation handler.
-   * @param u Target URL
-   * @param historyMode 0 = popstate, 1 = pushState, 2 = replaceState
-   * @param popState Optional history state object from popstate event
-   */
   const navigateInternal = async (
     u: string,
     historyMode: 0 | 1 | 2 = 1,
-    popState: { x?: number; y?: number } | null = null
+    popState: DeshiHistoryState | null = null,
+    forceFresh = false
   ): Promise<void> => {
     const normalized = normalizeUrl(u);
     if (!normalized) return;
 
     const [base, hash] = normalized.split('#');
 
-    if (base === currentBase && historyMode !== 2) {
+    if (base === currentBase && historyMode !== 2 && !forceFresh) {
+      const oldFullUrl = L.href;
       saveScrollState();
-      if (historyMode === 1) {
-        history.pushState({ x: scrollX, y: scrollY }, '', normalized);
+
+      if (historyMode === 1 && normalized !== currentUrl) {
+        if (hash) {
+          L.hash = hash;
+          historyIndex++;
+          history.replaceState({ x: scrollX, y: scrollY, i: historyIndex } as DeshiHistoryState, '');
+        } else {
+          historyIndex++;
+          history.pushState(
+            { x: scrollX, y: scrollY, i: historyIndex } as DeshiHistoryState,
+            '',
+            normalized
+          );
+          window.dispatchEvent(
+            new HashChangeEvent('hashchange', { oldURL: oldFullUrl, newURL: L.href })
+          );
+        }
       }
+
+      currentUrl = normalized;
       if (hash) {
         findHashElement(hash)?.scrollIntoView();
-      } else if (popState && popState.y != null) {
+      } else if (historyMode === 0 && popState && popState.y != null) {
         scroll(popState.x || 0, popState.y);
       } else {
         scroll(0, 0);
@@ -341,13 +591,29 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
         cancelable: true,
       })
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (historyMode === 0) {
+        if (popState && typeof popState.i === 'number' && popState.i !== historyIndex) {
+          ignoreNextPopstate = true;
+          history.go(historyIndex - popState.i);
+        } else {
+          history.replaceState({ x: scrollX, y: scrollY, i: historyIndex } as DeshiHistoryState, '', currentUrl);
+        }
+      }
+      return;
+    }
 
     const currentNavId = ++navId;
+    const prevUrl = currentUrl;
+    const prevBase = currentBase;
+    const prevIndex = historyIndex;
 
     try {
-      saveScrollState();
-      const { t, u: finalBase } = await fetchPage(normalized);
+      if (historyMode !== 0) {
+        saveScrollState();
+      }
+
+      const { t, u: finalBase } = await fetchPage(normalized, forceFresh);
 
       if (currentNavId !== navId) return;
 
@@ -359,6 +625,27 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
           detail: { newDocument: doc, url: finalUrl },
         })
       );
+
+      if (historyMode === 1) {
+        historyIndex++;
+        history.pushState({ x: 0, y: 0, i: historyIndex } as DeshiHistoryState, '', finalUrl);
+      } else if (historyMode === 2) {
+        history.replaceState({ x: 0, y: 0, i: historyIndex } as DeshiHistoryState, '', finalUrl);
+      } else if (historyMode === 0) {
+        if (popState && typeof popState.i === 'number') {
+          historyIndex = popState.i;
+        }
+        if (finalUrl !== getBase() + L.hash) {
+          history.replaceState(
+            { ...(popState || { x: 0, y: 0 }), i: historyIndex } as DeshiHistoryState,
+            '',
+            finalUrl
+          );
+        }
+      }
+
+      currentBase = finalBase;
+      currentUrl = finalUrl;
 
       const performSwap = async () => {
         await syncHead(doc);
@@ -381,15 +668,6 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
 
       if (currentNavId !== navId) return;
 
-      currentBase = finalBase;
-      normalizeCurrentHistory();
-
-      if (historyMode === 1) {
-        history.pushState({ x: 0, y: 0 }, '', finalUrl);
-      } else if (historyMode === 2) {
-        history.replaceState({ x: 0, y: 0 }, '', finalUrl);
-      }
-
       D.dispatchEvent(new Event('deshi:after-swap'));
 
       const targetEl = hash ? findHashElement(hash) : null;
@@ -401,13 +679,15 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
         scroll(0, 0);
       }
 
-      const focusTarget = D.querySelector<HTMLElement>('[autofocus]') || D.body;
-      focusTarget?.focus?.({ preventScroll: true });
+      manageFocusAndAnnounce();
 
       dispatchEvent(new CustomEvent('deshi:navigated', { detail: finalUrl }));
       D.dispatchEvent(new Event('deshi:page-load'));
     } catch {
       if (currentNavId === navId) {
+        currentBase = prevBase;
+        currentUrl = prevUrl;
+        historyIndex = prevIndex;
         L.href = normalized || u;
       }
     }
@@ -418,50 +698,51 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
       return;
     }
     const target = e.target as Element | null;
-    const anchor = target?.closest?.('a');
-    if (!anchor) return;
+    const anchor = target?.closest?.('a') as HTMLAnchorElement | null;
+    const normalized = getEligibleAnchorUrl(anchor, false);
+    if (!normalized) return;
 
-    const href = anchor.getAttribute('href');
-    if (
-      !href ||
-      (anchor.target && anchor.target !== '_self') ||
-      anchor.hasAttribute('download') ||
-      /\bexternal\b/i.test(anchor.getAttribute('rel') || '') ||
-      anchor.hasAttribute('data-deshi-reload') ||
-      anchor.hasAttribute('data-astro-reload')
-    ) {
+    e.preventDefault();
+
+    if (normalized === getBase() + L.hash) {
+      const hash = normalized.split('#')[1];
+      if (hash) findHashElement(hash)?.scrollIntoView();
+      else scroll(0, 0);
       return;
     }
 
-    const normalized = normalizeUrl(href);
-    if (!normalized || normalized === getBase() + L.hash) return;
-
-    e.preventDefault();
-    navigateInternal(normalized, anchor.hasAttribute('data-deshi-replace') ? 2 : 1);
+    navigateInternal(normalized, anchor!.hasAttribute('data-deshi-replace') ? 2 : 1);
   });
 
   const handlePrefetchEvent = (e: Event) => {
     const target = e.target as Element | null;
-    const anchor = target?.closest?.('a');
-    if (!anchor || anchor.hasAttribute('data-no-prefetch')) return;
-    const href = anchor.getAttribute('href');
-    if (href) prefetch(href);
+    const anchor = target?.closest?.('a') as HTMLAnchorElement | null;
+    const eligibleUrl = getEligibleAnchorUrl(anchor, true);
+    if (eligibleUrl) prefetch(eligibleUrl);
   };
 
   D.addEventListener('pointerover', handlePrefetchEvent, { passive: true });
   D.addEventListener('touchstart', handlePrefetchEvent, { passive: true });
   D.addEventListener('focusin', handlePrefetchEvent, { passive: true });
 
+  D.addEventListener('submit', () => {
+    C.clear();
+  });
+
   D.head.querySelectorAll('style').forEach((s) => s.setAttribute('data-d', ''));
-  normalizeCurrentHistory();
-  currentBase = getBase();
+  history.replaceState({ ...history.state, x: scrollX, y: scrollY, i: historyIndex } as DeshiHistoryState, '');
 
   addEventListener('popstate', (e: PopStateEvent) => {
-    navigateInternal(getBase() + L.hash, 0, e.state);
+    if (ignoreNextPopstate) {
+      ignoreNextPopstate = false;
+      return;
+    }
+    navigateInternal(getBase() + L.hash, 0, e.state as DeshiHistoryState | null);
   });
 
   const api: DeshiRouterAPI = {
-    navigate: (u, opts = {}) => navigateInternal(u, opts.replace ? 2 : 1),
+    navigate: (u, opts = {}) =>
+      navigateInternal(u, opts.replace ? 2 : 1, null, Boolean(opts.forceFresh)),
     prefetch,
     clearCache: (u) => {
       if (u) {
@@ -477,3 +758,20 @@ export function initDeshiRouter(): DeshiRouterAPI | undefined {
   D.dispatchEvent(new Event('deshi:page-load'));
   return api;
 }
+
+function computeContentHash(str: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+export const CLIENT_ROUTER_SCRIPT: string = `(${initDeshiRouter.toString()})()`;
+
+export const CLIENT_ROUTER_HASH: string = computeContentHash(CLIENT_ROUTER_SCRIPT);
+
+export const CLIENT_ROUTER_FILENAME: string = `router.${CLIENT_ROUTER_HASH}.js`;
+
+export const CLIENT_ROUTER_PATH: string = `/_deshi/${CLIENT_ROUTER_FILENAME}`;
