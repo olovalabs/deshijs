@@ -184,6 +184,49 @@ describe('function-scoped var declarations', () => {
   });
 });
 
+describe('unclosed frontmatter fences', () => {
+  it('reports the fence and does not emit the server text as HTML', () => {
+    const result = compile('---\nconst x = 1;', { file: 'edge.deshi' });
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'PF1001',
+      severity: 'error',
+      message: expect.stringContaining('frontmatter'),
+    }));
+    expect(result.script.bindings).toContain('x');
+    expect(result.code).toContain('const x = 1');
+    expect(result.code).not.toContain('$o += "---');
+    expect(result.ast.children).toEqual([]);
+  });
+
+  it('keeps markup after an unclosed fence out of the template', () => {
+    const result = compile('---\nconst x = 1;\n<p>secret</p>', { file: 'edge.deshi' });
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ code: 'PF1001' }));
+    const text = JSON.stringify(result.ast);
+    expect(text).not.toContain('secret');
+  });
+
+  it.each(['---\nconst x = 1;\n---\n<p>{x}</p>', '  ---\nconst x = 1;\n---\n<p>{x}</p>'])(
+    'still accepts a closed fence: %j',
+    async (source) => {
+      const result = await render(source);
+      expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+      expect(result.pages[0]?.html).toContain('<p>1</p>');
+    },
+  );
+});
+
+describe('deep HTML nesting', () => {
+  it('compiles thousands of nested elements without overflowing the stack', () => {
+    // Node 22 overflows near 2_000 nested elements. This host's recursive
+    // conversion overflows near 15_000. Stay above both.
+    const depth = 16_000;
+    const html = '<div>'.repeat(depth) + 'leaf' + '</div>'.repeat(depth);
+    const result = compile(html, { file: 'deep.deshi' });
+    expect(result.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(result.code).toContain(html);
+  });
+});
+
 describe('empty input smoke tests', () => {
   it.each(['', ' \n\t'])('compiles empty or whitespace-only source %j', (source) => {
     const result = compile(source, { file: 'src/empty.deshi' });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { scanStartTag, duplicateAttrNames, planAttributes } from '../attrs';
 import { compile, __clearCompileMemoForTests } from '../index';
 import { build } from '../build';
-import { walk, children, findNodes, cloneNodes } from '../ast/walk';
+import { walk, children, findNodes, cloneNode, cloneNodes } from '../ast/walk';
 import {
   referencesIdentifier,
   propertyAccesses,
@@ -185,6 +185,27 @@ describe('ast/walk', () => {
     expect(copy.map((n) => n.type)).toEqual(r.children.map((n) => n.type));
     expect(copy[0]).not.toBe(r.children[0]);
     expect((copy[0] as { children: Node[] }).children).not.toBe((r.children[0] as { children: Node[] }).children);
+  });
+
+  it('walks and clones a very deep tree without host recursion', () => {
+    const loc = { line: 1, column: 1, start: 0, end: 4 };
+    let node: ReturnType<typeof buildAst>['children'][number] = { type: 'Text', value: 'leaf', loc };
+    for (let i = 0; i < 20_000; i++) {
+      node = { type: 'Element', name: 'div', attrs: [], children: [node], loc, scoped: false };
+    }
+    let seen = 0;
+    walk(node, () => { seen++; });
+    expect(seen).toBe(20_001);
+    const copy = cloneNode(node);
+    expect(copy).not.toBe(node);
+    let depth = 0;
+    let cur = copy;
+    while (cur.type === 'Element') {
+      depth++;
+      cur = cur.children[0];
+    }
+    expect(depth).toBe(20_000);
+    expect(cur).toMatchObject({ type: 'Text', value: 'leaf' });
   });
 
   it('children() is the single source of traversal truth', () => {

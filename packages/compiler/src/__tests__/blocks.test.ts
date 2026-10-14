@@ -30,6 +30,27 @@ describe('splitBlocks', () => {
     expect(res.script).toBeDefined();
   });
 
+  it('commits an unclosed leading frontmatter fence and diagnoses it', () => {
+    const src = '---\nconst x = 1;\n<p>secret</p>';
+    const res = splitBlocks(src, 'edge.deshi');
+    expect(res.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'PF1001',
+      message: expect.stringContaining('frontmatter'),
+    }));
+    expect(res.script?.content).toContain('const x = 1');
+    expect(res.script?.content).toContain('<p>secret</p>');
+    expect(res.template).not.toContain('secret');
+    expect(res.template).not.toContain('const');
+  });
+
+  it('does not treat a leading --- without a fence newline as frontmatter', () => {
+    const src = '--- const x = 1;';
+    const res = splitBlocks(src, 'edge.deshi');
+    expect(res.diagnostics).toEqual([]);
+    expect(res.script).toBeUndefined();
+    expect(res.template).toContain(src);
+  });
+
   it('collects <style> blocks and blanks them from the template', () => {
     const src = `<style>.a { color: red; }</style>\n<div/>`;
     const res = splitBlocks(src, 'src/page.deshi');
