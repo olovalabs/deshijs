@@ -81,10 +81,15 @@ function genExprCode(expr: Expression, g: G): string {
   return `(${code})`;
 }
 
-function genElement(el: Element, em: Em, g: G): void {
+/**
+ * Write an element's opening tag (and, for void / set:html / set:text, the
+ * whole element). Returns the children that still need to be emitted before
+ * the closing tag, or null when the element is finished.
+ */
+function genElement(el: Element, em: Em, g: G): { children: Node[]; raw: boolean } | null {
   if (el.isDocHead) {
     genDocHead(el, em, g);
-    return;
+    return null;
   }
   em.str('<' + el.name);
   // The attribute planner folds class/class:list, style/define:vars and spreads
@@ -100,13 +105,23 @@ function genElement(el: Element, em: Em, g: G): void {
   }
   if (plan.scopeAttr) em.str(' ' + plan.scopeAttr);
   em.str('>');
-  if (VOID.has(el.name.toLowerCase())) return;
+  if (VOID.has(el.name.toLowerCase())) return null;
   const setHtml = el.attrs.find((a) => a.kind === 'setHtml') as { expr: Expression } | undefined;
   const setText = el.attrs.find((a) => a.kind === 'setText') as { expr: Expression } | undefined;
-  if (setHtml) em.expr(`(await unsafe(${genExprCode(setHtml.expr, g)}))`, true);
-  else if (setText) em.expr(`(await esc(${genExprCode(setText.expr, g)}))`, true);
-  else genNodes(el.children, em, g, el.name.toLowerCase() === 'script' || el.name.toLowerCase() === 'style');
-  em.str(`</${el.name}>`);
+  if (setHtml) {
+    em.expr(`(await unsafe(${genExprCode(setHtml.expr, g)}))`, true);
+    em.str(`</${el.name}>`);
+    return null;
+  }
+  if (setText) {
+    em.expr(`(await esc(${genExprCode(setText.expr, g)}))`, true);
+    em.str(`</${el.name}>`);
+    return null;
+  }
+  return {
+    children: el.children,
+    raw: el.name.toLowerCase() === 'script' || el.name.toLowerCase() === 'style',
+  };
 }
 
 function genDocHead(el: Element, em: Em, g: G): void {
@@ -174,25 +189,49 @@ function genSlot(s: Slot, em: Em, g: G): void {
 }
 
 function genNodes(nodes: Node[], em: Em, g: G, rawText = false): void {
-  for (const n of nodes) {
+  // Element nesting is a stack, not host recursion. JSX inside an expression
+  // calls genNodes again and gets its own stack; that depth is expression
+  // nesting, not the HTML tree.
+  type Frame =
+    | { kind: 'list'; nodes: Node[]; index: number; em: Em; raw: boolean }
+    | { kind: 'close'; em: Em; html: string };
+  const stack: Frame[] = [{ kind: 'list', nodes, index: 0, em, raw: rawText }];
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+    if (frame.kind === 'close') {
+      frame.em.str(frame.html);
+      stack.pop();
+      continue;
+    }
+    if (frame.index >= frame.nodes.length) {
+      stack.pop();
+      continue;
+    }
+    const n = frame.nodes[frame.index++];
     switch (n.type) {
       case 'Text':
-        em.str(rawText ? n.value : escapeHtml(n.value));
+        frame.em.str(frame.raw ? n.value : escapeHtml(n.value));
         break;
       case 'Expression':
-        em.expr(`(await esc(${genExprCode(n, g)}))`, true);
+        frame.em.expr(`(await esc(${genExprCode(n, g)}))`, true);
         break;
-      case 'Element':
-        genElement(n, em, g);
+      case 'Element': {
+        const open = genElement(n, frame.em, g);
+        if (open) {
+          stack.push({ kind: 'close', em: frame.em, html: `</${n.name}>` });
+          stack.push({ kind: 'list', nodes: open.children, index: 0, em: frame.em, raw: open.raw });
+        }
         break;
+      }
       case 'Component':
-        genComponent(n, em, g);
+        genComponent(n, frame.em, g);
         break;
       case 'Slot':
-        genSlot(n, em, g);
+        genSlot(n, frame.em, g);
         break;
       case 'Fragment':
-        genNodes(n.children, em, g);
+        // Fragments do not inherit raw-text mode from the surrounding list.
+        stack.push({ kind: 'list', nodes: n.children, index: 0, em: frame.em, raw: false });
         break;
       case 'HeadBlock': {
         const h = new Em();
@@ -201,13 +240,13 @@ function genNodes(nodes: Node[], em: Em, g: G, rawText = false): void {
         break;
       }
       case 'Comment':
-        em.str(`<!--${n.value}-->`);
+        frame.em.str(`<!--${n.value}-->`);
         break;
       case 'Doctype':
-        em.str('<!doctype html>');
+        frame.em.str('<!doctype html>');
         break;
       case 'Root':
-        genNodes(n.children, em, g);
+        stack.push({ kind: 'list', nodes: n.children, index: 0, em: frame.em, raw: false });
         break;
     }
   }
