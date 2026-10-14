@@ -274,13 +274,20 @@ function restoreHeadSlots(root: Root, ctx: ConvCtx): void {
     return nodes.length;
   };
 
+  // Loop, not recursion: the slot can sit inside a very deep element chain.
   const innermost = (nodes: Node[], at: number): [Node[], number] => {
-    for (const child of nodes) {
-      if (child.type !== 'Element' && child.type !== 'HeadBlock') continue;
-      if (child.loc.start > at || child.loc.end <= at) continue;
-      return innermost(child.children, at);
+    let list = nodes;
+    for (;;) {
+      let deeper: Node[] | null = null;
+      for (const child of list) {
+        if (child.type !== 'Element' && child.type !== 'HeadBlock') continue;
+        if (child.loc.start > at || child.loc.end <= at) continue;
+        deeper = child.children;
+        break;
+      }
+      if (!deeper) return [list, insertIndex(list, at)];
+      list = deeper;
     }
-    return [nodes, insertIndex(nodes, at)];
   };
 
   for (const s of pending) {
@@ -521,10 +528,345 @@ function applyWhitespace(nodes: Node[], parentName: string | null, ctx: ConvCtx)
   return out;
 }
 
+function convertText(n: P5.TextNode, ctx: ConvCtx, clip: Range): Node[] {
+  const l = n.sourceCodeLocation;
+  if (!l) return [{ type: 'Text', value: n.value, loc: { line: 1, column: 1, start: 0, end: 0 } }];
+  // Clip to the parent's content: parse5 hangs trailing whitespace off the
+  // end tag it follows, so a node's raw range can otherwise cover `</body>`.
+  const start = Math.max(l.startOffset, clip.start);
+  const end = Math.min(l.endOffset, clip.end);
+  if (end <= start) return [];
+  // HTML raw-text elements do not decode character references. Their bodies
+  // are JS/CSS (including literal braces), not template expressions.
+  const parent = n.parentNode;
+  if (parent && 'tagName' in parent && (parent.tagName === 'script' || parent.tagName === 'style')) {
+    return [{ type: 'Text', value: ctx.pre.text.slice(start, end), loc: locAt(ctx.source, start, end) }];
+  }
+  return splitText(ctx.pre.text, start, end, ctx);
+}
+
+function convertComment(n: P5.CommentNode, ctx: ConvCtx): Node[] {
+  const data = n.data;
+  const loc = nodeLoc(n, ctx);
+  if (data.startsWith('deshi-slot:')) {
+    return [{ type: 'Slot', name: data.slice('deshi-slot:'.length), fallback: [], loc }];
+  }
+  if (data.startsWith('!')) return [{ type: 'Comment', value: data.slice(1), loc }];
+  return [];
+}
+
+/**
+ * parse5 tree → Deshi nodes.
+ *
+ * An explicit stack, not recursion. A few thousand nested elements overflow
+ * the host call stack (Node 22 fails near 2,000) because each level used to
+ * call back into this function. Sibling order, whitespace folding, self-closing
+ * hoisting, and the `inRootBody` flag still follow the old call order.
+ */
 function convertChildren(children: P5.ChildNode[], parentName: string | null, ctx: ConvCtx, clip: Range): Node[] {
-  const out: Node[] = [];
-  for (const c of children) out.push(...convertNode(c, ctx, clip));
-  return applyWhitespace(out, parentName, ctx);
+  type Branch = 'fragment' | 'component' | 'slot' | 'head-block' | 'head-el' | 'element';
+  interface ListFrame {
+    kind: 'list';
+    nodes: P5.ChildNode[];
+    index: number;
+    parentName: string | null;
+    clip: Range;
+    acc: Node[];
+    deliver: (nodes: Node[]) => void;
+  }
+  interface HoistFrame {
+    kind: 'hoist';
+    nodes: P5.ChildNode[];
+    index: number;
+    clip: Range;
+    acc: Node[];
+    deliver: (nodes: Node[]) => void;
+  }
+  interface ElemFrame {
+    kind: 'elem';
+    phase: 'start' | 'kids' | 'hoist';
+    el: P5.Element;
+    clip: Range;
+    loc: Loc;
+    name: string;
+    lower: string;
+    rawChildren: P5.ChildNode[];
+    selfClosed: boolean;
+    contentClip: Range;
+    branch: Branch;
+    deliver: (nodes: Node[]) => void;
+    kidsResult: Node[] | null;
+    hoistResult: Node[] | null;
+    built: Node[] | null;
+    savedInRootBody: boolean | null;
+    attrs: Attr[] | null;
+    taken: ReturnType<typeof takeClientDirectives> | null;
+    slotName: string;
+  }
+  type Frame = ListFrame | HoistFrame | ElemFrame;
+
+  const stack: Frame[] = [];
+  let rootResult: Node[] | null = null;
+
+  const pushList = (
+    nodes: P5.ChildNode[],
+    listParent: string | null,
+    listClip: Range,
+    deliver: (out: Node[]) => void,
+  ) => {
+    stack.push({ kind: 'list', nodes, index: 0, parentName: listParent, clip: listClip, acc: [], deliver });
+  };
+  const pushHoist = (nodes: P5.ChildNode[], listClip: Range, deliver: (out: Node[]) => void) => {
+    stack.push({ kind: 'hoist', nodes, index: 0, clip: listClip, acc: [], deliver });
+  };
+
+  const finish = (frame: ElemFrame, nodes: Node[]) => {
+    stack.pop();
+    frame.deliver(nodes);
+  };
+
+  const buildNode = (frame: ElemFrame, kids: Node[]): Node[] => {
+    if (frame.branch === 'fragment') return kids;
+    if (frame.branch === 'component') {
+      const taken = frame.taken!;
+      const comp: Component = {
+        type: 'Component',
+        ident: frame.name,
+        props: taken.attrs,
+        slots: bucketSlots(kids, ctx),
+        clientProps: taken.clientProps,
+        clientStrategy: taken.clientStrategy,
+        clientValue: taken.clientValue,
+        clientValueStatic: taken.clientValueStatic,
+        loc: frame.loc,
+      };
+      return [comp];
+    }
+    if (frame.branch === 'slot') {
+      const slot: Slot = { type: 'Slot', name: frame.slotName, fallback: kids, loc: frame.loc };
+      return [slot];
+    }
+    if (frame.branch === 'head-block') {
+      return [{ type: 'HeadBlock', children: kids, loc: frame.loc }];
+    }
+    if (frame.branch === 'head-el') {
+      for (const ch of kids) {
+        if (ch.type === 'Element' && !HEAD_OK.has(ch.name.toLowerCase())) {
+          fail('PF1002', `<${ch.name}> is not valid inside <head>`, ctx.file, ctx.source, ch.loc.start);
+        }
+      }
+      const headEl: Element = {
+        type: 'Element',
+        name: 'head',
+        attrs: convertAttrs(frame.el, ctx),
+        children: kids,
+        loc: frame.loc,
+        scoped: false,
+        isDocHead: true,
+      };
+      return [headEl];
+    }
+    const attrs = frame.attrs ?? [];
+    const setHtml = attrs.find((a) => a.kind === 'setHtml' || a.kind === 'setText');
+    if (setHtml && kids.some((c) => c.type !== 'Text' || c.value.trim())) {
+      fail(
+        'PF4023',
+        `An element with ${setHtml.kind === 'setHtml' ? 'set:html' : 'set:text'} must not have children`,
+        ctx.file,
+        ctx.source,
+        frame.loc.start,
+      );
+    }
+    const element: Element = {
+      type: 'Element',
+      name: frame.lower === frame.name ? frame.lower : frame.name,
+      attrs,
+      children: setHtml ? [] : kids,
+      loc: frame.loc,
+      scoped: ctx.scoped && !NO_SCOPE.has(frame.lower),
+    };
+    return [element];
+  };
+
+  const afterKids = (frame: ElemFrame) => {
+    if (frame.savedInRootBody !== null) {
+      ctx.inRootBody = frame.savedInRootBody;
+      frame.savedInRootBody = null;
+    }
+    const built = buildNode(frame, frame.kidsResult ?? []);
+    // `<tag />` does not stop the HTML parser. Children it swallowed are
+    // emitted after the element, as siblings, using the parent's clip.
+    if (frame.selfClosed && frame.rawChildren.length > 0) {
+      frame.built = built;
+      frame.phase = 'hoist';
+      pushHoist(frame.rawChildren, frame.clip, (nodes) => { frame.hoistResult = nodes; });
+      return;
+    }
+    finish(frame, built);
+  };
+
+  const requestKids = (frame: ElemFrame, listParent: string | null) => {
+    frame.phase = 'kids';
+    pushList(frame.rawChildren, listParent, frame.contentClip, (nodes) => { frame.kidsResult = nodes; });
+  };
+
+  const startElement = (frame: ElemFrame) => {
+    if (frame.branch === 'fragment') {
+      // Unlike other tags, a self-closing Fragment still converts its children
+      // in place and then hoists them again — matching the previous call shape.
+      requestKids(frame, null);
+      return;
+    }
+    if (frame.branch === 'component') {
+      if (!ctx.components.has(frame.name)) {
+        fail(
+          'PF4024',
+          `<${frame.name}> is not an imported component`,
+          ctx.file,
+          ctx.source,
+          frame.loc.start,
+          `Add: import ${frame.name} from './${frame.name}.deshi' to the <script> block.`,
+        );
+      }
+      ctx.usedComponents.add(frame.name);
+      frame.taken = takeClientDirectives(convertAttrs(frame.el, ctx, true), frame.loc, ctx, frame.name, true);
+      if (frame.selfClosed) {
+        frame.kidsResult = [];
+        afterKids(frame);
+        return;
+      }
+      requestKids(frame, 'div');
+      return;
+    }
+    if (frame.branch === 'slot') {
+      const attrs = convertAttrs(frame.el, ctx);
+      const named = attrs.filter((a) => (a.kind === 'static' || a.kind === 'boolean' || a.kind === 'dynamic') && a.name === 'name');
+      if (named.some((a) => a.kind !== 'static') && ctx.dynamicSlots) ctx.dynamicSlots.value = true;
+      const staticName = named.find((a) => a.kind === 'static');
+      frame.slotName = (staticName && staticName.kind === 'static' ? staticName.value : '') || 'default';
+      if (frame.selfClosed) {
+        frame.kidsResult = [];
+        afterKids(frame);
+        return;
+      }
+      requestKids(frame, 'div');
+      return;
+    }
+    if (frame.branch === 'head-block' || frame.branch === 'head-el') {
+      if (frame.selfClosed) {
+        frame.kidsResult = [];
+        afterKids(frame);
+        return;
+      }
+      requestKids(frame, 'head');
+      return;
+    }
+    frame.attrs = convertAttrs(frame.el, ctx);
+    takeClientDirectives(frame.attrs, frame.loc, ctx, frame.name, false);
+    frame.savedInRootBody = ctx.inRootBody;
+    if (ctx.document && frame.lower === 'body') ctx.inRootBody = true;
+    if (VOID.has(frame.lower) || frame.selfClosed) {
+      frame.kidsResult = [];
+      afterKids(frame);
+      return;
+    }
+    requestKids(frame, frame.lower);
+  };
+
+  const beginNode = (n: P5.ChildNode, nodeClip: Range, deliver: (nodes: Node[]) => void) => {
+    if (n.nodeName === '#text') {
+      deliver(convertText(n as P5.TextNode, ctx, nodeClip));
+      return;
+    }
+    if (n.nodeName === '#comment') {
+      deliver(convertComment(n as P5.CommentNode, ctx));
+      return;
+    }
+    if (n.nodeName === '#documentType') {
+      deliver([{ type: 'Doctype', loc: nodeLoc(n, ctx) }]);
+      return;
+    }
+    if (n.nodeName === '#document' || n.nodeName === '#document-fragment') {
+      deliver([]);
+      return;
+    }
+
+    const el = n as P5.Element;
+    const loc = nodeLoc(el, ctx);
+    const name = originalTagName(el, ctx);
+    const lower = name.toLowerCase();
+    const rawChildren: P5.ChildNode[] =
+      lower === 'template' && (el as P5.Template).content
+        ? (el as P5.Template).content.childNodes
+        : el.childNodes;
+    if (ctx.document && !el.sourceCodeLocation && (lower === 'html' || lower === 'head' || lower === 'body')) {
+      fail('PF2003', `Root layout must contain an explicit <${lower}> element`, ctx.file, ctx.source, 0);
+    }
+    let branch: Branch = 'element';
+    if (lower === 'fragment' && name === 'Fragment') branch = 'fragment';
+    else if (isComponentName(name)) branch = 'component';
+    else if (lower === 'slot') branch = 'slot';
+    else if (lower === 'head' || lower === 'deshi-head') {
+      if (ctx.document && ctx.inRootBody) {
+        fail('PF4025', '<head> blocks are not allowed inside the root layout body', ctx.file, ctx.source, loc.start);
+      }
+      branch = !ctx.document || lower === 'deshi-head' ? 'head-block' : 'head-el';
+    }
+    stack.push({
+      kind: 'elem',
+      phase: 'start',
+      el,
+      clip: nodeClip,
+      loc,
+      name,
+      lower,
+      rawChildren,
+      selfClosed: isSelfClosing(el, ctx),
+      contentClip: contentRange(el, nodeClip),
+      branch,
+      deliver,
+      kidsResult: null,
+      hoistResult: null,
+      built: null,
+      savedInRootBody: null,
+      attrs: null,
+      taken: null,
+      slotName: 'default',
+    });
+  };
+
+  pushList(children, parentName, clip, (nodes) => { rootResult = nodes; });
+
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+    if (frame.kind === 'list') {
+      if (frame.index >= frame.nodes.length) {
+        const adjusted = applyWhitespace(frame.acc, frame.parentName, ctx);
+        stack.pop();
+        frame.deliver(adjusted);
+        continue;
+      }
+      const child = frame.nodes[frame.index++];
+      beginNode(child, frame.clip, (nodes) => { frame.acc.push(...nodes); });
+      continue;
+    }
+    if (frame.kind === 'hoist') {
+      if (frame.index >= frame.nodes.length) {
+        const acc = frame.acc;
+        stack.pop();
+        frame.deliver(acc);
+        continue;
+      }
+      const child = frame.nodes[frame.index++];
+      beginNode(child, frame.clip, (nodes) => { frame.acc.push(...nodes); });
+      continue;
+    }
+    if (frame.phase === 'start') startElement(frame);
+    else if (frame.phase === 'kids') afterKids(frame);
+    else finish(frame, [...(frame.built ?? []), ...(frame.hoistResult ?? [])]);
+  }
+
+  return rootResult ?? [];
 }
 
 /**
@@ -541,143 +883,6 @@ function isSelfClosing(el: P5.Element, ctx: ConvCtx): boolean {
   const st = el.sourceCodeLocation?.startTag;
   if (!st || st.endOffset <= st.startOffset) return false;
   return scanStartTag(ctx.pre.text, st.startOffset, st.endOffset).selfClosing;
-}
-
-function convertNode(n: P5.ChildNode, ctx: ConvCtx, clip: Range): Node[] {
-  if (n.nodeName === '#text') {
-    const l = (n as P5.TextNode).sourceCodeLocation;
-    if (!l) return [{ type: 'Text', value: (n as P5.TextNode).value, loc: { line: 1, column: 1, start: 0, end: 0 } }];
-    // Clip to the parent's content: parse5 hangs trailing whitespace off the
-    // end tag it follows, so a node's raw range can otherwise cover `</body>`.
-    const start = Math.max(l.startOffset, clip.start);
-    const end = Math.min(l.endOffset, clip.end);
-    if (end <= start) return [];
-    // HTML raw-text elements do not decode character references. Their bodies
-    // are JS/CSS (including literal braces), not template expressions.
-    const parent = (n as P5.TextNode).parentNode;
-    if (parent && 'tagName' in parent && (parent.tagName === 'script' || parent.tagName === 'style')) {
-      return [{ type: 'Text', value: ctx.pre.text.slice(start, end), loc: locAt(ctx.source, start, end) }];
-    }
-    return splitText(ctx.pre.text, start, end, ctx);
-  }
-  if (n.nodeName === '#comment') {
-    const data = (n as P5.CommentNode).data;
-    const loc = nodeLoc(n, ctx);
-    if (data.startsWith('deshi-slot:')) {
-      return [{ type: 'Slot', name: data.slice('deshi-slot:'.length), fallback: [], loc }];
-    }
-    if (data.startsWith('!')) return [{ type: 'Comment', value: data.slice(1), loc }];
-    return [];
-  }
-  if (n.nodeName === '#documentType') {
-    return [{ type: 'Doctype', loc: nodeLoc(n, ctx) }];
-  }
-  if (n.nodeName === '#document' || n.nodeName === '#document-fragment') return [];
-
-  const el = n as P5.Element;
-  const loc = nodeLoc(el, ctx);
-  const name = originalTagName(el, ctx);
-  const lower = name.toLowerCase();
-  const rawChildren: P5.ChildNode[] =
-    lower === 'template' && (el as P5.Template).content
-      ? (el as P5.Template).content.childNodes
-      : el.childNodes;
-  const selfClosed = isSelfClosing(el, ctx);
-  const kids = (parent: string | null): Node[] =>
-    selfClosed ? [] : convertChildren(rawChildren, parent, ctx, contentRange(el, clip));
-  /** Nodes the parser nested inside a `<tag />`; they belong to the parent. */
-  const hoisted = (): Node[] => {
-    if (!selfClosed) return [];
-    const out: Node[] = [];
-    for (const c of rawChildren) out.push(...convertNode(c, ctx, clip));
-    return out;
-  };
-  const done = (built: Node[]): Node[] => [...built, ...hoisted()];
-
-  if (ctx.document && !el.sourceCodeLocation && (lower === 'html' || lower === 'head' || lower === 'body')) {
-    fail('PF2003', `Root layout must contain an explicit <${lower}> element`, ctx.file, ctx.source, 0);
-  }
-
-  if (lower === 'fragment' && name === 'Fragment') {
-    return done(convertChildren(rawChildren, null, ctx, contentRange(el, clip)));
-  }
-
-  if (isComponentName(name)) {
-    if (!ctx.components.has(name)) {
-      fail('PF4024', `<${name}> is not an imported component`, ctx.file, ctx.source, loc.start,
-        `Add: import ${name} from './${name}.deshi' to the <script> block.`);
-    }
-    ctx.usedComponents.add(name);
-    const attrs = convertAttrs(el, ctx, true);
-    const taken = takeClientDirectives(attrs, loc, ctx, name, true);
-    const comp: Component = {
-      type: 'Component',
-      ident: name,
-      props: taken.attrs,
-      slots: bucketSlots(kids('div'), ctx),
-      clientProps: taken.clientProps,
-      clientStrategy: taken.clientStrategy,
-      clientValue: taken.clientValue,
-      clientValueStatic: taken.clientValueStatic,
-      loc,
-    };
-    return done([comp]);
-  }
-
-  if (lower === 'slot') {
-    const attrs = convertAttrs(el, ctx);
-    const named = attrs.filter((a) => (a.kind === 'static' || a.kind === 'boolean' || a.kind === 'dynamic') && a.name === 'name');
-    if (named.some((a) => a.kind !== 'static') && ctx.dynamicSlots) ctx.dynamicSlots.value = true;
-    const staticName = named.find((a) => a.kind === 'static');
-    const slot: Slot = {
-      type: 'Slot',
-      name: (staticName && staticName.kind === 'static' ? staticName.value : '') || 'default',
-      fallback: kids('div'),
-      loc,
-    };
-    return done([slot]);
-  }
-
-  if (lower === 'head' || lower === 'deshi-head') {
-    if (ctx.document && ctx.inRootBody) {
-      fail('PF4025', '<head> blocks are not allowed inside the root layout body', ctx.file, ctx.source, loc.start);
-    }
-    if (!ctx.document || lower === 'deshi-head') {
-      return done([{ type: 'HeadBlock', children: kids('head'), loc }]);
-    }
-    const children = kids('head');
-    for (const ch of children) {
-      if (ch.type === 'Element' && !HEAD_OK.has(ch.name.toLowerCase())) {
-        fail('PF1002', `<${ch.name}> is not valid inside <head>`, ctx.file, ctx.source, ch.loc.start);
-      }
-    }
-    const headEl: Element = {
-      type: 'Element', name: 'head', attrs: convertAttrs(el, ctx), children, loc,
-      scoped: false, isDocHead: true,
-    };
-    return done([headEl]);
-  }
-
-  const attrs = convertAttrs(el, ctx);
-  takeClientDirectives(attrs, loc, ctx, name, false);
-  const wasRootBody = ctx.inRootBody;
-  if (ctx.document && lower === 'body') ctx.inRootBody = true;
-  const children = VOID.has(lower) ? [] : kids(lower);
-  ctx.inRootBody = wasRootBody;
-
-  const setHtml = attrs.find((a) => a.kind === 'setHtml' || a.kind === 'setText');
-  if (setHtml && children.some((c) => c.type !== 'Text' || c.value.trim())) {
-    fail('PF4023', `An element with ${setHtml.kind === 'setHtml' ? 'set:html' : 'set:text'} must not have children`, ctx.file, ctx.source, loc.start);
-  }
-  const element: Element = {
-    type: 'Element',
-    name: lower === name ? lower : name,
-    attrs,
-    children: setHtml ? [] : children,
-    loc,
-    scoped: ctx.scoped && !NO_SCOPE.has(lower),
-  };
-  return done([element]);
 }
 
 export function parseTemplate(
@@ -721,16 +926,23 @@ export function parseTemplate(
 }
 
 export function containsDefaultSlot(nodes: Node[]): boolean {
-  for (const n of nodes) {
-    if (n.type === 'Slot' && n.name === 'default') return true;
-    if (n.type === 'Element' || n.type === 'Fragment' || n.type === 'HeadBlock') {
-      if (containsDefaultSlot(n.children)) return true;
+  const stack: Node[] = [];
+  for (let i = nodes.length - 1; i >= 0; i--) stack.push(nodes[i]);
+  while (stack.length) {
+    const n = stack.pop()!;
+    if (n.type === 'Slot') {
+      // Fallback content is not searched: a default slot nested inside another
+      // slot's fallback does not satisfy the layout's own slot requirement.
+      if (n.name === 'default') return true;
+      continue;
     }
-    if (n.type === 'Component') {
-      for (const s of Object.values(n.slots)) if (containsDefaultSlot(s)) return true;
-    }
-    if (n.type === 'Expression') {
-      for (const j of n.jsx) if (containsDefaultSlot(j.nodes)) return true;
+    let nested: Node[][] = [];
+    if (n.type === 'Element' || n.type === 'Fragment' || n.type === 'HeadBlock') nested = [n.children];
+    else if (n.type === 'Component') nested = Object.values(n.slots);
+    else if (n.type === 'Expression') nested = n.jsx.map((j) => j.nodes);
+    for (let s = nested.length - 1; s >= 0; s--) {
+      const list = nested[s];
+      for (let i = list.length - 1; i >= 0; i--) stack.push(list[i]);
     }
   }
   return false;

@@ -51,25 +51,41 @@ function leadingFenceStart(source: string): number {
 }
 
 export function splitBlocks(source: string, file: string): SplitResult {
-  // Astro frontmatter alias: leading `---` fenced block is treated as <script>
-  // so `---\nimport X from './X.deshi'\n---` works like <script>.
-  if (leadingFenceStart(source) !== -1) {
-    const start = leadingFenceStart(source);
+  // Astro frontmatter alias: a leading `---` fence is <script>.
+  // `---\nimport X from './X.deshi'\n---` works like <script>.
+  // An opening fence commits the rest of the file to frontmatter until a
+  // closing fence. Leaving it unmatched is an error — the body is server
+  // code, not template text.
+  const start = leadingFenceStart(source);
+  if (start !== -1) {
     const nl = source.indexOf('\n', start + 3);
     const second = source.indexOf('\n---', nl);
-    if (second !== -1) {
-      const endMark = source.indexOf('---', second + 1);
-      const contentStart = nl + 1;
-      const contentEnd = second + 1; // before newline of closing fence
-      const fenceEnd = source.indexOf('\n', endMark + 3);
-      const fenceRange = { start, end: fenceEnd === -1 ? source.length : fenceEnd + 1 };
-      const content = source.slice(contentStart, contentEnd);
-      // Handled after tokenizing — if no <script> is found, the fence content is
-      // injected as the script block (offsets preserved by noting its position).
-      const frontmatterScript = { content, contentStart, start, end: fenceEnd === -1 ? source.length : fenceEnd + 1 };
-      const after = splitBlocksInternal(source, file, frontmatterScript);
-      if (after) return after;
+    const closed = second !== -1;
+    const contentStart = nl + 1;
+    const endMark = closed ? source.indexOf('---', second + 1) : -1;
+    const contentEnd = closed ? second + 1 : source.length; // before newline of closing fence
+    const fenceEnd = closed ? source.indexOf('\n', endMark + 3) : -1;
+    const frontmatterScript = {
+      content: source.slice(contentStart, contentEnd),
+      contentStart,
+      start,
+      end: !closed || fenceEnd === -1 ? source.length : fenceEnd + 1,
+    };
+    const result = splitBlocksInternal(source, file, frontmatterScript);
+    if (!closed) {
+      result.diagnostics.unshift(
+        makeDiagnostic(
+          'PF1001',
+          'Unclosed frontmatter fence',
+          file,
+          source,
+          start,
+          'error',
+          'Close the frontmatter with a `---` line.',
+        ),
+      );
     }
+    return result;
   }
   return splitBlocksInternal(source, file, null);
 }
