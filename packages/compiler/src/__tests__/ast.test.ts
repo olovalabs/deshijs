@@ -197,7 +197,8 @@ describe('ast/walk', () => {
     walk(node, () => { seen++; });
     expect(seen).toBe(20_001);
     const copy = cloneNode(node);
-    expect(copy).not.toBe(node);
+    // Do not pass the tree to expect: its printer is recursive and overflows.
+    if (copy === node) throw new Error('clone returned the same node');
     let depth = 0;
     let cur = copy;
     while (cur.type === 'Element') {
@@ -205,7 +206,7 @@ describe('ast/walk', () => {
       cur = cur.children[0];
     }
     expect(depth).toBe(20_000);
-    expect(cur).toMatchObject({ type: 'Text', value: 'leaf' });
+    expect(cur.type === 'Text' && cur.value === 'leaf').toBe(true);
   });
 
   it('children() is the single source of traversal truth', () => {
