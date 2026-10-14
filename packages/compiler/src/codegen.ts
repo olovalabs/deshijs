@@ -105,7 +105,7 @@ function genElement(el: Element, em: Em, g: G): void {
   const setText = el.attrs.find((a) => a.kind === 'setText') as { expr: Expression } | undefined;
   if (setHtml) em.expr(`(await unsafe(${genExprCode(setHtml.expr, g)}))`, true);
   else if (setText) em.expr(`(await esc(${genExprCode(setText.expr, g)}))`, true);
-  else genNodes(el.children, em, g);
+  else genNodes(el.children, em, g, el.name.toLowerCase() === 'script' || el.name.toLowerCase() === 'style');
   em.str(`</${el.name}>`);
 }
 
@@ -135,7 +135,7 @@ function genComponent(c: Component, em: Em, g: G): void {
     .map(([name, nodes]) => {
       const s = new Em();
       genNodes(nodes, s, g);
-      return `${JSON.stringify(name)}: async () => ${s.code()}`;
+      return `[${JSON.stringify(name)}]: async () => ${s.code()}`;
     })
     .join(', ');
   const cp = c.clientProps
@@ -173,11 +173,11 @@ function genSlot(s: Slot, em: Em, g: G): void {
   em.expr(code, true);
 }
 
-function genNodes(nodes: Node[], em: Em, g: G): void {
+function genNodes(nodes: Node[], em: Em, g: G, rawText = false): void {
   for (const n of nodes) {
     switch (n.type) {
       case 'Text':
-        em.str(escapeHtml(n.value));
+        em.str(rawText ? n.value : escapeHtml(n.value));
         break;
       case 'Expression':
         em.expr(`(await esc(${genExprCode(n, g)}))`, true);

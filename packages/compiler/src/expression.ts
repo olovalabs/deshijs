@@ -56,8 +56,15 @@ export function parseBraceExpression(
   exprStart: number = bracePos + 1,
 ): { ast: acorn.Expression; close: number } {
   let ast: acorn.Expression;
+  // AST ranges omit redundant grouping parentheses and trailing comments.
+  // Acorn's consumed tokens/comments retain the complete expression boundary.
+  let consumedEnd = exprStart;
   try {
-    ast = JsxParser.parseExpressionAt(source, exprStart, ACORN_OPTIONS) as acorn.Expression;
+    ast = JsxParser.parseExpressionAt(source, exprStart, {
+      ...ACORN_OPTIONS,
+      onToken: (token) => { consumedEnd = Math.max(consumedEnd, token.end); },
+      onComment: (_block, _text, _start, end) => { consumedEnd = Math.max(consumedEnd, end); },
+    }) as acorn.Expression;
   } catch (e) {
     const err = e as { pos?: number; message: string };
     const pos = typeof err.pos === 'number' ? err.pos : bracePos;
@@ -67,7 +74,7 @@ export function parseBraceExpression(
     }
     fail('PF4001', `Expression syntax error: ${msg}`, file, source, pos);
   }
-  let i = ast.end;
+  let i = Math.max(ast.end, consumedEnd);
   while (i < source.length && /\s/.test(source[i])) i++;
   if (source[i] !== '}') {
     fail('PF1003', 'Unterminated { expression — expected a closing }', file, source, i < source.length ? i : bracePos);
@@ -316,7 +323,7 @@ function convertJsxChildren(children: AnyNode[], ctx: TemplateContext): Node[] {
 }
 
 export function bucketSlots(children: Node[], ctx: TemplateContext): Record<string, Node[]> {
-  const slots: Record<string, Node[]> = {};
+  const slots: Record<string, Node[]> = Object.create(null);
   for (const child of children) {
     let name = 'default';
     if (child.type === 'Element') {

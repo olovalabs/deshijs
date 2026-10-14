@@ -4,6 +4,7 @@
 // anything else is stripped to JS with esbuild (Vite's own TS engine) and
 // re-parsed, so every .deshi compiles with types and none leak into output.
 import * as acorn from 'acorn';
+import { functionVarNames } from './ast/estree';
 import { transformSync } from 'esbuild';
 import { fail, makeDiagnostic, type Diagnostic } from './types';
 import { ACORN_OPTIONS, JsxParser, isComponentName } from './expression';
@@ -254,6 +255,9 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
         if (text !== null) bodyParts.push(text);
       }
     }
+  }
+  for (const name of functionVarNames(program)) {
+    if (!info.bindings.includes(name)) info.bindings.push(name);
   }
   info.body = bodyParts.join('\n');
   return info;

@@ -278,7 +278,7 @@ export function fail(
 }
 
 /** FNV-1a 32-bit hash rendered as 8 hex chars. Used for scoped-style attributes,
- * CSS URLs and the compile memo key — it only needs to be stable, not secure. */
+ * CSS URLs — it only needs to be stable, not secure. */
 export function hashString(input: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
