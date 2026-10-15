@@ -1,0 +1,178 @@
+<head>
+  <title>JSX Power · Deshi</title>
+  <meta name="description" content="Dynamic component tags, defineSlots + scoped slots, JSX expressions" />
+</head>
+
+<script>
+  import Card from '../components/Card.deshi';
+  import SlotDemo from '../components/SlotDemo.deshi';
+
+  const rows = [
+    { title: 'Core Architecture', tag: 'Compiler', desc: 'AST-driven compilation with Vite integration' },
+    { title: 'Reusable Components', tag: 'JSX Way', desc: 'Dynamic tags, member expressions, and slot props' },
+    { title: 'Zero JS Default', tag: 'Static', desc: 'Everything server-rendered unless marked with client directives' },
+  ];
+
+  // Dynamic tags: aliasing, member expressions, and registry lookup
+  const Tag = Card;
+  const UI = { Card, Demo: SlotDemo };
+  const ui = { Card };
+  const chosenKey = 'Card';
+  const DynamicFromKey = UI[chosenKey];
+  const InlineBadge = (p) => `<span class="slot-badge">${p.text}</span>`;
+  // Spread props
+  const spreadProps = {
+    title: 'Spread Props Example',
+    tag: 'JSX Spread',
+  };
+
+  // State / control flow data
+  const mode = 'demo';
+  const showBanner = true;
+  const highlights = [
+    'Member-expression tags: <UI.Card />',
+    'Aliased tags: const Tag = Component; <Tag />',
+    'Scoped slots: <slot {item} /> with let-* bindings',
+    'Full JSX control flow: .map(), ternaries, and &&',
+  ];
+</script>
+
+<div class="jsxpower">
+  <span class="badge">Route: /jsx — JSX-parity components</span>
+  <h1>Components, the JSX way</h1>
+  <p class="lead">Dynamic tags, declared + scoped slots, spread props, and full JSX control flow.</p>
+
+  <!-- 1. Dynamic component tags -->
+  <section class="card">
+    <h2>1. Dynamic & Member Component Tags</h2>
+    <p class="muted">Tags resolve from script scope: imported components, member expressions (<code class="inline-code">&lt;UI.Card /&gt;</code> and <code class="inline-code">&lt;ui.Card /&gt;</code>), local function components, and dynamic registries.</p>
+
+    <div class="demo-stack">
+      <UI.Card title="Uppercase Namespaced (<UI.Card />)" tag="Dotted Tag">
+        Rendered via dotted member expression <code class="inline-code">&lt;UI.Card /&gt;</code>.
+      </UI.Card>
+
+      <ui.Card title="Lowercase Namespaced (<ui.Card />)" tag="Lowercase Head">
+        Rendered via dotted member expression with lowercase head <code class="inline-code">&lt;ui.Card /&gt;</code>.
+      </ui.Card>
+
+      <Tag title="Aliased Component (<Tag />)" tag="Alias">
+        Rendered via script binding <code class="inline-code">const Tag = Card; &lt;Tag /&gt;</code>.
+      </Tag>
+
+      <DynamicFromKey title="Registry Lookup (<DynamicFromKey />)" tag="Dynamic">
+        Rendered via dictionary lookup <code class="inline-code">const DynamicFromKey = UI['Card'];</code>.
+      </DynamicFromKey>
+
+      <p class="inline-demo">
+        Function component tag: <InlineBadge text="Local Function Component (<InlineBadge />)" />
+      </p>
+    </div>
+  </section>
+
+  <!-- 2. Spread props -->
+  <section class="card">
+    <h2>2. Spread Props (<code class="inline-code">&lt;Card &#123;...props&#125; /&gt;</code>)</h2>
+    <p class="muted">Pass objects directly to components with JSX spread syntax, with full override precedence.</p>
+    <div class="demo-stack">
+      <Card {...spreadProps}>
+        Props spread into the component: <code class="inline-code">title="{spreadProps.title}"</code>, <code class="inline-code">tag="{spreadProps.tag}"</code>.
+      </Card>
+      <Card {...spreadProps} tag="Overridden Tag">
+        Spread followed by an explicit prop: <code class="inline-code">tag="Overridden Tag"</code> overrides the spread value.
+      </Card>
+    </div>
+  </section>
+
+  <!-- 3. Scoped slots -->
+  <section class="card">
+    <h2>3. Scoped Slots (<code class="inline-code">defineSlots</code> + <code class="inline-code">let-*</code>)</h2>
+    <p class="muted">A child component forwards data via <code class="inline-code">&lt;slot &#123;item&#125; /&gt;</code>, and the caller consumes it with <code class="inline-code">let-item</code> on a slot template wrapper.</p>
+    <SlotDemo rows={rows}>
+      <template slot="row" let-item let-index>
+        <span class="slot-badge">Row #{index + 1}</span>
+        <strong>{item.title}</strong> — <span class="muted-text">{item.desc}</span>
+      </template>
+    </SlotDemo>
+  </section>
+
+  <!-- 4. JSX Control Flow -->
+  <section class="card">
+    <h2>4. JSX Control Flow</h2>
+    <p class="muted">Standard JavaScript expressions handle control flow with zero client runtime overhead.</p>
+
+    <div class="demo-block">
+      <h3>Conditional Rendering: Ternaries & Short-Circuit (<code class="inline-code">&amp;&amp;</code>)</h3>
+      {showBanner && (
+        <div class="banner">
+          <span class="banner-dot">●</span> Short-circuit banner evaluated via <code class="inline-code">&#123;showBanner &amp;&amp; ...&#125;</code>
+        </div>
+      )}
+
+      <p class="status-line">
+        Environment status:
+        {mode === 'demo' ? (
+          <span class="pill pill-active">Demo Mode</span>
+        ) : (
+          <span class="pill pill-inactive">Production</span>
+        )}
+      </p>
+    </div>
+
+    <div class="demo-block">
+      <h3>List Rendering with <code class="inline-code">.map()</code></h3>
+      <ul class="highlights-list">
+        {highlights.map((item, i) => (
+          <li>
+            <span class="check">✓</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div class="demo-block">
+      <h3>Rendering Components inside <code class="inline-code">.map()</code></h3>
+      <div class="card-grid">
+        {rows.map((row, i) => (
+          <Card title={row.title} tag={row.tag}>
+            <p>{row.desc}</p>
+          </Card>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <p class="nav-back"><a href="/">← Back home</a></p>
+</div>
+
+<style>
+  .jsxpower { max-width: 860px; margin: 0 auto; padding-bottom: 3rem; }
+  .badge { display:inline-block; padding:0.25rem 0.75rem; font-size:0.75rem; font-weight:600; color:#a3e635; background: rgba(163,230,53,0.1); border:1px solid rgba(163,230,53,0.3); border-radius:9999px; margin-bottom:1rem; }
+  h1 { font-size:2.4rem; margin:0 0 0.5rem; color:#fafafa; font-weight: 800; }
+  .lead { color:#a1a1aa; margin:0 0 2rem; font-size:1.15rem; line-height: 1.6; }
+  .card { background:#121215; border:1px solid #27272a; border-radius:12px; padding:1.5rem; margin-bottom:1.5rem; }
+  .card h2 { margin:0 0 0.5rem; font-size:1.25rem; color:#fafafa; font-weight: 700; }
+  .card h3 { margin:1rem 0 0.5rem; font-size:0.95rem; color:#d4d4d8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .muted { color:#71717a; font-size:0.9rem; margin:0 0 1rem; line-height: 1.5; }
+  .inline-code { background: #27272a; color: #a3e635; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; font-family: monospace; }
+  .demo-stack { display: flex; flex-direction: column; gap: 0.75rem; }
+  .demo-block { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid #27272a; }
+  .demo-block:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .slotdemo { display:block; border:1px dashed #3f3f46; background: #18181b; border-radius:8px; padding:1rem; }
+  .slot-badge { display: inline-block; background: #27272a; color: #a3e635; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 4px; margin-right: 0.5rem; }
+  .muted-text { color: #71717a; }
+  .banner { display: flex; align-items: center; gap: 0.5rem; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 0.6rem 0.9rem; border-radius: 8px; font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .banner-dot { font-size: 0.75rem; }
+  .status-line { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: #a1a1aa; }
+  .pill { display: inline-block; padding: 0.15rem 0.5rem; font-size: 0.75rem; font-weight: 600; border-radius: 9999px; }
+  .pill-active { background: rgba(163, 230, 53, 0.15); color: #a3e635; border: 1px solid rgba(163, 230, 53, 0.3); }
+  .pill-inactive { background: #27272a; color: #71717a; }
+  .highlights-list { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
+  .highlights-list li { display: flex; align-items: center; gap: 0.5rem; color: #e4e4e7; font-size: 0.9rem; }
+  .check { color: #a3e635; font-weight: bold; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 0.75rem; }
+  .nav-back { margin-top: 2rem; }
+  a { color:#38bdf8; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>

@@ -50,8 +50,8 @@ export interface ScannedTag {
 const NAME_START = /[A-Za-z_]/;
 const NAME_CHAR = /[A-Za-z0-9_:.-]/;
 const TAG_END = /[\s>/]/;
-/** A name made only of the prescan's mask filler. */
-const MASKED_NAME = /^x{2,}$/;
+/** A name made only of the prescan's mask filler (including numbered prefixes). */
+const MASKED_NAME = /^x\d*x*$/;
 
 /**
  * Read the attributes of the start tag occupying `[from, to)` of `src`, where

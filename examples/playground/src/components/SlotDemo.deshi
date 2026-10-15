@@ -1,0 +1,10 @@
+<script>
+  interface Row { title: string }
+  const props = defineProps<{ rows: { title: string }[] }>();
+  defineSlots<{ row: { required: true } }>();
+  const item = props.rows[0];
+  const index = 0;
+</script>
+<section class="slotdemo">
+  <slot name="row" {item} {index} />
+</section>

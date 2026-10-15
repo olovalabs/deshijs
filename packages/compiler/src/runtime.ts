@@ -10,7 +10,7 @@ import {
   type IslandStrategy,
 } from './islands';
 import { isFrameworkComponent, splitFilename } from './filetype';
-import { renderFrameworkComponent } from './frameworks';
+import { renderFrameworkComponent, serializeVNode } from './frameworks';
 import { serializeProps } from './serialize';
 import { escapeAttr, escapeHtml } from './escape';
 import { DESHI_VERSION } from './types';
@@ -165,7 +165,9 @@ export interface Bindings {
   };
 }
 
-export type SlotFns = Record<string, () => Promise<string>>;
+/** A slot renderer: receives the forwarded slot props (scoped slots) or {}. */
+export type SlotFn = (slotProps: Record<string, unknown>) => Promise<string>;
+export type SlotFns = Record<string, SlotFn>;
 
 export interface RenderModule {
   (bindings: Bindings, slotFns: SlotFns, ctx: RenderCtx): Promise<string>;
@@ -251,9 +253,18 @@ export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns
   } as Bindings;
 }
 
-export async function slot(fns: SlotFns, name: string, fallback?: () => Promise<string>): Promise<string> {
+export async function slot(
+  fns: SlotFns,
+  name: string,
+  fallbackOrProps?: (() => Promise<string>) | Record<string, unknown>,
+  propsArg?: Record<string, unknown>,
+): Promise<string> {
   const fn = Object.hasOwn(fns, name) ? fns[name] : undefined;
-  if (fn) return await fn();
+  const fallback = typeof fallbackOrProps === 'function' ? fallbackOrProps : undefined;
+  // The compiled form passes props as the 3rd argument when there is no
+  // fallback; accept either position so hand-written callers keep working.
+  const props = typeof fallbackOrProps === 'function' ? propsArg : fallbackOrProps;
+  if (fn) return await fn(props ?? {});
   if (fallback) return await fallback();
   return '';
 }
@@ -269,13 +280,14 @@ function componentBaseName(file: string): string {
 function wrapIslandSlots(slotFns: SlotFns): SlotFns {
   const wrapped: SlotFns = Object.create(null);
   for (const [name, fn] of Object.entries(slotFns)) {
-    wrapped[name] = async () => `<deshi-slot name="${escapeAttr(name)}">${await fn()}</deshi-slot>`;
+    // scoped slots keep their props through the <deshi-slot> wrapper
+    wrapped[name] = async (p) => `<deshi-slot name="${escapeAttr(name)}">${await fn(p)}</deshi-slot>`;
   }
   return wrapped;
 }
 
 export async function renderComponent(
-  Comp: RenderModule,
+  Comp: RenderModule | ((props: Record<string, unknown>) => unknown),
   props: Record<string, unknown>,
   slotFns: SlotFns,
   ctx: RenderCtx,
@@ -283,8 +295,19 @@ export async function renderComponent(
   strategy?: IslandStrategy | string,
   directiveValue?: unknown,
 ): Promise<string> {
-  const meta = Comp.__deshi;
-  if (!meta) throw new Error('renderComponent: not a compiled Deshi component');
+  const meta = (Comp as RenderModule)?.__deshi;
+  if (!meta) {
+    if (typeof Comp === 'function') {
+      const children = slotFns.default ? await slotFns.default({}) : undefined;
+      const res = await (Comp as (p: Record<string, unknown>) => unknown)({ ...props, children });
+      if (res == null || res === false) return '';
+      if (res instanceof Raw) return res.html;
+      if (typeof res === 'string') return res;
+      if (typeof res === 'object') return serializeVNode(res);
+      return String(res);
+    }
+    throw new Error('renderComponent: not a compiled Deshi component');
+  }
   const isFramework = isFrameworkComponent(meta.file);
   const maxDepth = ctx.maxDepth ?? 500;
   if (ctx.depth > maxDepth) {
@@ -320,13 +343,13 @@ export async function renderComponent(
       if (isOnly) {
         // Astro parity: client:only never renders the component on the server —
         // only its fallback slot (usually empty).
-        return slotFns.fallback ? await slotFns.fallback() : '';
+        return slotFns.fallback ? await slotFns.fallback({}) : '';
       }
       if (isFramework) {
         return renderFrameworkComponent(Comp, props, meta.file);
       }
       const islandSlots = island ? wrapIslandSlots(slotFns) : slotFns;
-      return Comp(bindings(ctx, props, islandSlots), islandSlots, ctx);
+      return (Comp as RenderModule)(bindings(ctx, props, islandSlots), islandSlots, ctx);
     });
     if (!island) return html;
 

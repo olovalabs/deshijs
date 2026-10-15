@@ -29,11 +29,13 @@ import {
 import {
   bucketSlots,
   checkAttrName,
+  componentTagResolves,
   isComponentName,
   locAt,
   makeExpression,
   parseBraceExpression,
   takeClientDirectives,
+  takeLetProps,
   type TemplateContext,
 } from './expression';
 import { duplicateAttrNames, scanStartTag } from './attrs';
@@ -163,7 +165,16 @@ export function prescan(src: string, ctx: TemplateContext, file: string): Presca
     const expr = makeExpression(ast, ctx);
     const found: FoundExpr = { open: bracePos, close, spread, inTag, expr };
     exprs.push(found);
-    mask(chars, bracePos, close + 1, inTag ? 'x' : ' ');
+    if (inTag) {
+      const prefix = 'x' + exprs.length;
+      const end = close + 1;
+      const len = end - bracePos;
+      for (let k = 0; k < len; k++) {
+        chars[bracePos + k] = k < prefix.length ? prefix[k] : 'x';
+      }
+    } else {
+      mask(chars, bracePos, close + 1, ' ');
+    }
     return found;
   };
 
@@ -292,7 +303,7 @@ function restoreHeadSlots(root: Root, ctx: ConvCtx): void {
 
   for (const s of pending) {
     const [list, index] = innermost(root.children, s.at);
-    list.splice(index, 0, { type: 'Slot', name: s.name, fallback: [], loc: locAt(src, s.at, s.at + 6) });
+    list.splice(index, 0, { type: 'Slot', name: s.name, fallback: [], props: [], loc: locAt(src, s.at, s.at + 6) });
   }
 }
 
@@ -440,8 +451,22 @@ function convertAttrs(el: P5.Element, ctx: ConvCtx, restoreCase = false): Attr[]
 
     if (found.length) {
       const f = found[0];
-      // A whole-attribute `{...rest}` is a spread; anything else is a value.
+      // A whole-attribute `{...rest}` is a spread; a bare `{expr}` occupying the
+      // whole attribute is a slot passthrough on <slot>, and an error elsewhere.
       const isSpread = f.spread && valueRange === null;
+      if (!isSpread && valueRange === null) {
+        if (el.nodeName.toLowerCase() === 'slot') {
+          attrs.push({ kind: 'slotProp', expr: f.expr });
+          continue;
+        }
+        fail(
+          'PF4044',
+          `{${f.expr.raw}} is a slot passthrough — only <slot> can forward props to slot content`,
+          ctx.file,
+          src,
+          f.open,
+        );
+      }
       // text around the braces inside a value is not a valid attribute
       if (!isSpread && valueRange) {
         const before = src.slice(valueRange.from, f.open);
@@ -549,7 +574,7 @@ function convertComment(n: P5.CommentNode, ctx: ConvCtx): Node[] {
   const data = n.data;
   const loc = nodeLoc(n, ctx);
   if (data.startsWith('deshi-slot:')) {
-    return [{ type: 'Slot', name: data.slice('deshi-slot:'.length), fallback: [], loc }];
+    return [{ type: 'Slot', name: data.slice('deshi-slot:'.length), fallback: [], props: [], loc }];
   }
   if (data.startsWith('!')) return [{ type: 'Comment', value: data.slice(1), loc }];
   return [];
@@ -602,6 +627,10 @@ function convertChildren(children: P5.ChildNode[], parentName: string | null, ct
     attrs: Attr[] | null;
     taken: ReturnType<typeof takeClientDirectives> | null;
     slotName: string;
+    /** the default bucket's `let-*` bindings declared on the component usage */
+    defaultLets?: string[];
+    /** whole-attribute `{item}` passthroughs captured for a `<slot>` */
+    slotProps?: Attr[];
   }
   type Frame = ListFrame | HoistFrame | ElemFrame;
 
@@ -629,11 +658,13 @@ function convertChildren(children: P5.ChildNode[], parentName: string | null, ct
     if (frame.branch === 'fragment') return kids;
     if (frame.branch === 'component') {
       const taken = frame.taken!;
+      const bucketed = bucketSlots(kids, ctx, frame.defaultLets ?? []);
       const comp: Component = {
         type: 'Component',
         ident: frame.name,
         props: taken.attrs,
-        slots: bucketSlots(kids, ctx),
+        slots: bucketed.nodes,
+        slotLets: bucketed.lets,
         clientProps: taken.clientProps,
         clientStrategy: taken.clientStrategy,
         clientValue: taken.clientValue,
@@ -643,7 +674,7 @@ function convertChildren(children: P5.ChildNode[], parentName: string | null, ct
       return [comp];
     }
     if (frame.branch === 'slot') {
-      const slot: Slot = { type: 'Slot', name: frame.slotName, fallback: kids, loc: frame.loc };
+      const slot: Slot = { type: 'Slot', name: frame.slotName, fallback: kids, props: frame.slotProps ?? [], loc: frame.loc };
       return [slot];
     }
     if (frame.branch === 'head-block') {
@@ -718,7 +749,18 @@ function convertChildren(children: P5.ChildNode[], parentName: string | null, ct
       return;
     }
     if (frame.branch === 'component') {
-      if (!ctx.components.has(frame.name)) {
+      if (!componentTagResolves(frame.name, ctx)) {
+        if (frame.name.includes('.')) {
+          const head = frame.name.split('.')[0];
+          fail(
+            'PF4041',
+            `<${frame.name}> must resolve to a component`,
+            ctx.file,
+            ctx.source,
+            frame.loc.start,
+            `Bind "${head}" in the <script> block (e.g. import * as ${head} from './…').`,
+          );
+        }
         fail(
           'PF4024',
           `<${frame.name}> is not an imported component`,
@@ -728,8 +770,15 @@ function convertChildren(children: P5.ChildNode[], parentName: string | null, ct
           `Add: import ${frame.name} from './${frame.name}.deshi' to the <script> block.`,
         );
       }
-      ctx.usedComponents.add(frame.name);
-      frame.taken = takeClientDirectives(convertAttrs(frame.el, ctx, true), frame.loc, ctx, frame.name, true);
+      // Only directly imported plain names participate in unused-import
+      // diagnostics; scope-resolved tags (`const Tag = …`, `UI.Card`) render
+      // from whatever the binding holds at run time.
+      if (!frame.name.includes('.') && ctx.components.has(frame.name)) {
+        ctx.usedComponents.add(frame.name);
+      }
+      const { attrs: allAttrs, lets: usageLets } = takeLetProps(convertAttrs(frame.el, ctx, true), ctx.file, ctx.source, frame.loc.start);
+      frame.defaultLets = usageLets;
+      frame.taken = takeClientDirectives(allAttrs, frame.loc, ctx, frame.name, true);
       if (frame.selfClosed) {
         frame.kidsResult = [];
         afterKids(frame);
@@ -744,6 +793,8 @@ function convertChildren(children: P5.ChildNode[], parentName: string | null, ct
       if (named.some((a) => a.kind !== 'static') && ctx.dynamicSlots) ctx.dynamicSlots.value = true;
       const staticName = named.find((a) => a.kind === 'static');
       frame.slotName = (staticName && staticName.kind === 'static' ? staticName.value : '') || 'default';
+      // whole-attribute `{item}` passthroughs become the slot's forwarded props
+      frame.slotProps = attrs.filter((a) => a.kind === 'slotProp');
       if (frame.selfClosed) {
         frame.kidsResult = [];
         afterKids(frame);
@@ -909,7 +960,7 @@ export function parseTemplate(
       fail('PF2003', 'Root layout must contain <html>, <head> and <body>', ctx.file, ctx.source, 0);
     }
     if (!head.children.some((c) => c.type === 'Slot' && c.name === 'head')) {
-      head.children.push({ type: 'Slot', name: 'head', fallback: [], loc: head.loc, headMarker: true });
+      head.children.push({ type: 'Slot', name: 'head', fallback: [], props: [], loc: head.loc, headMarker: true });
     }
     if (opts.isLayout && !containsDefaultSlot(body.children)) {
       fail('PF2002', 'Root layout must render a <slot /> for the page content', ctx.file, ctx.source, body.loc.start);

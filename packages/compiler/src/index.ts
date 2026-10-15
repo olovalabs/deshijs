@@ -11,7 +11,7 @@ import { generate } from './codegen';
 import { compileDocument } from './document';
 import { isDocumentFile, isLayoutPath } from './filetype';
 import { highlightStateToken } from './highlight';
-import type { PropContract } from './tsprops';
+import type { PropContract, SlotContract } from './tsprops';
 import {
   DeshiError,
   hashString,
@@ -50,6 +50,10 @@ export interface CompileMeta {
   requiredSlots: string[];
   /** true when a `<slot name={…}>` is computed, so slot checks are skipped */
   dynamicSlots: boolean;
+  /** the slot interface declared via `defineSlots`, if any */
+  declaredSlots: SlotContract | null;
+  /** slot name → the slot props `<slot name="x" {p} />` forwards */
+  slotPropsFor: Record<string, string[]>;
   deps: string[];
   hasClient: boolean;
   hasCss: boolean;
@@ -158,6 +162,7 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       file,
       source,
       components: script.components,
+      bindings: new Set(script.bindings),
       scoped: scoped.length > 0,
       usedComponents: new Set(),
       usedSlots: new Set(),
@@ -182,14 +187,43 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   // 7. meta
   const slots = new Set<string>();
   const requiredSlots = new Set<string>();
+  const slotPropsFor: Record<string, string[]> = Object.create(null);
   let headBlocks = 0;
   walk(root.children, (n) => {
     if (n.type === 'Slot' && !(root.document && n.name === 'head')) {
       slots.add(n.name);
       if (!n.fallback.some((c) => c.type !== 'Text' || c.value.trim())) requiredSlots.add(n.name);
+      const forwarded = (n.props ?? []).filter((a) => a.kind === 'slotProp');
+      const names: string[] = [];
+      for (const a of forwarded) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ast = (a as { expr: { ast: any; raw: string } }).expr.ast;
+        if (ast.type === 'Identifier') names.push(ast.name);
+      }
+      if (names.length) for (const key of names) (slotPropsFor[n.name] ??= []).push(key);
     }
     if (n.type === 'HeadBlock') headBlocks++;
   });
+
+  // The writer of the component must keep its declared slot interface honest.
+  if (script.slotDecls) {
+    const scriptBase = blocks?.script ? blocks.script.contentStart : 0;
+    for (const name of script.slotDecls.order) {
+      const spec = script.slotDecls.slots[name];
+      if (slots.has(name) || spec.required) continue;
+      diagnostics.push(
+        makeDiagnostic(
+          'PF4042',
+          `Slot "${name}" is declared in defineSlots but never rendered by ${file}`,
+          file,
+          source,
+          scriptBase + spec.offset,
+          'warning',
+          'Render <slot name="' + name + '" /> somewhere, or drop the declaration.',
+        ),
+      );
+    }
+  }
   const deps = script.imports.filter((i) => i.isComponent).map((i) => i.source);
   for (const c of script.components) {
     if (!tctx.usedComponents.has(c)) {
@@ -288,6 +322,8 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       slots: [...slots],
       requiredSlots: [...requiredSlots],
       dynamicSlots: tctx.dynamicSlots?.value ?? false,
+      declaredSlots: script.slotDecls,
+      slotPropsFor,
       deps,
       hasClient,
       hasCss: scoped.length > 0 || global.length > 0,

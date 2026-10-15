@@ -37,18 +37,47 @@ export function analyzeTemplateScope(nodes: Node[], bindings: string[], file: st
   const known = new Set<string>([...bindings, ...IMPLICIT_BINDINGS, ...GLOBALS_WHITELIST]);
   const seen = new Set<Expression>();
 
-  /** Expressions nested inside a JSX run are checked via their own node. */
-  const markSubExprsSeen = (expr: Expression) => {
+  /** Expressions nested inside a JSX run are checked via their own node.
+   *  With an extended known set (scoped slots), nested expressions
+   *  are analyzed there too — otherwise they would resolve wrongly. */
+  const markSubExprsSeen = (expr: Expression, extended?: Set<string>): void => {
     for (const j of expr.jsx) {
       walk(j.nodes, (sub) => {
         if (sub.type === 'Expression') {
           seen.add(sub);
-          markSubExprsSeen(sub);
+          if (extended) {
+            analyzeExpression(sub, extended, file, source);
+            markSubExprsSeen(sub, extended);
+          } else {
+            markSubExprsSeen(sub);
+          }
         } else if (sub.type === 'Element') {
-          for (const a of sub.attrs) if ('expr' in a) seen.add(a.expr);
+          for (const a of sub.attrs) {
+            if ('expr' in a && a.expr) {
+              seen.add(a.expr);
+              if (extended) {
+                analyzeExpression(a.expr, extended, file, source);
+                markSubExprsSeen(a.expr, extended);
+              }
+            }
+          }
         } else if (sub.type === 'Component') {
-          for (const a of sub.props) if ('expr' in a) seen.add(a.expr);
-          if (sub.clientProps) seen.add(sub.clientProps);
+          for (const a of sub.props) {
+            if ('expr' in a && a.expr) {
+              seen.add(a.expr);
+              if (extended) {
+                analyzeExpression(a.expr, extended, file, source);
+                markSubExprsSeen(a.expr, extended);
+              }
+            }
+          }
+          if (sub.clientProps) {
+            seen.add(sub.clientProps);
+            if (extended) {
+              analyzeExpression(sub.clientProps, extended, file, source);
+              markSubExprsSeen(sub.clientProps, extended);
+            }
+          }
         }
       });
     }
@@ -61,14 +90,51 @@ export function analyzeTemplateScope(nodes: Node[], bindings: string[], file: st
     markSubExprsSeen(e);
   };
 
+  /**
+   * Scoped slots introduce bound names (`let-item`) that resolve only inside
+   * their own subtree. Analyze those nodes under an extended known set and
+   * mark everything seen, so the base walk (which has no such context) never
+   * re-checks them.
+   */
+  const analyzeExtended = (nodes: Node[], extra: string[], base = known): void => {
+    if (!nodes.length) return;
+    const scoped = base === known ? new Set<string>([...base, ...extra]) : base;
+    const sub = (e: Expression): void => {
+      if (e && !seen.has(e)) {
+        seen.add(e);
+        analyzeExpression(e, scoped, file, source);
+        markSubExprsSeen(e, scoped);
+      }
+    };
+    walk(nodes, (n) => {
+      if (n.type === 'Expression') {
+        sub(n);
+      } else if (n.type === 'Element') {
+        for (const a of n.attrs) if ('expr' in a && a.expr) sub(a.expr);
+      } else if (n.type === 'Component') {
+        for (const a of n.props) if ('expr' in a && a.expr) sub(a.expr);
+        if (n.clientProps) sub(n.clientProps);
+        // nested components carry their own bindings
+        if (n.slotLets) for (const [bucket, lets] of Object.entries(n.slotLets)) analyzeExtended(n.slots[bucket] ?? [], lets, scoped);
+      } else if (n.type === 'Slot') {
+        analyzeExtended(n.fallback, extra, scoped);
+      }
+    });
+  };
+
   walk(nodes, (n) => {
     if (n.type === 'Expression') {
       check(n);
     } else if (n.type === 'Element') {
-      for (const a of n.attrs) if ('expr' in a) check(a.expr);
+      for (const a of n.attrs) if ('expr' in a && a.expr) check(a.expr);
     } else if (n.type === 'Component') {
-      for (const a of n.props) if ('expr' in a) check(a.expr);
+      for (const a of n.props) if ('expr' in a && a.expr) check(a.expr);
       if (n.clientProps) check(n.clientProps);
+      if (n.slotLets) for (const [bucket, lets] of Object.entries(n.slotLets)) analyzeExtended(n.slots[bucket] ?? [], lets);
+    } else if (n.type === 'Slot') {
+      // a scoped slot's own passthrough expressions live in the writer scope
+      const props = (n.props ?? []).filter((a) => a.kind === 'slotProp' && 'expr' in a);
+      for (const a of props) if ('expr' in a && a.expr) check(a.expr);
     }
   });
 }

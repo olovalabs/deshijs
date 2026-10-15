@@ -17,9 +17,11 @@ import {
   JsxParser,
   bucketSlots,
   checkAttrName,
+  componentTagResolves,
   isComponentName,
   makeExpression,
   takeClientDirectives,
+  takeLetProps,
   type TemplateContext,
 } from './expression';
 import { analyzeScript, type ScriptInfo } from './script';
@@ -184,17 +186,27 @@ function mdxElement(node: M, ctx: TemplateContext): Node[] {
   const attrs: Attr[] = (node.attributes ?? []).map((a: M) => attrFromMdx(a, ctx, l));
 
   if (isComponentName(name)) {
-    if (!ctx.components.has(name)) {
+    if (!componentTagResolves(name, ctx)) {
+      if (name.includes('.')) {
+        const head = name.split('.')[0];
+        fail('PF4041', `<${name}> must resolve to a component`, ctx.file, ctx.source, l.start,
+          `Bind "${head}" in the <script> block (import * as ${head} from './…').`);
+      }
       fail('PF4024', `<${name}> is not an imported component`, ctx.file, ctx.source, l.start,
         `Add: import ${name} from './${name}.deshi' to the top of the file.`);
     }
-    ctx.usedComponents.add(name);
-    const taken = takeClientDirectives(attrs, l, ctx, name, true);
+    if (!name.includes('.') && ctx.components.has(name)) {
+      ctx.usedComponents.add(name);
+    }
+    const { attrs: plain, lets: usageLets } = takeLetProps(attrs, ctx.file, ctx.source, l.start);
+    const taken = takeClientDirectives(plain, l, ctx, name, true);
+    const bucketed = bucketSlots(children, ctx, usageLets);
     return [{
       type: 'Component',
       ident: name,
       props: taken.attrs,
-      slots: bucketSlots(children, ctx),
+      slots: bucketed.nodes,
+      slotLets: bucketed.lets,
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
       clientValue: taken.clientValue,
@@ -205,7 +217,7 @@ function mdxElement(node: M, ctx: TemplateContext): Node[] {
 
   if (name === 'slot') {
     const nameAttr = attrs.find((a) => a.kind === 'static' && a.name === 'name');
-    return [{ type: 'Slot', name: (nameAttr as { value?: string } | undefined)?.value || 'default', fallback: children, loc: l }];
+    return [{ type: 'Slot', name: (nameAttr as { value?: string } | undefined)?.value || 'default', fallback: children, props: [], loc: l }];
   }
 
   takeClientDirectives(attrs, l, ctx, name, false);
@@ -465,6 +477,7 @@ export function compileDocument(source: string, file: string, _opts: DocumentOpt
     file,
     source,
     components: script.components,
+    bindings: new Set(script.bindings),
     scoped: false,
     usedComponents: new Set(),
     usedSlots: new Set(),
@@ -486,6 +499,7 @@ export function compileDocument(source: string, file: string, _opts: DocumentOpt
       ident: 'Layout',
       props: [{ kind: 'dynamic', name: 'frontmatter', expr: exprFromSource('frontmatter', ctx, rootLoc) as never }],
       slots: { default: [article] },
+      slotLets: {},
       loc: rootLoc,
     });
   } else {

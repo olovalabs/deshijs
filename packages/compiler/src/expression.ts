@@ -28,8 +28,15 @@ export interface TemplateContext {
   file: string;
   /** full original file source (template offsets are file offsets) */
   source: string;
-  /** local identifiers of imported .html components */
+  /** local identifiers of imported .deshi/.html components */
   components: Set<string>;
+  /**
+   * every `<script>` binding (imports + declarations). Component tags may name
+   * any of them, not just imports — `const Tag = registry[k]; <Tag />` — so
+   * classification consults this set as well. Optional: single-file tooling
+   * may omit it, and then only imported components match.
+   */
+  bindings?: Set<string>;
   scoped: boolean;
   usedComponents: Set<string>;
   usedSlots: Set<string>;
@@ -122,7 +129,30 @@ function jsxToTemplate(expr: Expression, ctx: TemplateContext): void {
 function jsxName(nameNode: AnyNode, ctx: TemplateContext): string {
   if (nameNode.type === 'JSXIdentifier') return nameNode.name;
   if (nameNode.type === 'JSXNamespacedName') return `${nameNode.namespace.name}:${nameNode.name.name}`;
+  if (nameNode.type === 'JSXMemberExpression') {
+    // `<UI.Card />`, `<Icons.Tone.Info />` — a dotted tag is a component whose
+    // value expression is the dotted chain itself. Computed JSX is not real
+    // syntax (neither in React), so anything else stays a syntax error.
+    const obj = jsxName(nameNode.object, ctx);
+    if (nameNode.property.type !== 'JSXIdentifier') {
+      fail('PF4001', 'Computed JSX member tags are not valid — assign the value to a const first', ctx.file, ctx.source, nameNode.start);
+    }
+    return `${obj}.${nameNode.property.name}`;
+  }
   fail('PF4001', 'Member expressions (<a.b>) are not valid tag names in Deshi', ctx.file, ctx.source, nameNode.start);
+}
+
+/**
+ * Whether a capitalized (or dotted) tag can resolve in scope: an imported
+ * component, or any `<script>` binding (`const Tag = registry[k]`), or the
+ * head of a dotted chain bound either way.
+ */
+export function componentTagResolves(name: string, ctx: TemplateContext): boolean {
+  const head = name.split('.')[0];
+  if (ctx.components.has(head)) return true;
+  if (ctx.bindings?.has(head)) return true;
+  if (head === 'props' || head === 'slots' || head === 'Deshi' || head === 'Astro') return true;
+  return false;
 }
 
 function convertJsxAttr(a: AnyNode, ctx: TemplateContext): Attr {
@@ -295,11 +325,9 @@ function jsxTextValue(raw: string): string {
 }
 
 export function isComponentName(name: string): boolean {
-  // Uppercase-first covers `Card` and namespaced `UI.Card`; hyphens are
-  // custom *elements* (`my-widget`), never components. JSX already guarantees
-  // a non-empty name, but guard anyway so "" can never classify as a component.
   if (!name) return false;
   if (name.includes('-')) return false;
+  if (name.includes('.')) return true;
   const c = name.charCodeAt(0);
   return c >= 65 && c <= 90;
 }
@@ -322,8 +350,51 @@ function convertJsxChildren(children: AnyNode[], ctx: TemplateContext): Node[] {
   return out;
 }
 
-export function bucketSlots(children: Node[], ctx: TemplateContext): Record<string, Node[]> {
-  const slots: Record<string, Node[]> = Object.create(null);
+/**
+ * Strip `let-*` attributes off a slot wrapper or a component usage. Each
+ * `let-item` names a scoped-slot binding: a plain identifier that resolves to
+ * the slot props of the bucket it declares (`let-` + identifier).
+ */
+export function takeLetProps(
+  attrs: Attr[],
+  file: string,
+  source: string,
+  offset: number,
+): { attrs: Attr[]; lets: string[] } {
+  const rest: Attr[] = [];
+  const lets: string[] = [];
+  for (const a of attrs) {
+    const name = 'name' in a ? a.name : '';
+    if (!name.startsWith('let-')) {
+      rest.push(a);
+      continue;
+    }
+    const binding = name.slice('let-'.length);
+    if (!/^[A-Za-z_$][\w$]*$/.test(binding)) {
+      fail(
+        'PF4046',
+        `"${name}" is not a valid slot binding — use let-item with a plain identifier`,
+        file,
+        source,
+        offset,
+      );
+    }
+    lets.push(binding);
+  }
+  return { attrs: rest, lets };
+}
+
+export interface BucketResult {
+  /** bucket name → slot content nodes */
+  nodes: Record<string, Node[]>;
+  /** bucket name → `let-*` scoped-slot bindings in scope for that bucket */
+  lets: Record<string, string[]>;
+}
+
+export function bucketSlots(children: Node[], ctx: TemplateContext, defaultLets: string[] = []): BucketResult {
+  const nodes: Record<string, Node[]> = Object.create(null);
+  const lets: Record<string, string[]> = Object.create(null);
+  if (defaultLets.length) lets['default'] = [...defaultLets];
   for (const child of children) {
     let name = 'default';
     if (child.type === 'Element') {
@@ -333,12 +404,26 @@ export function bucketSlots(children: Node[], ctx: TemplateContext): Record<stri
         name = a.value || 'default';
         child.attrs.splice(idx, 1);
       }
+      // `<template slot="name" let-item>` names a scoped slot; the wrapper
+      // itself disappears and its children become the slot content.
+      if (name !== 'default' && child.name.toLowerCase() === 'template') {
+        const { attrs: rest, lets: wrapperLets } = takeLetProps(child.attrs, ctx.file, ctx.source, child.loc.start);
+        child.attrs = rest;
+        if (wrapperLets.length || child.children.length) {
+          (nodes[name] ??= []).push(...child.children);
+          if (wrapperLets.length) lets[name] = [...(lets[name] ?? []), ...wrapperLets];
+        }
+        ctx.usedSlots.add(name);
+        continue;
+      }
     }
     if (child.type === 'Text' && !child.value.trim()) continue;
-    (slots[name] ??= []).push(child);
+    (nodes[name] ??= []).push(child);
     ctx.usedSlots.add(name);
   }
-  return slots;
+  // every bucket carrying lets counts as used, even if its content is empty
+  for (const name of Object.keys(lets)) ctx.usedSlots.add(name);
+  return { nodes, lets };
 }
 
 export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
@@ -354,23 +439,42 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
   if (name === 'Fragment') return children;
 
   if (isComponentName(name)) {
-    if (!ctx.components.has(name)) {
+    if (!componentTagResolves(name, ctx)) {
+      if (name.includes('.')) {
+        const head = name.split('.')[0];
+        fail(
+          'PF4041',
+          `<${name}> must resolve to a component`,
+          ctx.file,
+          ctx.source,
+          node.start,
+          `Bind "${head}" in the <script> block (e.g. import * as ${head} from './…').`,
+        );
+      }
       fail(
         'PF4024',
         `<${name}> is not an imported component`,
         ctx.file,
         ctx.source,
         node.start,
-        `Add: import ${name} from './${name}.html' to the <script> block.`,
+        `Add: import ${name} from './${name}.deshi' to the <script> block.`,
       );
     }
-    ctx.usedComponents.add(name);
-    const taken = takeClientDirectives(attrs, loc, ctx, name, true);
+    // Only directly imported plain names participate in unused-import
+    // diagnostics; scope-resolved tags (`const Tag = …`, dotted chains) are
+    // opaque until render time.
+    if (!name.includes('.') && ctx.components.has(name)) {
+      ctx.usedComponents.add(name);
+    }
+    const { attrs: plain, lets: usageLets } = takeLetProps(attrs, ctx.file, ctx.source, loc.start);
+    const taken = takeClientDirectives(plain, loc, ctx, name, true);
+    const bucketed = bucketSlots(children, ctx, usageLets);
     const comp: Component = {
       type: 'Component',
       ident: name,
       props: taken.attrs,
-      slots: bucketSlots(children, ctx),
+      slots: bucketed.nodes,
+      slotLets: bucketed.lets,
       clientProps: taken.clientProps,
       clientStrategy: taken.clientStrategy,
       clientValue: taken.clientValue,
@@ -384,7 +488,7 @@ export function convertJsxNode(node: AnyNode, ctx: TemplateContext): Node[] {
     const nameAttr = attrs.find((a: Attr) => a.kind === 'static' && a.name === 'name') as
       | { value: string }
       | undefined;
-    return [{ type: 'Slot', name: nameAttr?.value || 'default', fallback: children, loc }];
+    return [{ type: 'Slot', name: nameAttr?.value || 'default', fallback: children, props: [], loc }];
   }
 
   takeClientDirectives(attrs, loc, ctx, name, false);

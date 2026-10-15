@@ -16,7 +16,7 @@
 import type { Attr, Component, Loc, Node, Root } from './types';
 import { walk } from './ast/walk';
 import { hasOpaquePropertyAccess, propertyAccesses, staticType, staticValue } from './ast/estree';
-import { describeType, type PropContract, type PropType } from './tsprops';
+import { describeType, type PropContract, type PropType, type SlotContract } from './tsprops';
 import { isFrameworkComponent } from './filetype';
 /** What one compiled component file tells the compiler about its interface. */
 export interface ComponentInfo {
@@ -28,6 +28,10 @@ export interface ComponentInfo {
   requiredSlots: string[];
   /** true when a slot name is computed, so slot checks are skipped */
   dynamicSlots: boolean;
+  /** the slot interface declared via `defineSlots`, when there is one */
+  declaredSlots?: SlotContract | null;
+  /** slot name → the slot props `<slot name="x" {p} />` forwards */
+  slotPropsFor?: Record<string, string[]>;
   /** the declared contract, or null when the component declares none */
   contract: PropContract | null;
   /** `props.x` names the component reads */
@@ -48,6 +52,8 @@ export interface CompiledFileLike {
     slots: string[];
     requiredSlots: string[];
     dynamicSlots: boolean;
+    declaredSlots?: { order: string[]; slots: Record<string, { required: boolean }> } | null;
+    slotPropsFor?: Record<string, string[]>;
     contract: PropContract | null;
     propReads: string[];
     propReadsOpaque: boolean;
@@ -71,6 +77,8 @@ export function resolverFromCompiled(
       slots: res.meta.slots,
       requiredSlots: res.meta.requiredSlots,
       dynamicSlots: res.meta.dynamicSlots,
+      declaredSlots: (res.meta.declaredSlots ?? null) as ComponentInfo['declaredSlots'],
+      slotPropsFor: res.meta.slotPropsFor ?? {},
       contract: res.meta.contract,
       reads: res.meta.propReads,
       opaque: res.meta.propReadsOpaque,
@@ -90,6 +98,8 @@ export function resolverFromCompiled(
         slots: ['default'],
         requiredSlots: [],
         dynamicSlots: true,
+        declaredSlots: null,
+        slotPropsFor: {},
         contract: null,
         reads: [],
         opaque: true,
@@ -283,7 +293,7 @@ function checkUsage(node: Component, ctx: CheckContext): PropIssue[] {
             kind === 'string'
               ? 'HTML attribute values are always strings — pass an expression: name={value}.'
               : undefined,
-          loc: 'expr' in a ? a.expr.loc : at,
+          loc: 'expr' in a && a.expr ? a.expr.loc : at,
         });
       }
     }
@@ -302,27 +312,57 @@ function checkUsage(node: Component, ctx: CheckContext): PropIssue[] {
   }
 
   // ── slots ──
-  if (!info.dynamicSlots) {
+  // Rendered slots and `defineSlots` declarations describe the same surface;
+  // merge them so usage checks work even when the component renders slot names
+  // dynamically but declared its interface.
+  const rendered = new Set(info.slots);
+  const declared = info.declaredSlots ?? null;
+  if (declared) for (const name of declared.order) rendered.add(name);
+  const required = new Set(info.requiredSlots);
+  if (declared) for (const name of declared.order) if (declared.slots[name].required) required.add(name);
+
+  const slotChecks = !info.dynamicSlots || !!declared;
+  if (slotChecks) {
     for (const name of Object.keys(node.slots)) {
       if (name === 'default') continue;
-      if (info.slots.includes(name)) continue;
+      if (rendered.has(name)) continue;
       issues.push({
         code: 'PF4033',
         severity: 'error',
         message: `<${node.ident}> has no slot named "${name}"`,
-        hint: `Slots it renders: ${info.slots.map((s) => `"${s}"`).join(', ')}.`,
+        hint: `Slots it provides: ${[...rendered].map((s) => `"${s}"`).join(', ')}.`,
         loc: at,
       });
     }
-    for (const name of info.requiredSlots) {
+    for (const name of required) {
       if (name === 'default') continue;
       if (node.slots[name] && node.slots[name].length) continue;
       issues.push({
         code: 'PF4040',
         severity: 'warning',
-        message: `<${node.ident}> renders <slot name="${name}" /> with no fallback, and this usage provides no "${name}" slot`,
+        message: `<${node.ident}> requires a "${name}" slot, and this usage provides none`,
         loc: at,
       });
+    }
+
+    // Scoped-slot bindings: `let-item` must be forwarded by the component.
+    const forwardedBy = info.slotPropsFor ?? {};
+    if (node.slotLets) {
+      for (const [name, lets] of Object.entries(node.slotLets)) {
+        const forwarded = new Set(forwardedBy[name] ?? []);
+        for (const binding of lets) {
+          if (forwarded.has(binding)) continue;
+          issues.push({
+            code: 'PF4045',
+            severity: 'warning',
+            message: `<${node.ident}> does not forward "${binding}" into its "${name}" slot content`,
+            hint: forwardedBy[name]?.length
+              ? `Forwarded props: ${forwardedBy[name].map((p) => `{${p}}`).join(', ')}.`
+              : `No <slot name="${name}" {…} /> forwards props in ${info.file}.`,
+            loc: at,
+          });
+        }
+      }
     }
   }
 
@@ -445,11 +485,13 @@ export function collectPropReads(
       return;
     }
     if (n.type === 'Element') {
-      for (const a of n.attrs) if ('expr' in a) fromExpr(a.expr.ast);
+      for (const a of n.attrs) if ('expr' in a && a.expr) fromExpr(a.expr.ast);
       return;
     }
     if (n.type === 'Component') {
-      for (const a of n.props) if ('expr' in a) fromExpr(a.expr.ast);
+      for (const a of n.props) {
+        if ('expr' in a && a.expr) fromExpr(a.expr.ast);
+      }
       if (n.clientProps) fromExpr(n.clientProps.ast);
     }
   });

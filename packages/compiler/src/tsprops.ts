@@ -14,6 +14,8 @@
 // compiler sees it, so the contract has to be read out of the *original* source.
 // That needs a small type reader: enough of the TypeScript grammar to describe
 // props, and no more. It parses syntax only — it never infers types from values.
+import * as acorn from 'acorn';
+import { JsxParser, ACORN_OPTIONS } from './expression';
 
 /** The prop types the checks distinguish. `Simple` is expanded so the union
  *  stays a real discriminated union (narrowing on `kind` then just works). */
@@ -50,6 +52,25 @@ export interface PropContract {
   /** name of the interface / type alias the contract came from, if any */
   via: string | null;
   /** offset of the `defineProps` call */
+  offset: number;
+}
+
+export interface SlotSpec {
+  name: string;
+  /** a usage must provide content for this slot */
+  required: boolean;
+  /** offset of the member, roughly (as with props, used for diagnostics) */
+  offset: number;
+}
+
+/** The slot interface declared via `defineSlots` — compile-time only. */
+export interface SlotContract {
+  /** declaration order */
+  order: string[];
+  slots: Record<string, SlotSpec>;
+  /** name of the interface / type alias the contract came from, if any */
+  via: string | null;
+  /** offset of the `defineSlots` call */
   offset: number;
 }
 
@@ -646,6 +667,124 @@ export function contractFromSite(code: string, site: DefinePropsSite, scope: Typ
 
   if (!order.length) return null;
   return { order, props, via, offset: site.at };
+}
+
+// ─── defineSlots — the slot interface half ──────────────────────────────────
+
+export interface DefineSlotsSite {
+  /** offset of the `defineSlots` identifier */
+  at: number;
+  typeText: string | null;
+  argText: string | null;
+  local: string | null;
+  end: number;
+}
+
+/** Locate every `defineSlots(…)` / `defineSlots<T>(…)` call — same shape as findDefineProps. */
+export function findDefineSlots(code: string): DefineSlotsSite[] {
+  const out: DefineSlotsSite[] = [];
+  const re = /\bdefineSlots\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const at = m.index;
+    let i = at + m[0].length;
+    const ws = (): void => {
+      while (i < code.length && /\s/.test(code[i])) i++;
+    };
+    ws();
+    let typeText: string | null = null;
+    if (code[i] === '<') {
+      let depth = 0;
+      const start = ++i;
+      while (i < code.length) {
+        const c = code[i];
+        if (c === '<') depth++;
+        else if (c === '>') {
+          if (depth === 0) break;
+          depth--;
+        }
+        i++;
+      }
+      typeText = code.slice(start, i);
+      if (code[i] === '>') i++;
+      ws();
+    }
+    let argText: string | null = null;
+    if (code[i] === '(') {
+      const close = matchBracketFrom(code, i, '(', ')');
+      argText = code.slice(i + 1, close === -1 ? code.length : close);
+      i = close === -1 ? code.length : close + 1;
+    }
+    const local = boundNameBefore(code, at);
+    out.push({ at, typeText, argText, local, end: i });
+    re.lastIndex = i;
+  }
+  return out;
+}
+
+const slotRequired = (type: TypeNode, scope: TypeScope, depth: number): boolean => {
+  if (depth > 4) return false;
+  if (type.k === 'object') {
+    return type.members.some((mm) => mm.name === 'required' && (!mm.optional || mm.type.k === 'literal' && mm.type.value === true));
+  }
+  if (type.k === 'name') return (scope[type.name] ?? []).some((mm) => mm.name === 'required');
+  return false;
+};
+
+/** Build a slot contract from a `defineSlots` site. */
+export function slotContractFromSite(code: string, site: DefineSlotsSite, scope: TypeScope): SlotContract | null {
+  const slots: Record<string, SlotSpec> = {};
+  const order: string[] = [];
+  let via: string | null = null;
+
+  if (site.typeText) {
+    let node = parseTypeText(site.typeText);
+    if (node.k === 'name') {
+      via = node.name;
+      const members = scope[node.name];
+      if (!members) return null;
+      node = { k: 'object', members, pos: site.at };
+    }
+    const members: TypeMember[] = node.k === 'object' ? node.members : [];
+    for (const m of members) {
+      if (m.rest || m.call) continue;
+      slots[m.name] = {
+        name: m.name,
+        required: !m.optional && slotRequired(m.type, scope, 0),
+        offset: m.pos,
+      };
+      order.push(m.name);
+    }
+  } else if (site.argText && site.argText.trim()) {
+    // JS form: defineSlots({ footer: { required: true } }) — parsed with a real
+    // parser, since the object nests like any other object literal.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ast: any = null;
+    try {
+      ast = JsxParser.parseExpressionAt(site.argText, 0, ACORN_OPTIONS);
+    } catch {
+      ast = null;
+    }
+    if (ast?.type === 'ObjectExpression') {
+      for (const p of ast.properties) {
+        if (p.type !== 'Property') continue;
+        const name = p.key.type === 'Identifier' ? p.key.name : p.key.type === 'Literal' && typeof p.key.value === 'string' ? p.key.value : '';
+        if (!name) continue;
+        const body = p.value.type === 'ObjectExpression' ? p.value.properties : [];
+        const required = body.some(
+          (mm: any) =>
+            mm.type === 'Property' &&
+            (mm.key.type === 'Identifier' ? mm.key.name : String(mm.key.value)) === 'required' &&
+            !(mm.value.type === 'Literal' && mm.value.value === false),
+        );
+        slots[name] = { name, required, offset: site.at };
+        order.push(name);
+      }
+    }
+  }
+
+  if (!order.length) return null;
+  return { order, slots, via, offset: site.at };
 }
 
 const SCHEMA_CTORS: Record<string, PropType['kind']> = {

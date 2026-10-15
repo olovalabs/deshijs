@@ -2,6 +2,7 @@
 // Every template node becomes a string-concatenation expression; JSX found inside
 // `{ }` expressions is spliced back into the expression source as `$r(...)` calls.
 import type { Component, Element, Expression, Node, Root, Slot } from './types';
+import { fail } from './types';
 import type { ImportInfo, ScriptInfo } from './script';
 import { escapeHtml } from './escape';
 import { planAttributes, planPropsObject } from './attrs';
@@ -145,12 +146,17 @@ function genDocHead(el: Element, em: Em, g: G): void {
 
 function genComponent(c: Component, em: Em, g: G): void {
   const props = planPropsObject(c.props, { print: (e) => genExprCode(e, g) });
+  const lets: Record<string, string[]> = c.slotLets ?? Object.create(null);
   const slots = Object.entries(c.slots)
     .filter(([, nodes]) => nodes.length)
     .map(([name, nodes]) => {
       const s = new Em();
       genNodes(nodes, s, g);
-      return `[${JSON.stringify(name)}]: async () => ${s.code()}`;
+      // A scoped slot bucket receives the forwarded slot props as its own
+      // destructure parameter; plain buckets keep the zero-arg signature.
+      const bound = lets[name] ?? [];
+      const params = `(${bound.length ? `{ ${bound.join(', ')} } = {}` : ''})`;
+      return `[${JSON.stringify(name)}]: async ${params} => ${s.code()}`;
     })
     .join(', ');
   const cp = c.clientProps
@@ -175,13 +181,35 @@ function genSlot(s: Slot, em: Em, g: G): void {
     em.str('<!--deshi:head-->');
     return;
   }
+  // `<slot name="row" {item} />` forwards `item` into the caller's slot content.
   let fb = '';
   if (s.fallback.length) {
     const f = new Em();
     genNodes(s.fallback, f, g);
-    fb = `, async () => ${f.code()}`;
+    fb = `async () => ${f.code()}`;
   }
-  const code = `(await $slot($slotFns, ${JSON.stringify(s.name)}${fb}))`;
+  const props = s.props ?? [];
+  const entries: string[] = [];
+  for (const a of props) {
+    if (a.kind !== 'slotProp') continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ast = a.expr.ast as any;
+    if (ast.type !== 'Identifier') {
+      fail(
+        'PF4044',
+        `A slot passthrough must be a bare identifier: {${a.expr.raw}}`,
+        g.file,
+        a.expr.src,
+        a.expr.loc.start,
+      );
+    }
+    entries.push(`${JSON.stringify(ast.name)}: ${genExprCode(a.expr, g)}`);
+  }
+  // positional args: ($slotFns, name, fallback?, props?) — keep 3rd as fallback
+  const tail: string[] = [];
+  if (fb) tail.push(fb);
+  if (entries.length) tail.push(`{ ${entries.join(', ')} }`);
+  const code = `(await $slot($slotFns, ${JSON.stringify(s.name)}${tail.length ? ', ' + tail.join(', ') : ''}))`;
   // No marker comments in output (Astro-clean HTML): the client router swaps
   // <main> (everything route-specific renders inside it, layouts nest under
   // one root), so no per-segment hooks are needed in the markup.

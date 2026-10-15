@@ -46,6 +46,12 @@ export interface Component {
   ident: string;
   props: Attr[];
   slots: Record<string, Node[]>;
+  /**
+   * Scoped-slot bindings per bucket: `let-item` / `let-index` names the caller
+   * declared, which become the slot function's destructure parameters, and can
+   * be referenced inside that bucket's template content only.
+   */
+  slotLets: Record<string, string[]>;
   clientProps?: Expression;
   /** Per-usage island strategy — Astro parity: load, visible, idle, media, only. */
   clientStrategy?: ClientStrategy;
@@ -85,6 +91,12 @@ export interface Slot {
   type: 'Slot';
   name: string;
   fallback: Node[];
+  /**
+   * `slotProp` attributes — the writer side of a scoped slot:
+   * `<slot name="row" {item} />` forwards `item` into the caller's slot
+   * content. Each entry is a bare identifier expression.
+   */
+  props: Attr[];
   loc: Loc;
   /** marks the position of the tail of the document head (after <slot name="head"/>) */
   headMarker?: boolean;
@@ -114,6 +126,8 @@ export type Attr =
   | { kind: 'setText'; expr: Expression }
   | { kind: 'classList'; expr: Expression }
   | { kind: 'defineVars'; expr: Expression }
+  /** whole-attribute `{item}` on a `<slot>` — forwards a slot prop (writer side) */
+  | { kind: 'slotProp'; expr: Expression }
   | { kind: 'transition'; name: string; value: string | Expression };
 
 // ─── Diagnostics ───────────────────────────────────────────────────────────────
@@ -178,6 +192,12 @@ export const ERROR_CATALOG: Record<string, string> = {
   PF4038: 'React-style prop on a component',
   PF4039: 'Element directive used on a component',
   PF4040: 'Required slot not provided',
+  PF4041: 'Member-expression component tag does not resolve',
+  PF4042: 'Slot declared but never rendered',
+  PF4043: 'defineSlots declared more than once',
+  PF4044: 'Slot passthrough ({expr}) used off <slot>',
+  PF4045: 'Slot binding (let-*) never forwarded by the component',
+  PF4046: 'Invalid slot binding name',
   PF5001: 'Forbidden <script> in zero-JS mode',
   PF5002: 'Asset not found',
   PF5003: 'Client chunk missing from manifest',

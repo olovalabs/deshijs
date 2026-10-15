@@ -9,7 +9,7 @@ import { transformSync } from 'esbuild';
 import { fail, makeDiagnostic, type Diagnostic } from './types';
 import { ACORN_OPTIONS, JsxParser, isComponentName } from './expression';
 import { extname, isComponentFile, isSourceFile } from './filetype';
-import { collectTypeDeclarations, contractFromSite, findDefineProps, type PropContract } from './tsprops';
+import { collectTypeDeclarations, contractFromSite, findDefineProps, findDefineSlots, slotContractFromSite, type PropContract, type SlotContract } from './tsprops';
 
 export interface ImportSpec {
   imported: string; // 'default' | '*' | name
@@ -34,6 +34,8 @@ export interface ScriptInfo {
   programBody: unknown[];
   /** the prop contract declared via `defineProps`, if any */
   contract: PropContract | null;
+  /** the slot interface declared via `defineSlots`, if any */
+  slotDecls: SlotContract | null;
   /** local name `defineProps` was bound to (`props` in `const props = defineProps()`) */
   propsLocal: string | null;
   /** source text of the `<script>` body *as parsed* (type-stripped when TS) */
@@ -102,6 +104,7 @@ export function emptyScript(): ScriptInfo {
     diagnostics: [],
     programBody: [],
     contract: null,
+    slotDecls: null,
     propsLocal: null,
     source: '',
   };
@@ -156,26 +159,45 @@ export function analyzeScript(code: string, file: string, fullSource: string, of
     }
     if (!info.propsLocal) info.propsLocal = site.local;
   }
-  const definePropsSites = findDefineProps(src).sort((a, b) => a.at - b.at);
+  // The slot interface: same reading scheme, from the original source.
+  const slotsSitesInCode = findDefineSlots(code);
+  for (const site of slotsSitesInCode) {
+    const decls = slotContractFromSite(code, site, typeScope);
+    if (decls) {
+      info.slotDecls = decls;
+      break;
+    }
+  }
+  if (slotsSitesInCode.length > 1) {
+    info.diagnostics.push(
+      makeDiagnostic('PF4043', 'defineSlots is declared more than once — a component has one slot interface', file, fullSource, offset + slotsSitesInCode[1].at),
+    );
+  }
+  const defineSites: Array<{ kind: 'props' | 'slots'; at: number; end: number; local: string | null }> = [
+    // erasure driven off the parsed (type-stripped) source
+    ...findDefineProps(src).sort((a, b) => a.at - b.at).map((s) => ({ kind: 'props' as const, at: s.at, end: s.end, local: s.local })),
+    ...findDefineSlots(src).sort((a, b) => a.at - b.at).map((s) => ({ kind: 'slots' as const, at: s.at, end: s.end, local: s.local })),
+  ].sort((a, b) => a.at - b.at);
 
   /**
-   * The body text of one statement, with any `defineProps(…)` call replaced by
-   * a plain `props` reference. The binding itself is dropped when it is called
-   * `props`, because `props` is already an implicit binding.
+   * The body text of one statement, with any `defineProps(…)` call replaced by a
+   * plain `props` reference and `defineSlots(…)` by `undefined` — both are
+   * compile-time macros that never run. The binding itself is dropped when it
+   * says `props` or `slots`, because those are already implicit bindings.
    */
   const statementText = (stmt: AnyNode): string | null => {
-    const sites = definePropsSites.filter((s) => s.at >= stmt.start && s.at < stmt.end);
+    const sites = defineSites.filter((s) => s.at >= stmt.start && s.at < stmt.end);
     if (!sites.length) return src.slice(stmt.start, stmt.end);
     const single =
       sites.length === 1 &&
-      sites[0].local === 'props' &&
+      ((sites[0].kind === 'props' && sites[0].local === 'props') || (sites[0].kind === 'slots' && sites[0].local === 'slots')) &&
       stmt.type === 'VariableDeclaration' &&
       stmt.declarations.length === 1;
     if (single) return null;
     let out = '';
     let cursor = stmt.start;
     for (const s of sites) {
-      out += src.slice(cursor, s.at) + 'props';
+      out += src.slice(cursor, s.at) + (s.kind === 'props' ? 'props' : 'undefined');
       cursor = s.end;
     }
     return out + src.slice(cursor, stmt.end);

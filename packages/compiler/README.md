@@ -221,6 +221,89 @@ binding every `<script>` body already has. A plain-JavaScript form works too —
 type is provable, a spread suppresses the completeness checks, and a component
 that declares nothing is never reported for unknown props.
 
+## Component slots
+
+### Declared slots — `defineSlots<T>()`
+
+Declare a component's slot interface once; the compiler checks every usage
+against it (unknown named slot → PF4033, missing required slot → PF4040), even
+when the component renders its slots through a dynamic `name={…}`:
+
+```deshi
+<script>
+  defineSlots<{ footer?: { required?: boolean }, row: { required: true } }>();
+</script>
+<slot name="row" /> <slot name="footer" />
+```
+
+A plain `defineSlots({ footer: { required: true } })` works too. A declared
+slot that never renders is a PF4042 warning; declaring `defineSlots` twice is
+PF4043.
+
+### Scoped slots — props forwarded into slot content
+
+A `<slot>` can pass bindings back to the caller; the callers binds them with
+`let-*` on a slot wrapper (or, for the default slot, on the component usage
+itself). The wrapper itself disappears from the output:
+
+```deshi
+<Card items={rows}>
+  <template slot="row" let-item let-index>{index}: {item.title}</template>
+</Card>
+
+<Card let-t>{t.name}</Card>            <!-- default scoped slot -->
+```
+
+```deshi
+<!-- Card.deshi -->
+<slot name="row" {item} {index} />     <!-- forwards bindings, bare identifiers -->
+```
+
+Only the wrapper's own `let-*` names are in scope inside that content — no
+implicit leakage. A `let-*` the component never forwards is a PF4045 warning;
+a passthrough that is not a bare identifier is PF4044.
+
+### Control flow — plain JSX
+
+There are no looping or conditional directives. Lists, conditionals and chains
+are written exactly like JSX, as expressions — `{rows.map((row, i) => …)}`,
+`{cond && …}` and ternaries:
+
+```deshi
+<ul>
+  {rows.map((row, i) => <li key={i}>{i}: {row.title}</li>)}
+</ul>
+{showFlag ? <Flag on /> : null}
+{
+  n > 10 ? <p>lots</p>
+  : n > 0 ? <span>some</span>
+  : <span>none</span>
+}
+```
+
+Branch bodies may contain components, islands and nested expressions — all of
+it renders at build time with no extra client JS.
+
+### Dynamic component tags
+
+A capitalized tag is a component when it resolves in scope — not only when it
+was imported. That covers member tags, aliasing, and registries:
+
+```deshi
+<script>
+  import * as UI from './ui.ts';
+  import Card from './Card.deshi';
+  const Tag = Card;
+  const renderBanner = UI.Banner; // whatever the namespace holds (PF4041 if missing)
+</script>
+
+<UI.Card title="hi" />   <!-- member-expression tag -->
+<Tag title="ho" />       <!-- script-bound tag -->
+```
+
+Contracts are unknown for such tags at compile time, so prop checks are
+skipped for them.
+
 ## Architecture
 
 Everything is AST-based, from source text to output:

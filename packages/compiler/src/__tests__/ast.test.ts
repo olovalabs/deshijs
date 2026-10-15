@@ -41,7 +41,7 @@ describe('scanStartTag', () => {
     const tag = scanStartTag(src, 0, src.length);
     expect(tag.name).toBe('div');
     expect(tag.attrs.map((a) => a.name).slice(0, 4)).toEqual(['id', 'class', 'data-x', 'disabled']);
-    expect(tag.attrs[4].name).toMatch(/^x+$/);
+    expect(tag.attrs[4].masked).toBe(true);
     expect(tag.attrs[5].name).toBe('title');
     expect(tag.attrs[1].value).toBe('b c');
     expect(tag.attrs[1].quote).toBe("'");

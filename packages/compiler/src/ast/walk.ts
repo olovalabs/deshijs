@@ -27,7 +27,7 @@ export interface ChildRef {
 export function attrExprs(attrs: Attr[]): Array<{ attr: Attr; expr: Extract<Attr, { expr: unknown }>['expr'] }> {
   const out: Array<{ attr: Attr; expr: Extract<Attr, { expr: unknown }>['expr'] }> = [];
   for (const attr of attrs) {
-    if ('expr' in attr) out.push({ attr, expr: attr.expr });
+    if ('expr' in attr && attr.expr) out.push({ attr, expr: attr.expr });
   }
   return out;
 }
