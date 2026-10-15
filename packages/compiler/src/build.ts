@@ -7,7 +7,8 @@ import { build as esbuildBuild, transformSync } from 'esbuild';
 import { compile, type CompileResult } from './index';
 import { scopedCssUrl } from './css';
 import { CLIENT_ROUTER_SCRIPT } from './client-router';
-import { formatHtml, minifyHtml } from './html';
+import { formatHtml } from './html';
+import { optimizeHtml } from './optimize';
 import { ACORN_OPTIONS, JsxParser } from './expression';
 import {
   buildUrl,
@@ -68,6 +69,8 @@ export interface BuildOptions {
   css?: 'extract' | 'inline';
   site?: string;
   minify?: boolean;
+  /** Strip `console.*` / `debugger` from island chunks and inline scripts (production). */
+  dropConsole?: boolean;
   appDir?: string; // defaults to 'src' (or 'src/app' if present)
   /** Maximum component nesting depth before throwing PF4002. Defaults to 500. */
   maxDepth?: number;
@@ -247,6 +250,7 @@ async function bundleIslandChunk(
   file: string,
   projectRoot: string,
   minify: boolean,
+  dropConsole = false,
 ): Promise<string> {
   if (!/(^|[\s;])import[\s("]/.test(code)) return code;
   try {
@@ -262,6 +266,7 @@ async function bundleIslandChunk(
       platform: 'browser',
       target: 'es2020',
       minify,
+      ...(dropConsole ? { drop: ['console', 'debugger'] as ('console' | 'debugger')[] } : {}),
       write: false,
       logLevel: 'silent',
       external: ['*.vue', '*.svelte'],
@@ -280,6 +285,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     router: options.router ?? true,
     css: options.css ?? ('inline' as const),
     minify: options.minify ?? true,
+    dropConsole: options.dropConsole ?? false,
     site: options.site,
     appDir: options.appDir,
     stableCssUrl: options.stableCssUrl,
@@ -582,7 +588,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   // import specifiers and Vite resolves them in dev.
   if (opts.projectRoot) {
     for (const entry of Object.values(clientByHash)) {
-      entry.code = await bundleIslandChunk(entry.code, entry.file, opts.projectRoot, opts.minify ?? false);
+      entry.code = await bundleIslandChunk(entry.code, entry.file, opts.projectRoot, opts.minify ?? false, opts.dropConsole);
     }
   }
 
@@ -710,7 +716,7 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
     };
     const finalHtml = inject(head, tail);
     const previewHtml = inject(previewHead, previewTail);
-    html = opts.minify ? minifyHtml(finalHtml) : formatHtml(finalHtml);
+    html = opts.minify ? optimizeHtml(finalHtml, { dropConsole: opts.dropConsole }) : formatHtml(finalHtml);
 
     return {
       url,
@@ -974,6 +980,7 @@ export async function buildToDisk(
       router: options.router ?? true,
       css: options.css ?? 'inline',
       minify: options.minify ?? true,
+      dropConsole: options.dropConsole ?? false,
       appDir,
       site: options.site,
       highlight: options.highlight,

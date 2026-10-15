@@ -331,6 +331,30 @@ ESTree toolkit. Adding a node type touches one file.
 - `sitemap.xml` and `robots.txt` when `site` is configured.
 - `_deshi/` — per-island JS chunks and (with `router: true`) the client router.
 
+### Build output optimization
+
+Every production build is passed through a compile-time optimizer (`optimizeHtml`,
+`optimizeCss`, `optimizeJs`, all exported from `deshijs`):
+
+- **HTML** — comments are stripped (hydration markers, conditional comments and
+  SSI are kept), redundant attributes (`type="text/javascript"` on `<script>`,
+  `type="text/css"` on `<style>`/`<link>`) and empty `class`/`style` attributes
+  are removed, `class` whitespace is collapsed, and `style="…"` declarations are
+  minified.
+- **CSS** — compiler-generated `<style>` blocks (scoped and global) are minified
+  with [Lightning CSS](https://lightningcss.dev) when it is installed, which
+  shortens values (`#ffffff` → `#fff`, `0.5` → `.5`) and drops dead rules. The
+  dependency is optional; the compiler falls back to a css-tree minifier
+  automatically. Author inline `<style>` stays byte-for-byte intact.
+- **JS** — island chunks are bundled and minified with esbuild; inline scripts
+  keep their original bytes unless you opt in.
+
+Author `<script is:inline>` / inline `<style>` text is never rewritten, matching
+Astro's `is:inline` contract.
+
+Set `build.dropConsole: true` (or pass `dropConsole` to the plugin) to also strip
+`console.*` calls and `debugger` statements from island chunks and inline scripts.
+
 ## Publishing
 
 ```bash

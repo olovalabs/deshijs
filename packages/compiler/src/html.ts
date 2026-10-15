@@ -44,6 +44,71 @@ const VOID = new Set([
 // Content whose inner whitespace must never be rewritten.
 const PRESERVE = new Set(['pre', 'textarea', 'script', 'style']);
 
+// ─── optional production optimizations ───────────────────────────────────────
+
+export interface HtmlMinifyOptions {
+  /** Drop comments except deshi/astro markers, conditional comments and SSI. */
+  removeComments?: boolean;
+  /** Remove redundant / empty attributes and collapse `class` whitespace. */
+  optimizeAttributes?: boolean;
+  /** Minifier for a bare `style="…"` declaration list. Default: identity. */
+  minifyDeclarations?: (declarations: string) => string;
+  /** Minifier for an inline `<style>`. Defaults to `minifyCss`. */
+  minifyStyle?: (css: string) => string;
+  /** Minifier for an inline classic/module `<script>`. Default: identity. */
+  minifyScript?: (code: string) => string;
+}
+
+/** Comments that must survive minification (hydration markers, IE, SSI). */
+function keepComment(value: string): boolean {
+  const v = value.trim();
+  if (v.startsWith('deshi:') || v.startsWith('astro:')) return true;
+  if (v.startsWith('[') || v.startsWith('!') || v.startsWith('#')) return true; // conditional / bang / SSI
+  return v.includes('<![endif') || v.includes('[if ');
+}
+
+/** Inline `<script>` whose body is JavaScript (not JSON/data) and has no `src`. */
+function isInlineJsScript(el: P5.Element): boolean {
+  const attrs = el.attrs ?? [];
+  if (attrs.some((a) => a.name === 'src')) return false;
+  const type = (attrs.find((a) => a.name === 'type')?.value ?? '').trim().toLowerCase();
+  return type === '' || type === 'text/javascript' || type === 'application/javascript' || type === 'module';
+}
+
+function isRedundantAttribute(tag: string, name: string, value: string): boolean {
+  const v = value.trim().toLowerCase();
+  if (tag === 'script') {
+    if (name === 'language' && v === 'javascript') return true;
+    if (name === 'type' && (v === 'text/javascript' || v === 'application/javascript')) return true;
+  }
+  if (tag === 'style' && name === 'type' && v === 'text/css') return true;
+  if (tag === 'link' && name === 'type' && v === 'text/css') return true;
+  return false;
+}
+
+function optimizeElement(element: P5.Element, options: HtmlMinifyOptions): void {
+  const tag = element.tagName;
+  const out: P5.Element['attrs'] = [];
+  for (const a of element.attrs ?? []) {
+    const value = a.value ?? '';
+    if (isRedundantAttribute(tag, a.name, value)) continue;
+    if (a.name === 'class') {
+      const v = value.replace(/[ \t\n\r\f]+/g, ' ').trim();
+      if (!v) continue;
+      out.push({ name: a.name, value: v });
+      continue;
+    }
+    if (a.name === 'style') {
+      const v = options.minifyDeclarations ? options.minifyDeclarations(value) : value.trim();
+      if (!v) continue;
+      out.push({ name: a.name, value: v });
+      continue;
+    }
+    out.push(a);
+  }
+  element.attrs = out;
+}
+
 function isDocument(html: string): boolean {
   const t = html.trimStart();
   return t.startsWith('<!doctype') || t.startsWith('<!DOCTYPE') || t.startsWith('<html');
@@ -157,7 +222,7 @@ export function formatHtml(html: string): string {
 
 // ─── minify ──────────────────────────────────────────────────────────────────
 
-function collapse(node: P5.ParentNode, preserve: boolean): void {
+function collapse(node: P5.ParentNode, preserve: boolean, options: HtmlMinifyOptions): void {
   const kids = (node as { childNodes?: P5.ChildNode[] }).childNodes;
   if (!kids) return;
   const parentTag = (node as P5.Element).tagName;
@@ -194,31 +259,39 @@ function collapse(node: P5.ParentNode, preserve: boolean): void {
       continue;
     }
     if (child.nodeName === '#comment') {
+      if (options.removeComments && !keepComment((child as P5.CommentNode).data ?? '')) continue;
       out.push(child);
       continue;
     }
     const el = child as P5.Element;
+    if (options.optimizeAttributes) optimizeElement(el, options);
     if (el.tagName === 'style') {
       const styleText = el.childNodes.find((c) => c.nodeName === '#text') as P5.TextNode | undefined;
-      if (styleText) styleText.value = minifyCss(styleText.value ?? '');
+      if (styleText) styleText.value = (options.minifyStyle ?? minifyCss)(styleText.value ?? '');
       out.push(child);
       continue;
     }
-    collapse(el, preserve || PRESERVE.has(el.tagName));
+    if (el.tagName === 'script' && options.minifyScript && isInlineJsScript(el)) {
+      const scriptText = el.childNodes.find((c) => c.nodeName === '#text') as P5.TextNode | undefined;
+      if (scriptText) scriptText.value = options.minifyScript(scriptText.value ?? '');
+      out.push(child);
+      continue;
+    }
+    collapse(el, preserve || PRESERVE.has(el.tagName), options);
     out.push(child);
   }
   (node as { childNodes: P5.ChildNode[] }).childNodes = out;
 }
 
 /** Minify HTML for production builds. */
-export function minifyHtml(html: string): string {
+export function minifyHtml(html: string, options: HtmlMinifyOptions = {}): string {
   if (isDocument(html)) {
     const doc = parse(html);
-    collapse(doc, false);
+    collapse(doc, false, options);
     // parse5 uppercases the doctype; keep the historical lowercase form.
     return serialize(doc).replace(/^<!DOCTYPE html>/i, '<!doctype html>');
   }
   const frag = parseFragment(html);
-  collapse(frag, false);
+  collapse(frag, false, options);
   return serialize(frag);
 }

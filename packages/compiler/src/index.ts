@@ -6,7 +6,7 @@ import { walk, hasDescendant } from './ast/walk';
 import { referencesIdentifier } from './ast/estree';
 import { analyzeTemplateScope } from './scope';
 import { checkComponentUsages, collectPropReads, unusedDeclaredProps, type ComponentResolver } from './props';
-import { scopeCss, minifyCss, scopedCssUrl } from './css';
+import { scopeCss, minifyCss, optimizeCss, scopedCssUrl } from './css';
 import { generate } from './codegen';
 import { compileDocument } from './document';
 import { isDocumentFile, isLayoutPath } from './filetype';
@@ -152,9 +152,9 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
         global += minifyCss(s.content);
       } else if (hasDefineVars) {
         // define:vars styles remain scoped but with CSS vars preamble
-        scoped += scopeCss(s.content, hash);
-      } else if (s.kind === 'style') scoped += scopeCss(s.content, hash);
-      else global += minifyCss(s.content);
+        scoped += optimizeCss(scopeCss(s.content, hash));
+      } else if (s.kind === 'style') scoped += optimizeCss(scopeCss(s.content, hash));
+      else global += optimizeCss(s.content);
     }
 
     // 4. template parse (parse5 + acorn-jsx) incl. jsxToTemplate / components / slots / head
@@ -421,5 +421,7 @@ function attrToJson(a: import('./types').Attr): unknown {
 
 export { DeshiError, ERROR_CATALOG } from './types';
 export type { Diagnostic, Root, Node } from './types';
+export { optimizeHtml, optimizeJs } from './optimize';
+export { minifyCss, minifyDeclarationList, optimizeCss } from './css';
 export { setContext, getContext, hasContext, runWithContext } from './runtime';
 export { detectFramework, generateFrameworkIslandChunk, renderFrameworkComponent, serializeVNode } from './frameworks';

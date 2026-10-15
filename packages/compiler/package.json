@@ -68,6 +68,9 @@
     "unified": "^11.0.5",
     "yaml": "^2.6.1"
   },
+  "optionalDependencies": {
+    "lightningcss": "^1.33.0"
+  },
   "peerDependencies": {
     "vite": ">=5.0.0"
   },

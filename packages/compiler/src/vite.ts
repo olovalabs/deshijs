@@ -50,6 +50,8 @@ export interface DeshiPluginOptions {
   outDir?: string;
   trailingSlash?: 'never' | 'always' | 'ignore';
   minify?: boolean;
+  /** Strip `console.*` / `debugger` from client JS (production). */
+  dropConsole?: boolean;
   router?: boolean | { prefetch?: boolean };
   css?: 'extract' | 'inline';
   experimental?: { viewTransitions?: boolean };
@@ -593,6 +595,7 @@ export function deshi(options: DeshiPluginOptions = {}): Plugin {
           router: (dc as any).router ?? enableRouter,
           css: (dc as any).css ?? options.css ?? 'inline',
           minify: (dc as any).minify ?? options.minify ?? true,
+          dropConsole: (dc as any).build?.dropConsole ?? options.dropConsole ?? false,
           appDir: (dc as any).appDir ?? options.appDir ?? 'src',
           site: (dc as any).site,
           highlight: highlightOpts ?? undefined,

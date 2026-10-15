@@ -67,7 +67,9 @@ describe('compile', () => {
     __clearCompileMemoForTests();
     const src = `<div>Font test</div><style>@font-face { font-family: 'Custom'; src: url('/fonts/custom.woff2'); } .text { font-family: 'Custom'; }</style>`;
     const res = compile(src, { file: 'src/font.deshi' });
-    expect(res.css.scoped).toContain("@font-face{font-family:'Custom';src:url('/fonts/custom.woff2')}");
+    // Lightning CSS (or the css-tree fallback) may drop the quotes around the
+    // valid custom-ident; both forms are equivalent, so accept either.
+    expect(res.css.scoped).toMatch(/@font-face\{font-family:['"]?Custom['"]?;src:url\(['"]?\/fonts\/custom\.woff2['"]?\)\}/);
     expect(res.css.scoped).not.toContain('@font-face[data-deshi');
   });
 });

@@ -54,6 +54,8 @@ export interface DeshiConfig {
     assetsPrefix?: string;
     inlineStylesheets?: 'always' | 'auto' | 'never';
     maxDepth?: number;
+    /** Strip `console.*` / `debugger` from client JS (default false). */
+    dropConsole?: boolean;
   };
   router?: boolean | { prefetch?: DeshiPrefetchConfig | boolean };
   css?: 'extract' | 'inline';

@@ -1,8 +1,46 @@
 // Scoped style transform (css-tree). Appends `[data-deshi-<hash>]` to every compound
 // selector, respecting :global(...), :root / :host, @keyframes names, and recursing
 // into @media / @supports / nested at-rules.
+//
+// `optimizeCss` delegates the *compiler-generated* CSS to Lightning CSS when it
+// is installed (a far stronger optimizer than css-tree: color/value shortening,
+// dead-rule removal, safe transforms), and falls back to css-tree otherwise. The
+// dependency is optional so the compiler still works without a native binary.
+// Author inline `<style>` text keeps the tolerant `minifyCss` path instead.
+import { createRequire } from 'node:module';
 import { parse, walk, generate, List, type CssNode, type Selector, type Rule, type WalkContext } from 'css-tree';
 import { hashString } from './types';
+
+// ─── Lightning CSS (optional) ────────────────────────────────────────────────
+
+interface LightningCss {
+  transform(options: {
+    filename?: string;
+    code: Uint8Array;
+    minify?: boolean;
+    targets?: unknown;
+    errorRecovery?: boolean;
+  }): { code: Uint8Array };
+}
+
+let lightning: LightningCss | null | undefined;
+
+/** Load Lightning CSS on demand. Returns null when it is not installed. */
+export function loadLightningCss(): LightningCss | null {
+  if (lightning !== undefined) return lightning;
+  try {
+    const require = createRequire(import.meta.url);
+    lightning = require('lightningcss') as LightningCss;
+  } catch {
+    lightning = null;
+  }
+  return lightning;
+}
+
+/** Test hook — forget the cached Lightning CSS module lookup. */
+export function __resetCssOptimizerForTests(): void {
+  lightning = undefined;
+}
 
 export function scopeAttribute(hash: string): string {
   return `data-deshi-${hash}`;
@@ -113,5 +151,55 @@ export function minifyCss(css: string): string {
     return generate(parse(css, { positions: false }));
   } catch {
     return css.trim();
+  }
+}
+
+/**
+ * Aggressively optimize compiler-generated CSS (scoped/global style blocks).
+ * Uses Lightning CSS when installed — shorter values, dead-rule removal — and
+ * falls back to the css-tree `minifyCss` pass otherwise.
+ *
+ * Author inline `<style>` text is deliberately routed through `minifyCss`
+ * instead, so raw markup keeps its original bytes.
+ */
+export function optimizeCss(css: string): string {
+  const trimmed = css.trim();
+  if (!trimmed) return '';
+  const lc = loadLightningCss();
+  if (lc) {
+    try {
+      return lc.transform({ filename: 'deshi.css', code: Buffer.from(css), minify: true }).code.toString();
+    } catch {
+      // Invalid or unsupported CSS — fall back to the tolerant css-tree pass.
+    }
+  }
+  return minifyCss(css);
+}
+
+/**
+ * Minify a bare declaration list, e.g. the value of a `style="…"` attribute.
+ * Falls back to css-tree, then to the trimmed input when nothing can parse it.
+ */
+export function minifyDeclarationList(decls: string): string {
+  const trimmed = decls.trim();
+  if (!trimmed) return '';
+  const lc = loadLightningCss();
+  if (lc) {
+    try {
+      // Lightning CSS optimizes rules, not declaration lists — wrap the list in
+      // a throwaway rule and unwrap the (minified) body afterwards.
+      const out = lc
+        .transform({ filename: 'inline.css', code: Buffer.from(`*{${trimmed}}`), minify: true })
+        .code.toString();
+      const m = /^\*\{([\s\S]*)\}$/.exec(out.trim());
+      if (m) return m[1];
+    } catch {
+      // fall through
+    }
+  }
+  try {
+    return generate(parse(trimmed, { positions: false, context: 'declarationList' } as Parameters<typeof parse>[1]));
+  } catch {
+    return trimmed;
   }
 }
