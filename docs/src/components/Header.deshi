@@ -1,7 +1,7 @@
 <script>
   const logo = props.logo || "/deshi.svg";
   const brand = props.brand || "Deshi";
-  const version = props.version || "3.1.0";
+  const version = props.version || "3.1.1";
   const showSidebarToggle = props.sidebar !== undefined ? props.sidebar : true;
 
   // Tab bar (holocron's second header row). Active state is derived from the

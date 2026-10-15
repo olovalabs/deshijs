@@ -51,7 +51,7 @@ describe('makeAstro', () => {
     expect(astro.route).toEqual({ pattern: '/[slug]', file: 'src/page.deshi' });
     expect(astro.url).toBe(url);
     expect(astro.site?.origin).toBe('https://example.com');
-    expect(astro.generator).toBe('Deshi 3.1.0');
+    expect(astro.generator).toBe('Deshi 3.1.1');
     expect(astro.slots).toEqual({ default: true });
     expect(astro.cookies.get()).toBeUndefined();
     expect(astro.cookies.has('x')).toBe(false);
