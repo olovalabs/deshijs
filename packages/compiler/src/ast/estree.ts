@@ -348,7 +348,7 @@ export function propertyAccesses(root: AnyNode, obj: string): PropAccess[] {
   const out: PropAccess[] = [];
   const seen = new Set<string>();
   const add = (name: string, optional = false) => {
-    const key = name + ' ' + String(optional);
+    const key = name + '\0' + String(optional);
     if (seen.has(key)) return;
     seen.add(key);
     out.push({ name, optional });

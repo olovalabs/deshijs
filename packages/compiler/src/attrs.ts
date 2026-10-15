@@ -50,7 +50,12 @@ export interface ScannedTag {
 const NAME_START = /[A-Za-z_]/;
 const NAME_CHAR = /[A-Za-z0-9_:.-]/;
 const TAG_END = /[\s>/]/;
-/** A name made only of the prescan's mask filler (including numbered prefixes). */
+/**
+ * A name made only of the prescan's mask filler. Only a *fallback* for callers
+ * that scan without the prescan's offsets (unit tests): the real decision is
+ * whether the name begins at a recorded `{…}` offset, so a genuine attribute
+ * named `x` / `x1` / `xx` is never mistaken for a masked expression.
+ */
 const MASKED_NAME = /^x\d*x*$/;
 
 /**
@@ -61,8 +66,19 @@ const MASKED_NAME = /^x\d*x*$/;
  * masking is what makes an unquoted expression value well-formed here, so this
  * scanner never has to reason about braces, quotes or `>` inside a value. Every
  * iteration is guaranteed to consume at least one character.
+ *
+ * `maskedStarts` holds the source offsets where the prescan wrote an in-tag
+ * expression (a whole-attribute `{…}` spread). When supplied, an attribute is
+ * "masked" exactly when its name begins at one of those offsets.
  */
-export function scanStartTag(src: string, from: number, to: number): ScannedTag {
+export function scanStartTag(
+  src: string,
+  from: number,
+  to: number,
+  maskedStarts?: ReadonlySet<number>,
+): ScannedTag {
+  const isMasked = (nameStart: number, name: string): boolean =>
+    maskedStarts ? maskedStarts.has(nameStart) : MASKED_NAME.test(name);
   let i = from;
   if (src[i] === '<') i++;
   const nameStart = i;
@@ -102,7 +118,7 @@ export function scanStartTag(src: string, from: number, to: number): ScannedTag 
     if (src[j] !== '=') {
       attrs.push({
         name: attrName, nameStart: attrNameStart, end: i, hasValue: false,
-        quote: '', value: '', valueStart: i, valueEnd: i, masked: MASKED_NAME.test(attrName),
+        quote: '', value: '', valueStart: i, valueEnd: i, masked: isMasked(attrNameStart, attrName),
       });
       continue;
     }
@@ -127,7 +143,7 @@ export function scanStartTag(src: string, from: number, to: number): ScannedTag 
     }
     attrs.push({
       name: attrName, nameStart: attrNameStart, end: i, hasValue: true, quote,
-      value, valueStart, valueEnd, masked: MASKED_NAME.test(attrName),
+      value, valueStart, valueEnd, masked: isMasked(attrNameStart, attrName),
     });
   }
 

@@ -100,4 +100,13 @@ describe('generate', () => {
     expect(out.esm).toContain('deshi:head');
     expect(out.esm).toContain('"isDocument":true');
   });
+
+  it('uses the hoisted makeAstro helper rather than an inline Astro literal', () => {
+    const { esm, evalBody } = gen('<div>hi</div>');
+    expect(esm).toContain('makeAstro as $astro');
+    expect(esm).toContain('$astro({ props, params, url, route, slots })');
+    // the old inline default object no longer ships in every module
+    expect(esm).not.toContain('cookies:');
+    expect(evalBody).toContain('makeAstro: $astro');
+  });
 });

@@ -85,6 +85,13 @@ export interface Prescan {
   /** every expression, sorted by `open` */
   exprs: FoundExpr[];
   /**
+   * Source offsets where an in-tag expression (a whole-attribute `{…}`) was
+   * masked. Lets `scanStartTag` classify a masked "name" by position instead of
+   * guessing from its shape, so a real attribute named `x`/`x1` is not mistaken
+   * for one.
+   */
+  maskedStarts: Set<number>;
+  /**
    * `<slot>` tags inside a real `<head>`. They are blanked out of the parse5
    * text and re-inserted into the AST afterwards, because the HTML parser
    * closes `<head>` as soon as it meets an element it does not know there.
@@ -136,6 +143,7 @@ export function prescan(src: string, ctx: TemplateContext, file: string): Presca
   const chars = src.split('');
   const exprs: FoundExpr[] = [];
   const headSlots: Prescan['headSlots'] = [];
+  const maskedStarts = new Set<number>();
   let i = 0;
   let sawHtml = false;
   let inHead = false;
@@ -161,6 +169,7 @@ export function prescan(src: string, ctx: TemplateContext, file: string): Presca
     const found: FoundExpr = { open: bracePos, close, spread, inTag, expr };
     exprs.push(found);
     if (inTag) {
+      maskedStarts.add(bracePos);
       const prefix = 'x' + exprs.length;
       const end = close + 1;
       const len = end - bracePos;
@@ -256,7 +265,7 @@ export function prescan(src: string, ctx: TemplateContext, file: string): Presca
     i++;
   }
 
-  return { text: chars.join(''), exprs, headSlots, sawHtml };
+  return { text: chars.join(''), exprs, headSlots, maskedStarts, sawHtml };
 }
 
 /**
@@ -386,7 +395,7 @@ function originalAttrNames(el: P5.Element, ctx: ConvCtx): Map<number, string> {
   const out = new Map<number, string>();
   const startTag = el.sourceCodeLocation?.startTag;
   if (!startTag || startTag.endOffset <= startTag.startOffset) return out;
-  for (const a of scanStartTag(ctx.pre.text, startTag.startOffset, startTag.endOffset).attrs) {
+  for (const a of scanStartTag(ctx.pre.text, startTag.startOffset, startTag.endOffset, ctx.pre.maskedStarts).attrs) {
     if (a.masked) continue;
     out.set(a.nameStart, a.name);
   }
@@ -406,7 +415,7 @@ function convertAttrs(el: P5.Element, ctx: ConvCtx, restoreCase = false): Attr[]
   // value — which may contain spaces, `/` or `>` — cannot derail the scan.
   const startTag = el.sourceCodeLocation?.startTag;
   if (startTag && startTag.endOffset > startTag.startOffset) {
-    for (const dup of duplicateAttrNames(scanStartTag(ctx.pre.text, startTag.startOffset, startTag.endOffset))) {
+    for (const dup of duplicateAttrNames(scanStartTag(ctx.pre.text, startTag.startOffset, startTag.endOffset, ctx.pre.maskedStarts))) {
       ctx.diagnostics.push(
         makeDiagnostic(
           'PF1002',
@@ -931,7 +940,7 @@ function isSelfClosing(el: P5.Element, ctx: ConvCtx): boolean {
   if (VOID.has(el.tagName.toLowerCase())) return false;
   const st = el.sourceCodeLocation?.startTag;
   if (!st || st.endOffset <= st.startOffset) return false;
-  return scanStartTag(ctx.pre.text, st.startOffset, st.endOffset).selfClosing;
+  return scanStartTag(ctx.pre.text, st.startOffset, st.endOffset, ctx.pre.maskedStarts).selfClosing;
 }
 
 export function parseTemplate(

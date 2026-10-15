@@ -43,4 +43,18 @@ describe('build', () => {
     expect(res.ok).toBe(false);
     expect(res.diagnostics.length).toBeGreaterThan(0);
   });
+
+  it('records a note when an island chunk cannot be bundled', async () => {
+    const res = await build(
+      {
+        files: {
+          'src/layout.deshi': `<html><head><title>T</title></head><body><slot /></body></html>`,
+          'src/components/Counter.deshi': `<script client>import missing from './does-not-exist.js';\nconsole.log(missing);</script>\n<button>0</button>`,
+          'src/page.deshi': `<script>import Counter from './components/Counter.deshi';</script>\n<Counter client:load />`,
+        },
+      },
+      { appDir: 'src', router: true, projectRoot: '/nonexistent-deshi-root-xyz' },
+    );
+    expect(res.notes.some((n) => /kept unbundled/.test(n))).toBe(true);
+  });
 });

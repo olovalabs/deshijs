@@ -253,6 +253,61 @@ export function bindings(ctx: RenderCtx, props: Record<string, unknown>, slotFns
   } as Bindings;
 }
 
+/**
+ * The `Astro` / `Deshi` global shape used at render time. Superset of the value
+ * `bindings()` builds: the render preamble additionally exposes `route`,
+ * `cookies`, `redirect` and `rewrite` (Astro parity).
+ */
+export interface AstroGlobal {
+  props: Record<string, unknown>;
+  params: Record<string, string | string[]>;
+  url: URL;
+  route: { pattern: string; file: string };
+  request: { url: string; headers: Headers };
+  site?: URL;
+  generator: string;
+  slots: Record<string, true>;
+  cookies: { get: (name?: string) => string | undefined; has: (name: string) => boolean };
+  redirect: (path: string, status?: number) => Response;
+  rewrite: () => null;
+  setContext: <T = unknown>(key: unknown, value: T) => void;
+  getContext: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
+  hasContext: (key: unknown) => boolean;
+}
+
+/**
+ * Build the `Astro` / `Deshi` global for a render call.
+ *
+ * Compiled modules use this in their preamble when the caller supplies no
+ * binding object. Keeping the shape here (instead of inlining it into every
+ * generated module) means one tested definition, and every page gets smaller.
+ */
+export function makeAstro(b: {
+  props: Record<string, unknown>;
+  params: Record<string, string | string[]>;
+  url: URL;
+  route: { pattern: string; file: string };
+  slots?: Record<string, true>;
+}): AstroGlobal {
+  return {
+    props: b.props,
+    params: b.params,
+    url: b.url,
+    route: b.route,
+    request: { url: b.url ? b.url.href : '/', headers: new Headers() },
+    site: b.url ? new URL(b.url.origin) : undefined,
+    generator: 'Deshi ' + DESHI_VERSION,
+    slots: b.slots || {},
+    // Extra members the render preamble exposes beyond `bindings()`.
+    cookies: { get: () => undefined, has: () => false },
+    redirect: (p: string, s?: number) => new Response(null, { status: s || 302, headers: { Location: p } }),
+    rewrite: () => null,
+    setContext,
+    getContext,
+    hasContext,
+  };
+}
+
 export async function slot(
   fns: SlotFns,
   name: string,
@@ -495,6 +550,7 @@ export const runtime = {
   slot,
   renderComponent,
   headPush,
+  makeAstro,
   cache,
   setContext,
   getContext,

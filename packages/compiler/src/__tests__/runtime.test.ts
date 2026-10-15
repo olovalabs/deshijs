@@ -10,6 +10,7 @@ import {
   mergeHead,
   raw,
   esc,
+  makeAstro,
 } from '../runtime';
 
 describe('escapeHtml / escapeAttr', () => {
@@ -32,6 +33,30 @@ describe('cls / sty / attrs', () => {
   it('skips false/null attrs and escapes values', () => {
     expect(attrs({ a: false, b: null, c: 'x"y' })).toBe(' c="x&quot;y"');
     expect(attrs({ disabled: true })).toBe(' disabled');
+  });
+});
+
+describe('makeAstro', () => {
+  it('exposes props/params/url plus the render-preamble members', () => {
+    const url = new URL('https://example.com/a');
+    const astro = makeAstro({
+      props: { x: 1 },
+      params: { slug: 'a' },
+      url,
+      route: { pattern: '/[slug]', file: 'src/page.deshi' },
+      slots: { default: true },
+    });
+    expect(astro.props).toEqual({ x: 1 });
+    expect(astro.params).toEqual({ slug: 'a' });
+    expect(astro.route).toEqual({ pattern: '/[slug]', file: 'src/page.deshi' });
+    expect(astro.url).toBe(url);
+    expect(astro.site?.origin).toBe('https://example.com');
+    expect(astro.generator).toBe('Deshi 3.1.0');
+    expect(astro.slots).toEqual({ default: true });
+    expect(astro.cookies.get()).toBeUndefined();
+    expect(astro.cookies.has('x')).toBe(false);
+    expect(astro.rewrite()).toBeNull();
+    expect(astro.redirect('/there', 301).status).toBe(301);
   });
 });
 

@@ -251,6 +251,7 @@ async function bundleIslandChunk(
   projectRoot: string,
   minify: boolean,
   dropConsole = false,
+  onError?: (error: unknown) => void,
 ): Promise<string> {
   if (!/(^|[\s;])import[\s("]/.test(code)) return code;
   try {
@@ -274,7 +275,10 @@ async function bundleIslandChunk(
       jsxImportSource: detectFramework(file) === 'preact' ? 'preact' : 'react',
     });
     return result.outputFiles?.[0]?.text ?? code;
-  } catch {
+  } catch (error) {
+    // Not fatal — projects without the framework installed take this path. But
+    // report it so a genuinely broken import is not invisible.
+    onError?.(error);
     return code;
   }
 }
@@ -588,7 +592,9 @@ export async function build(project: Project, options: BuildOptions = {}): Promi
   // import specifiers and Vite resolves them in dev.
   if (opts.projectRoot) {
     for (const entry of Object.values(clientByHash)) {
-      entry.code = await bundleIslandChunk(entry.code, entry.file, opts.projectRoot, opts.minify ?? false, opts.dropConsole);
+      entry.code = await bundleIslandChunk(entry.code, entry.file, opts.projectRoot, opts.minify ?? false, opts.dropConsole, (error) => {
+        notes.push(`Island chunk for ${entry.file} was kept unbundled: ${error instanceof Error ? error.message : String(error)}`);
+      });
     }
   }
 

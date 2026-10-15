@@ -8,7 +8,6 @@ import { escapeHtml } from './escape';
 import { planAttributes, planPropsObject } from './attrs';
 import { printExpression } from './ast/print';
 import { scopeAttribute } from './css';
-import { DESHI_VERSION } from './types';
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
@@ -328,7 +327,7 @@ export function generate(input: CodegenInput): CodegenOutput {
   // Template expressions can use `Astro.props`, `Astro.params`, `Astro.url`, etc.
   const renderFn = [
     `async function render({ props, slots, params, url, route, env, Deshi, Astro }, $slotFns, $ctx) {`,
-    `  if (!Deshi) { Deshi = Astro || { props, params, url, route, site: url ? new (globalThis.URL||URL)(url.origin) : undefined, generator: ${JSON.stringify('Deshi ' + DESHI_VERSION)}, slots: slots || {}, request: { url: url ? url.href : '/', headers: new Headers() }, cookies: { get:()=>undefined, has:()=>false }, redirect:(p,s)=>new Response(null,{status:s||302, headers:{Location:p}}), rewrite:()=>null, setContext, getContext, hasContext }; }`,
+    `  if (!Deshi) { Deshi = Astro || $astro({ props, params, url, route, slots }); }`,
     `  if (!Astro) { Astro = Deshi; }`,
     body.trimEnd(),
     heads,
@@ -359,8 +358,8 @@ export function generate(input: CodegenInput): CodegenOutput {
     for (const s of imp.specifiers) userImports.add(s.local);
   }
   const contextHelpers = ['setContext', 'getContext', 'hasContext'].filter((h) => !userImports.has(h));
-  const esmHelpers = ['esc', 'unsafe', 'attrs', 'cls', 'sty', 'renderComponent', 'headPush', 'slot as $slot', 'raw as $r', ...contextHelpers];
-  const evalHelpers = ['esc', 'unsafe', 'attrs', 'cls', 'sty', 'renderComponent', 'headPush', 'slot: $slot', 'raw: $r', ...contextHelpers];
+  const esmHelpers = ['esc', 'unsafe', 'attrs', 'cls', 'sty', 'renderComponent', 'headPush', 'makeAstro as $astro', 'slot as $slot', 'raw as $r', ...contextHelpers];
+  const evalHelpers = ['esc', 'unsafe', 'attrs', 'cls', 'sty', 'renderComponent', 'headPush', 'makeAstro: $astro', 'slot: $slot', 'raw: $r', ...contextHelpers];
   const esm = [
     `import { ${esmHelpers.join(', ')} } from '${runtimeSource}';`,
     // React-style co-located CSS: Vite serves/transforms this (postcss, HMR, bundling).

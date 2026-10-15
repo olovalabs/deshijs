@@ -69,6 +69,23 @@ describe('scanStartTag', () => {
     const dup = `<div class="a" id="b" class="c">`;
     expect(duplicateAttrNames(scanStartTag(dup, 0, dup.length)).map((a) => a.name)).toEqual(['class']);
   });
+
+  it('classifies masked spreads by offset, not by name shape', () => {
+    const ctx = { file: 'f.deshi', source: '', components: new Set<string>(), scoped: false, usedComponents: new Set<string>(), usedSlots: new Set<string>() };
+    const src = `<div x1="a" {...spread} x="b">`;
+    const pre = prescan(src, ctx, 'f.deshi');
+    const tag = scanStartTag(pre.text, 0, pre.text.length, pre.maskedStarts);
+    // exactly the `{...spread}` is masked; the real `x1` / `x` attributes are not
+    expect(tag.attrs.filter((a) => a.masked)).toHaveLength(1);
+    expect(tag.attrs.filter((a) => !a.masked).map((a) => a.name)).toEqual(['x1', 'x']);
+  });
+
+  it('reports duplicate attributes whose names look like mask filler', () => {
+    const ctx = { file: 'f.deshi', source: '', components: new Set<string>(), scoped: false, usedComponents: new Set<string>(), usedSlots: new Set<string>() };
+    const src = `<div x1="a" x1="b">`;
+    const pre = prescan(src, ctx, 'f.deshi');
+    expect(duplicateAttrNames(scanStartTag(pre.text, 0, pre.text.length, pre.maskedStarts)).map((a) => a.name)).toEqual(['x1']);
+  });
 });
 
 describe('planAttributes', () => {
@@ -308,6 +325,20 @@ describe('component attribute names keep their case', () => {
     const res = compile(`<div dataFoo="1" myBar="2"></div>`, { file: 'src/case.deshi' });
     expect(res.code).toContain('datafoo=');
     expect(res.code).toContain('mybar=');
+  });
+});
+
+describe('attributes named like mask filler are real attributes', () => {
+  it('warns on a duplicate attribute literally named x1', () => {
+    __clearCompileMemoForTests();
+    const res = compile(`<div x1="a" x1="b">hi</div>`, { file: 'src/dup-x1.deshi' });
+    expect(res.diagnostics.some((d) => d.code === 'PF1002' && d.message.includes('x1'))).toBe(true);
+  });
+
+  it('keeps a real x1 attribute in the output', () => {
+    __clearCompileMemoForTests();
+    const res = compile(`<div x1="a">hi</div>`, { file: 'src/x1.deshi' });
+    expect(res.code).toContain('x1=\\"a\\"');
   });
 });
 

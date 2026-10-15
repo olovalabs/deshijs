@@ -98,6 +98,10 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
   const cacheable = !opts.resolveComponent;
   const cached = cacheable ? compileMemo.get(memoKey) : undefined;
   if (cached) {
+    // Refresh recency: Map preserves insertion order, so re-inserting moves the
+    // entry to the most-recently-used end. Eviction then drops the oldest.
+    compileMemo.delete(memoKey);
+    compileMemo.set(memoKey, cached);
     return {
       ...cached,
       meta: { ...cached.meta },
@@ -105,7 +109,12 @@ export function compile(source: string, opts: CompileOptions): CompileResult {
       diagnostics: [...cached.diagnostics],
     };
   }
-  if (compileMemo.size >= MAX_COMPILE_MEMO) compileMemo.clear();
+  // Bound the cache by evicting the single least-recently-used entry instead of
+  // discarding the whole working set when the limit is reached.
+  if (cacheable && compileMemo.size >= MAX_COMPILE_MEMO) {
+    const oldest = compileMemo.keys().next().value;
+    if (oldest !== undefined) compileMemo.delete(oldest);
+  }
 
   const diagnostics: Diagnostic[] = [];
   const hash = hashString(file);
