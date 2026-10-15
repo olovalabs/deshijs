@@ -41,21 +41,16 @@ import {
 import { duplicateAttrNames, scanStartTag } from './attrs';
 import { decodeText } from './html';
 import { walk } from './ast/walk';
+import {
+  collapseWhitespace,
+  dropWhitespaceBetween,
+  isAsciiWhitespace,
+  isBlockTag,
+} from './whitespace';
 
 const VOID = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta',
   'param', 'source', 'track', 'wbr',
-]);
-const BLOCK = new Set([
-  'html', 'head', 'body', 'div', 'main', 'section', 'article', 'header', 'footer', 'nav',
-  'ul', 'ol', 'li', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr',
-  'td', 'th', 'title', 'meta', 'link', 'script', 'style', 'pre', 'blockquote', 'form',
-  'fieldset', 'figure', 'figcaption', 'aside', 'hr', 'dl', 'dt', 'dd', 'details', 'summary',
-  'template', 'slot', 'option', 'select', 'br',
-  // SVG structural & graphical elements — drop interstitial whitespace, Astro-style:
-  'svg', 'g', 'defs', 'symbol', 'mask', 'pattern', 'clippath', 'lineargradient',
-  'radialgradient', 'filter', 'marker', 'path', 'circle', 'rect', 'line',
-  'polyline', 'polygon', 'ellipse', 'use', 'stop', 'image',
 ]);
 const PRESERVE = new Set(['pre', 'textarea', 'script', 'style']);
 const HEAD_OK = new Set(['base', 'link', 'meta', 'title', 'noscript', 'style', 'script', 'template']);
@@ -519,7 +514,7 @@ function originalTagName(el: P5.Element, ctx: ConvCtx): string {
 
 function isBlockNode(n: Node | undefined): boolean {
   if (!n) return true;
-  if (n.type === 'Element') return BLOCK.has(n.name.toLowerCase());
+  if (n.type === 'Element') return isBlockTag(n.name);
   if (n.type === 'Component' || n.type === 'Slot' || n.type === 'HeadBlock' || n.type === 'Doctype') return true;
   return false;
 }
@@ -527,7 +522,7 @@ function isBlockNode(n: Node | undefined): boolean {
 function applyWhitespace(nodes: Node[], parentName: string | null, ctx: ConvCtx): Node[] {
   if (!ctx.opts.minify) return nodes;
   if (parentName && PRESERVE.has(parentName.toLowerCase())) return nodes;
-  const parentBlock = parentName === null ? true : BLOCK.has(parentName.toLowerCase());
+  const parentBlock = parentName === null ? true : isBlockTag(parentName);
   const out: Node[] = [];
   nodes.forEach((n, i) => {
     if (n.type !== 'Text') {
@@ -536,12 +531,15 @@ function applyWhitespace(nodes: Node[], parentName: string | null, ctx: ConvCtx)
     }
     const prev = nodes[i - 1];
     const next = nodes[i + 1];
-    let v = n.value.replace(/\s+/g, ' ');
-    if (!v.trim()) {
-      const dropped =
-        (isBlockNode(prev) && (prev !== undefined || parentBlock)) ||
-        (isBlockNode(next) && (next !== undefined || parentBlock)) ||
-        (prev === undefined && next === undefined);
+    let v = collapseWhitespace(n.value);
+    if (isAsciiWhitespace(v)) {
+      const dropped = dropWhitespaceBetween(
+        prev !== undefined,
+        isBlockNode(prev),
+        next !== undefined,
+        isBlockNode(next),
+        parentBlock,
+      );
       if (dropped) return;
       out.push({ ...n, value: ' ' });
       return;

@@ -4,6 +4,7 @@
 // touches markup.
 import { parse, parseFragment, serialize, serializeOuter, Tokenizer, type DefaultTreeAdapterTypes as P5 } from 'parse5';
 import { minifyCss } from './css';
+import { collapseWhitespace, dropWhitespaceBetween, isAsciiWhitespace, isBlockTag } from './whitespace';
 
 /**
  * Decode character references the way the HTML parser does.
@@ -61,6 +62,18 @@ function hasElementChild(el: P5.Element): boolean {
   return kids.some((c) => Boolean((c as P5.Element).tagName));
 }
 
+/** Block/inline classification of a sibling, for whitespace folding. */
+function isBlockChild(n: P5.ChildNode | undefined): boolean {
+  if (!n) return false;
+  const tag = (n as P5.Element).tagName;
+  return typeof tag === 'string' && isBlockTag(tag);
+}
+
+/** Serialize a run of inline nodes exactly, together, as one string. */
+function serializeRun(run: P5.ChildNode[]): string {
+  return serialize({ nodeName: '#document-fragment', childNodes: run } as unknown as P5.ParentNode);
+}
+
 // ─── format ──────────────────────────────────────────────────────────────────
 
 /** Pretty-format HTML for development: block elements on their own lines. */
@@ -70,34 +83,75 @@ export function formatHtml(html: string): string {
   const root = isDocument(html) ? parse(html) : parseFragment(html);
   const lines: string[] = [];
 
-  const emit = (nodes: P5.ChildNode[], depth: number): void => {
+  // Inline content is kept on a single line and serialized as-is, so formatting
+  // never inserts (or removes) a space between inline boxes. Only block elements
+  // are broken onto their own lines; the surrounding newlines they add are
+  // insignificant in a block formatting context. Children are only emitted for
+  // block elements, so their parent context is always block-level.
+  const emitNodes = (nodes: P5.ChildNode[], depth: number): void => {
     const pad = '  '.repeat(depth);
-    for (const n of nodes) {
+    let run: P5.ChildNode[] = [];
+    const flush = (): void => {
+      if (!run.length) return;
+      lines.push(pad + serializeRun(run));
+      run = [];
+    };
+
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
       if (n.nodeName === '#text') {
-        const t = ((n as P5.TextNode).value ?? '').trim();
-        if (t) lines.push(pad + t);
+        const t = n as P5.TextNode;
+        const value = t.value ?? '';
+        if (isAsciiWhitespace(value)) {
+          const dropped = dropWhitespaceBetween(
+            i > 0,
+            isBlockChild(nodes[i - 1]),
+            i + 1 < nodes.length,
+            isBlockChild(nodes[i + 1]),
+            true,
+          );
+          if (dropped) continue;
+        }
+        // Collapsing ASCII runs is rendering-neutral and keeps dev output tidy.
+        t.value = collapseWhitespace(value);
+        run.push(n);
         continue;
       }
       if (n.nodeName === '#comment') {
+        flush();
         lines.push(pad + serializeOuter(n));
         continue;
       }
       if (n.nodeName === '#documentType') {
+        flush();
         lines.push('<!doctype html>');
         continue;
       }
       const el = n as P5.Element;
-      if (PRESERVE.has(el.tagName) || !hasElementChild(el)) {
+      if (PRESERVE.has(el.tagName)) {
+        // Whitespace inside is significant — never reformat or split it.
+        flush();
+        lines.push(pad + serializeOuter(el));
+        continue;
+      }
+      if (!isBlockTag(el.tagName)) {
+        // Inline element: belongs to the surrounding inline run.
+        run.push(n);
+        continue;
+      }
+      flush();
+      if (!hasElementChild(el)) {
         lines.push(pad + serializeOuter(el));
         continue;
       }
       lines.push(pad + startTag(el));
-      emit(el.childNodes, depth + 1);
+      emitNodes(el.childNodes, depth + 1);
       lines.push(pad + `</${el.tagName}>`);
     }
+    flush();
   };
 
-  emit(root.childNodes as P5.ChildNode[], 0);
+  emitNodes(root.childNodes as P5.ChildNode[], 0);
   return lines.join('\n');
 }
 
@@ -106,16 +160,35 @@ export function formatHtml(html: string): string {
 function collapse(node: P5.ParentNode, preserve: boolean): void {
   const kids = (node as { childNodes?: P5.ChildNode[] }).childNodes;
   if (!kids) return;
+  const parentTag = (node as P5.Element).tagName;
+  const parentBlock = !parentTag || isBlockTag(parentTag);
   const out: P5.ChildNode[] = [];
-  for (const child of kids) {
+  for (let i = 0; i < kids.length; i++) {
+    const child = kids[i];
     if (child.nodeName === '#text') {
       const txt = child as P5.TextNode;
       if (preserve) {
         out.push(child);
         continue;
       }
-      const v = (txt.value ?? '').replace(/\s+/g, ' ');
-      if (!v.trim()) continue; // drop whitespace-only text between markup
+      const prev = kids[i - 1];
+      const next = kids[i + 1];
+      let v = collapseWhitespace(txt.value ?? '');
+      if (isAsciiWhitespace(v)) {
+        // Kept only when it separates inline boxes (a rendered space); dropped
+        // against a block boundary, where it can never be seen.
+        const dropped = dropWhitespaceBetween(
+          prev !== undefined,
+          isBlockChild(prev),
+          next !== undefined,
+          isBlockChild(next),
+          parentBlock,
+        );
+        if (dropped) continue;
+        txt.value = ' ';
+        out.push(child);
+        continue;
+      }
       txt.value = v;
       out.push(child);
       continue;

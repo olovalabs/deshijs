@@ -63,6 +63,21 @@ describe('raw-text code generation', () => {
   });
 });
 
+describe('whitespace folding end-to-end', () => {
+  it('keeps inline and non-breaking spaces through the static build', async () => {
+    const result = await render('<p><strong>bold</strong> <em>italic</em> and x&nbsp;y</p>');
+    expect(result.ok).toBe(true);
+    const html = result.pages[0]?.html ?? '';
+    expect(html).toContain('<strong>bold</strong> <em>italic</em>');
+    expect(html.includes('x\u00a0y') || html.includes('x&nbsp;y')).toBe(true);
+  });
+
+  it('still removes whitespace between block elements', async () => {
+    const result = await render('<p>one</p>\n<p>two</p>');
+    expect(result.pages[0]?.html).toContain('<p>one</p><p>two</p>');
+  });
+});
+
 describe('empty attribute values', () => {
   it.each(['""', "''"])('passes %s as a string, not a boolean', async (empty) => {
     const result = await render(`<script>import Card from './Card.deshi';</script><Card title = ${empty} enabled />`, {
