@@ -2,317 +2,714 @@
   import Header from './components/Header.deshi';
 </script>
 
-<div class="relative min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/25 selection:text-primary">
-
-  <!-- EXISTING STANDALONE HEADER -->
+<div class="landing">
+  <!-- Bring back the original standalone header -->
   <Header sidebar={false} />
 
-  <!-- TOP HERO BACKGROUND IMAGE (hero.png) -->
-  <div class="absolute inset-x-0 top-0 h-[680px] md:h-[820px] overflow-hidden pointer-events-none z-0">
-    <img src="/hero.png" alt="Hero background" class="w-full h-full object-cover object-top opacity-80 select-none" />
-    <!-- Gradient overlays to seamlessly blend into dark background -->
-    <div class="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background"></div>
-    <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,var(--background)_92%)]"></div>
-  </div>
+  <!-- Layout wrapper with vertical blueprint grid lines matching the docs width system -->
+  <div class="relative">
+    <div aria-hidden="true" class="grid-line-v solid hidden lg:block" style="left:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset))"></div>
+    <div aria-hidden="true" class="grid-line-v solid hidden lg:block" style="right:calc(50% - var(--grid-max-width) / 2 - var(--grid-line-offset))"></div>
 
-  <!-- HERO SECTION -->
-  <section class="relative pt-20 sm:pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col items-center z-10">
+    <div class="landing-content max-w-(--grid-max-width) mx-auto px-(--mobile-padding) lg:px-0">
 
-    <!-- HERO CONTENT (CENTERED) -->
-    <div class="relative z-10 max-w-4xl mx-auto text-center flex flex-col items-center">
-      <!-- Badge -->
-      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-medium mb-8 shadow-[0_0_20px_color-mix(in_srgb,var(--primary)_20%,transparent)] backdrop-blur-xs">
-        <span>The 0JS Progressive Framework</span>
-      </div>
-
-      <!-- Headline (editorial serif, holocron hero style) -->
-      <h1 class="font-serif text-[40px] sm:text-[56px] md:text-[68px] leading-none tracking-tight text-foreground mb-6 text-center max-w-4xl">
-        Zero JavaScript by default.<br />
-        <span class="text-muted-foreground">Full-stack when you need it.</span>
-      </h1>
-
-      <!-- Subtitle -->
-      <p class="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed font-normal">
-        Build with pure 0KB JS static speed out of the box. Seamlessly scale into a progressive, full-stack web framework with rich components and instant routing.
-      </p>
-
-      <!-- CTA Buttons -->
-      <div class="flex items-center justify-center gap-3 flex-wrap mb-16">
-        <a href="/docs" class="inline-flex items-center justify-center bg-primary hover:brightness-110 text-primary-foreground font-medium text-sm px-6 py-2.5 rounded-full transition-all hover:scale-[1.03] active:scale-[0.98] cursor-pointer">
-          Getting Started
+      <!-- Hero section featuring Get Started in Seconds -->
+      <section class="hero">
+        <a href="/docs" class="announcement">
+          <strong>Deshi v3.1</strong>
+          <span>The 0JS progressive web framework →</span>
         </a>
-        <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="inline-flex items-center justify-center bg-transparent hover:bg-accent border border-border hover:border-ring text-foreground font-medium text-sm px-6 py-2.5 rounded-full transition-all cursor-pointer">
-          View on GitHub
-        </a>
-      </div>
-    </div>
 
-    <!-- SHOWCASE: FLOATING DOCS PREVIEW WINDOW -->
-    <div id="showcase" class="relative z-10 mt-6 sm:mt-10 w-full max-w-5xl mx-auto">
-      <div class="rounded-2xl border border-border bg-card/95 shadow-[0_30px_100px_rgba(0,0,0,0.9)] backdrop-blur-2xl overflow-hidden group">
-        
-        <!-- Mock Window Top Bar -->
-        <div class="h-12 border-b border-border bg-background px-4 flex items-center justify-between">
-          <!-- Window Dots + Brand -->
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5">
-              <span class="w-3 h-3 rounded-full bg-secondary group-hover:bg-[#ff5f56] transition-colors"></span>
-              <span class="w-3 h-3 rounded-full bg-secondary group-hover:bg-[#ffbd2e] transition-colors"></span>
-              <span class="w-3 h-3 rounded-full bg-secondary group-hover:bg-[#27c93f] transition-colors"></span>
-            </div>
+        <h1>
+          Zero JavaScript by default.<br />
+          <span class="gradient-text">Full-stack when you need it.</span>
+        </h1>
 
-            <div class="h-4 w-px bg-border mx-1"></div>
+        <p class="hero-subtitle">
+          Build static speed out of the box with zero client runtime penalty. Progressive reactivity with islands and instant file-based routing.
+        </p>
 
-            <div class="flex items-center gap-2">
-              <img src="/deshi.svg" alt="Deshi" class="w-4 h-4 object-contain" />
-              <span class="text-xs font-semibold text-foreground">Deshi Docs</span>
-            </div>
+        <!-- CTA row -->
+        <div class="hero-actions">
+          <a href="/docs" class="gradient-button">
+            <span>Get Started</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
+          <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="github-button">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.52 2 12 2z"></path>
+            </svg>
+            <span>View on GitHub</span>
+          </a>
+        </div>
+
+        <!-- GET STARTED IN SECONDS (featured directly inside hero) -->
+        <div class="hero-showcase">
+          <div class="hero-showcase-header">
+            <h2 class="section-title">Get Started in Seconds</h2>
+            <p class="section-desc">Initialize a new project or explore core architecture in under a minute.</p>
           </div>
 
-          <!-- Mock Header Search & Window Layout -->
-          <div class="flex items-center gap-2">
-            <div class="hidden sm:flex items-center gap-2 bg-muted border border-border text-muted-foreground text-[11px] px-3 py-1 rounded-md">
-              <svg class="w-3 h-3 text-text-tertiary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-              <span>Search</span>
-              <kbd class="ml-3 px-1 py-0.2 text-[9px] bg-muted border border-border rounded font-mono text-muted-foreground">⌘K</kbd>
+          <div class="learn-grid">
+            <div class="learn-card">
+              <div class="card-badge">Instant Setup</div>
+              <h3>Quick Start</h3>
+              <p>Scaffold a brand new Deshi project in seconds with Bun, pnpm, or npm and launch the dev server.</p>
+              
+              <div class="code-block">
+                <div class="code-heading">Terminal</div>
+                <pre><code><span class="code-keyword">bun</span> create deshi@latest my-app
+<span class="code-keyword">cd</span> my-app &amp;&amp; <span class="code-keyword">bun</span> dev</code></pre>
+              </div>
+
+              <div class="card-art mcp-art">
+                <strong>bun create deshi@latest</strong>
+                <span>0KB JS</span>
+                <span>SSG</span>
+                <span>Vite</span>
+              </div>
+              <a href="/docs" class="text-link">Read getting started guide →</a>
             </div>
 
-            <a href="/docs" class="p-1 text-muted-foreground hover:text-foreground rounded hover:bg-accent transition" title="Open Full Documentation">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="9" y1="3" x2="9" y2="21"></line>
-              </svg>
-            </a>
+            <div class="learn-card">
+              <div class="card-badge">Zero Hydration Tax</div>
+              <h3>Component &amp; Islands</h3>
+              <p>Compile to pure static HTML by default. Add fine-grained partial hydration only where interaction lives.</p>
+
+              <div class="code-block">
+                <div class="code-heading">src/page.deshi</div>
+                <pre><code><span class="code-comment">&lt;!-- 0KB JS emitted by default --&gt;</span>
+&lt;<span class="code-keyword">Header</span> /&gt;
+
+<span class="code-comment">&lt;!-- Partial hydration on viewport entry --&gt;</span>
+&lt;<span class="code-keyword">Counter</span> client:visible /&gt;</code></pre>
+              </div>
+
+              <div class="card-art mcp-art">
+                <strong>AST · Codegen</strong>
+                <span>TypeScript</span>
+                <span>Slots</span>
+                <span>Islands</span>
+              </div>
+              <a href="/docs/islands" class="text-link">Explore island directives →</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Interactive pure-CSS tabs features -->
+      <section class="section features">
+        <input type="radio" name="feature" id="feature-0" class="feature-radio" checked />
+        <input type="radio" name="feature" id="feature-1" class="feature-radio" />
+        <input type="radio" name="feature" id="feature-2" class="feature-radio" />
+        <input type="radio" name="feature" id="feature-3" class="feature-radio" />
+
+        <h2 class="section-title">Designed for speed &amp; simplicity</h2>
+
+        <div class="feature-tabs" role="tablist">
+          <label for="feature-0" class="feature-tab" role="tab">0KB JS Default</label>
+          <label for="feature-1" class="feature-tab" role="tab">File Routing</label>
+          <label for="feature-2" class="feature-tab" role="tab">Islands</label>
+          <label for="feature-3" class="feature-tab" role="tab">Vite Native</label>
+        </div>
+
+        <!-- Panel 0: 0KB JS -->
+        <div class="feature-panel" id="panel-0">
+          <div class="feature-copy">
+            <h3>Zero JavaScript Default</h3>
+            <p>Pages compile to pure static HTML and CSS. No hydration tax, zero runtime penalty, and <code>100</code> Lighthouse scores out of the box.</p>
+            <input type="text" class="demo-search" placeholder="Filter fruits..." value="Apple" readonly />
+            <ul class="fruit-list">
+              <li>🍎 Apple</li>
+              <li>🍌 Banana</li>
+              <li>🍊 Orange</li>
+              <li>🍓 Strawberry</li>
+            </ul>
+            <a href="/docs" class="text-link">Explore the documentation →</a>
+          </div>
+          <div class="code-block">
+            <div class="code-heading">src/page.deshi</div>
+            <pre><code><span class="code-comment">&lt;!-- 0KB JavaScript emitted to the client --&gt;</span>
+&lt;<span class="code-keyword">h1</span>&gt;Zero JS Default&lt;/<span class="code-keyword">h1</span>&gt;
+&lt;<span class="code-keyword">p</span>&gt;Static HTML speed with progressive power.&lt;/<span class="code-keyword">p</span>&gt;</code></pre>
           </div>
         </div>
 
-        <!-- Mock Window 3-Column Docs Layout Body -->
-        <div class="grid grid-cols-1 md:grid-cols-12 min-h-[460px]">
-
-          <!-- Mock Left Sidebar (Cols 1-3) -->
-          <div class="md:col-span-3 border-r border-border bg-background p-3 text-xs flex flex-col justify-between">
-            <div class="space-y-3">
-              <!-- Search inside sidebar -->
-              <div class="flex items-center gap-2 bg-muted border border-border text-text-tertiary px-2.5 py-1.5 rounded-lg text-[11px]">
-                <svg class="w-3 h-3 text-text-tertiary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <span>Search</span>
-                <span class="ml-auto font-mono text-[9px] bg-muted px-1 py-0.5 rounded text-muted-foreground">⌘ K</span>
-              </div>
-
-              <!-- Framework Pill Dropdown -->
-              <div class="flex items-center justify-between bg-muted hover:bg-accent border border-border px-2.5 py-1.5 rounded-lg text-foreground text-[11px] cursor-pointer">
-                <div class="flex items-center gap-1.5">
-                  <svg class="w-3.5 h-3.5 text-primary" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                  </svg>
-                  <span>Framework</span>
-                </div>
-                <span class="text-text-tertiary text-[10px]">⇅</span>
-              </div>
-
-              <!-- Introduction Menu -->
-              <div class="pt-2">
-                <div class="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider px-2 mb-1.5">Introduction</div>
-                <div class="space-y-1">
-                  <!-- Active item (Quick Start) -->
-                  <a href="/docs" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary font-medium">
-                    <svg class="w-3.5 h-3.5 text-primary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                    <span>Quick Start</span>
-                  </a>
-
-                  <a href="/docs" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition">
-                    <svg class="w-3.5 h-3.5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                    <span>What is Deshi</span>
-                  </a>
-
-                  <a href="/docs" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition">
-                    <svg class="w-3.5 h-3.5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <polyline points="16 3 21 3 21 8"></polyline>
-                      <line x1="4" y1="20" x2="21" y2="3"></line>
-                      <polyline points="21 16 21 21 16 21"></polyline>
-                      <line x1="15" y1="15" x2="21" y2="21"></line>
-                      <line x1="4" y1="4" x2="9" y2="9"></line>
-                    </svg>
-                    <span>Comparisons</span>
-                  </a>
-
-                  <a href="/docs" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition">
-                    <svg class="w-3.5 h-3.5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    <span>Deploying</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <!-- Version pill -->
-            <div class="pt-3 border-t border-border flex items-center justify-between text-[10px] text-text-tertiary px-1">
-              <span>v3.1.1</span>
-              <span class="text-primary flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                Ready
-              </span>
-            </div>
+        <!-- Panel 1: File Routing -->
+        <div class="feature-panel" id="panel-1">
+          <div class="feature-copy">
+            <h3>File-Based Routing</h3>
+            <p>Directory-driven routing in <code>src/</code> with support for static segments, dynamic <code>[slug]</code> parameters, and catch-all routes.</p>
+            <input type="text" class="demo-search" placeholder="Route pattern..." value="src/docs/[...slug]/page.deshi" readonly />
+            <ul class="fruit-list">
+              <li><code>/</code> → src/page.deshi</li>
+              <li><code>/docs</code> → src/docs/page.mdx</li>
+              <li><code>/blog/[id]</code> → dynamic route</li>
+              <li><code>/shop/[[...all]]</code> → catch-all</li>
+            </ul>
+            <a href="/docs/routing" class="text-link">Read routing guide →</a>
           </div>
+          <div class="code-block">
+            <div class="code-heading">src/blog/[slug]/page.deshi</div>
+            <pre><code><span class="code-keyword">export async function</span> getStaticPaths() &#123;
+  <span class="code-keyword">return</span> [&#123; params: &#123; slug: <span class="code-string">"quickstart"</span> &#125; &#125;];
+&#125;
 
-          <!-- Mock Middle Main Content (Cols 4-9) -->
-          <div class="md:col-span-6 p-6 sm:p-8 bg-background flex flex-col justify-between">
+<span class="code-comment">// Resolved params passed via props</span>
+<span class="code-keyword">const</span> &#123; slug &#125; = props.params;</code></pre>
+          </div>
+        </div>
+
+        <!-- Panel 2: Islands -->
+        <div class="feature-panel" id="panel-2">
+          <div class="feature-copy">
+            <h3>Partial Hydration with Islands</h3>
+            <p>Ship client interactivity only where necessary. Choose exactly when your UI hydrates with directives like <code>client:visible</code> or <code>client:load</code>.</p>
+            <button type="button">Interactive Island Component</button>
+            <p class="empty-state">Hydrates on viewport entry or user interaction.</p>
+            <a href="/docs/islands" class="text-link">Learn about islands →</a>
+          </div>
+          <div class="code-block">
+            <div class="code-heading">src/components/Counter.deshi</div>
+            <pre><code><span class="code-comment">&lt;!-- Hydrate only when visible on screen --&gt;</span>
+&lt;<span class="code-keyword">Counter</span> client:visible /&gt;
+
+<span class="code-comment">&lt;!-- Hydrate when browser is idle --&gt;</span>
+&lt;<span class="code-keyword">SearchDialog</span> client:idle /&gt;</code></pre>
+          </div>
+        </div>
+
+        <!-- Panel 3: Vite Native -->
+        <div class="feature-panel" id="panel-3">
+          <div class="feature-copy">
+            <h3>Vite-Native Ecosystem</h3>
+            <p>Built directly on Vite for sub-millisecond Hot Module Replacement (HMR), tree-shaking, and compatibility with Tailwind CSS v4.</p>
+            <button type="button">bun run dev</button>
+            <p class="empty-state">Instant reload in development, optimized static bundle in production.</p>
+            <a href="/docs/vite-plugin" class="text-link">Explore Vite plugin →</a>
+          </div>
+          <div class="code-block">
+            <div class="code-heading">vite.config.ts</div>
+            <pre><code><span class="code-keyword">import</span> &#123; defineConfig &#125; <span class="code-keyword">from</span> <span class="code-string">"vite"</span>;
+<span class="code-keyword">import</span> deshi <span class="code-keyword">from</span> <span class="code-string">"deshijs/vite"</span>;
+
+<span class="code-keyword">export default</span> defineConfig(&#123;
+  plugins: [deshi()],
+&#125;);</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Benefits Section -->
+      <section class="section benefits">
+        <h2 class="section-title">Engineered for Velocity</h2>
+        <div class="benefit-grid">
+          <div class="benefit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
             <div>
-              <div class="text-xs text-text-tertiary mb-2">Docs / Getting Started</div>
-              <h2 class="text-2xl sm:text-3xl font-[560] text-foreground tracking-tight mb-2 font-sans">Quick Start</h2>
-              <p class="text-xs text-muted-foreground mb-5">Getting Started with Deshi</p>
-
-              <!-- Action Pills -->
-              <div class="flex items-center gap-2 mb-6">
-                <button type="button" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted border border-border text-[11px] text-foreground hover:text-foreground">
-                  <svg class="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                  <span>Copy Markdown</span>
-                </button>
-                <button type="button" class="flex items-center gap-1 px-2.5 py-1 rounded-md bg-muted border border-border text-[11px] text-foreground hover:text-foreground">
-                  <span>Open</span>
-                  <span class="text-[9px]">▾</span>
-                </button>
-              </div>
-
-              <!-- Section Introduction -->
-              <h3 class="text-sm font-[560] text-foreground mb-2">Introduction</h3>
-              <p class="text-xs text-muted-foreground leading-relaxed mb-5">
-                <strong class="text-foreground">Deshi</strong> is a documentation framework, designed to be fast, flexible, and composes seamlessly into your modern web stack.
-              </p>
-
-              <!-- Code Box -->
-              <div class="rounded-xl border border-border bg-background overflow-hidden shadow-inner">
-                <div class="flex items-center justify-between px-3 py-1.5 border-b border-border bg-card text-[10px] text-text-tertiary font-mono">
-                  <span>Terminal</span>
-                  <span>bash</span>
-                </div>
-                <div class="p-3.5 font-mono text-xs text-foreground flex items-center justify-between">
-                  <code><span class="text-primary">bun</span> create deshi@latest</code>
-                  <svg class="w-3.5 h-3.5 text-text-tertiary hover:text-foreground cursor-pointer" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-border flex items-center justify-between">
-              <a href="/docs" class="text-xs text-primary hover:underline flex items-center gap-1 font-medium">
-                Explore Full Documentation <span>→</span>
-              </a>
+              <strong>0KB JS Baseline</strong>
+              <p>Instant paint and perfect Lighthouse performance with pure HTML/CSS output.</p>
             </div>
           </div>
-
-          <!-- Mock Right TOC Sidebar (Cols 10-12) -->
-          <div class="hidden md:block md:col-span-3 border-l border-border bg-background p-4 text-xs">
-            <div class="flex items-center gap-1.5 text-muted-foreground font-medium text-[11px] mb-3">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-              <span>On this page</span>
-            </div>
-
-            <div class="space-y-1 text-[11px] border-l border-border">
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-muted-foreground hover:text-foreground transition">Introduction</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 border-l-2 border-primary text-primary font-medium bg-primary/5 transition">Terminology</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-muted-foreground hover:text-foreground transition">Automatic Installation</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-muted-foreground hover:text-foreground transition">Enjoy!</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-muted-foreground hover:text-foreground transition">FAQ</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-text-tertiary hover:text-foreground transition pl-5">For Vite</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-text-tertiary hover:text-foreground transition pl-5">For Next.js</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-muted-foreground hover:text-foreground transition">Learn More</a>
-              <a href="/docs" class="block -ml-px pl-3 py-1 text-text-tertiary hover:text-foreground transition pl-5">Writing Content</a>
+          <div class="benefit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            <div>
+              <strong>Selective Hydration</strong>
+              <p>Component islands hydrate independently without full page rerenders.</p>
             </div>
           </div>
-
+          <div class="benefit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <div>
+              <strong>Vite &amp; Bun Ready</strong>
+              <p>Zero-config compatibility with modern JavaScript and edge runtimes.</p>
+            </div>
+          </div>
+          <div class="benefit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <div>
+              <strong>Markdown &amp; MDX Native</strong>
+              <p>Built-in Shiki syntax highlighting, frontmatter, and content collections.</p>
+            </div>
+          </div>
         </div>
+      </section>
 
-      </div>
-    </div>
-
-  </section>
-
-  <!-- FEATURES VALUE PROP GRID -->
-  <section id="features" class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-border">
-    <div class="text-center max-w-2xl mx-auto mb-14">
-      <h2 class="text-2xl sm:text-3xl font-[560] text-foreground tracking-tight mb-3">Designed for speed. Engineered for style.</h2>
-      <p class="text-sm text-muted-foreground">Everything you need to ship documentation that developers actually want to read.</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="p-6 rounded-2xl bg-card border border-border hover:border-ring transition">
-        <div class="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline>
+      <!-- Performance Section -->
+      <section class="section performance">
+        <h2 class="section-title">Speed you can feel.</h2>
+        <p>Deshi pre-renders pure HTML at build time for instant page loads and 100 Lighthouse performance scores.</p>
+        <a href="/docs" class="gradient-button">
+          <span>Get Started with Deshi</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
-        </div>
-        <h3 class="text-base font-[560] text-foreground mb-2">0 Client-side JavaScript</h3>
-        <p class="text-xs text-muted-foreground leading-relaxed">
-          Static HTML output with zero client hydration overhead. Instant initial paint with the highest possible Lighthouse scores.
-        </p>
+        </a>
+      </section>
+
+      <!-- Brand Row -->
+      <div class="brand-row">
+        <span>Vite</span>
+        <span>Bun</span>
+        <span>Cloudflare</span>
+        <span>Vercel</span>
+        <span>Netlify</span>
+        <span>Node.js</span>
       </div>
 
-      <div class="p-6 rounded-2xl bg-card border border-border hover:border-ring transition">
-        <div class="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
-          </svg>
-        </div>
-        <h3 class="text-base font-[560] text-foreground mb-2">Edge-to-Edge Fluid Layout</h3>
-        <p class="text-xs text-muted-foreground leading-relaxed">
-          Standalone left sidebar, responsive top header, and centered reading container tailored to 52rem for optimal comprehension.
-        </p>
-      </div>
+      <!-- Page Footer -->
+      <footer class="page-footer">
+        <a href="/docs">Docs</a>
+        <a href="/docs/routing">Routing</a>
+        <a href="/docs/islands">Islands</a>
+        <a href="/docs/api-reference">API Reference</a>
+        <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer">GitHub</a>
+        <span>Released under MIT License.</span>
+      </footer>
 
-      <div class="p-6 rounded-2xl bg-card border border-border hover:border-ring transition">
-        <div class="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-4">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-          </svg>
-        </div>
-        <h3 class="text-base font-[560] text-foreground mb-2">Modular & Standalone</h3>
-        <p class="text-xs text-muted-foreground leading-relaxed">
-          Standalone components for Header, Sidebar, and OnThisPage TOC that can be dropped into any layout or configured independently.
-        </p>
-      </div>
     </div>
-  </section>
-
-  <!-- FOOTER -->
-  <footer class="border-t border-border bg-background py-10 px-4 sm:px-8 text-xs text-text-tertiary">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <img src="/deshi.svg" alt="Deshi" class="w-5 h-5 object-contain" />
-        <span class="text-foreground font-semibold">Deshi Docs</span>
-        <span>— Released under MIT License.</span>
-      </div>
-
-      <div class="flex items-center gap-6">
-        <a href="/docs" class="hover:text-foreground transition">Documentation</a>
-        <a href="https://github.com/olovalabs/deshi" target="_blank" rel="noreferrer" class="hover:text-foreground transition">GitHub</a>
-      </div>
-    </div>
-  </footer>
-
+  </div>
 </div>
+
+<style is:global>
+:root:has(.landing),
+.landing {
+  --background: oklch(1 0 0);
+  --foreground: oklch(.18 .005 285);
+  --muted: oklch(.966 .004 285);
+  --muted-foreground: oklch(.52 .024 285);
+  --border: oklch(.90 .008 285);
+  --border-subtle: oklch(.92 .008 285);
+  --accent: oklch(.95 .01 285);
+  --accent-foreground: oklch(.18 .005 285);
+  --primary: oklch(.59 .29 305);
+  --hot-pink: oklch(.65 .29 345);
+  --red: oklch(.65 .26 25);
+  --code-background: oklch(.975 .012 280);
+  --code-comment: oklch(.52 .025 240);
+  --code-keyword: oklch(.53 .19 280);
+  --code-string: oklch(.48 .13 160);
+  --brand-gradient: linear-gradient(110deg, var(--red), var(--hot-pink) 52%, var(--primary));
+  --pattern-gradient: linear-gradient(100deg, var(--primary), var(--hot-pink));
+  --font-body: "Inter", Arial, sans-serif;
+  --font-heading: "Inter Tight", Arial, sans-serif;
+}
+
+body:has(.landing) {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.landing * { box-sizing: border-box; border-color: var(--border); }
+.landing {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 14px;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+.landing h1, .landing h2, .landing h3 { font-family: var(--font-heading); }
+.landing a { color: inherit; text-decoration: none; }
+.landing button, .landing input { font: inherit; }
+.landing button, .landing a, .landing input { -webkit-tap-highlight-color: transparent; }
+.landing button { cursor: pointer; }
+.landing button:focus-visible, .landing a:focus-visible, .landing input:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+
+.gradient-text {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Announcement pill */
+.announcement {
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  background: var(--background);
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 24px;
+  transition: border-color .2s;
+}
+.announcement:hover {
+  border-color: var(--primary);
+}
+.announcement strong {
+  font-weight: 500;
+  background: var(--brand-gradient);
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.announcement span { color: var(--muted-foreground); }
+
+/* Buttons */
+.gradient-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: linear-gradient(var(--background), var(--background)) padding-box, var(--brand-gradient) border-box;
+  padding: 10px 22px;
+  min-height: 40px;
+  font-weight: 500;
+  font-size: 13px;
+  transition: box-shadow .2s;
+}
+.gradient-button:hover { box-shadow: 0 0 0 3px var(--muted); }
+.gradient-button svg { width: 16px; height: 16px; }
+
+.github-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  padding: 10px 20px;
+  min-height: 40px;
+  font-weight: 500;
+  font-size: 13px;
+  transition: background-color .15s, border-color .15s;
+}
+.github-button:hover {
+  background: var(--muted);
+  border-color: var(--foreground);
+}
+
+/* Hero Section */
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 0 40px;
+  width: 100%;
+}
+.hero::before, .hero::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  width: 700px;
+  height: 310px;
+  background: var(--pattern-gradient);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M7 10l3-5' stroke='black' stroke-width='.65'/%3E%3C/svg%3E"), linear-gradient(transparent,black 30%,black 65%,transparent);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M7 10l3-5' stroke='black' stroke-width='.65'/%3E%3C/svg%3E"), linear-gradient(transparent,black 30%,black 65%,transparent);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+.hero::before { right: -60px; top: -30px; transform: rotate(-3deg); opacity: .7; }
+.hero::after { left: -100px; top: 180px; transform: rotate(-8deg); opacity: .5; height: 230px; }
+
+.hero h1 {
+  position: relative;
+  margin: 0;
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  max-width: 840px;
+}
+.hero-subtitle {
+  position: relative;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 620px;
+  margin: 18px auto 0;
+}
+.hero-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 32px;
+  margin-bottom: 54px;
+  flex-wrap: wrap;
+}
+
+/* Hero Showcase (Get Started in Seconds) */
+.hero-showcase {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  text-align: left;
+}
+.hero-showcase-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.hero-showcase-header .section-title {
+  margin-bottom: 8px;
+  font-size: 32px;
+}
+.section-desc {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Sections & Width System */
+.section {
+  width: 100%;
+  max-width: var(--grid-max-width, 1200px);
+  margin: 0 auto;
+  padding: 60px 0 80px;
+}
+.section-title {
+  text-align: center;
+  margin: 0 auto 30px;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* Feature Tabs */
+.feature-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: max-content;
+  max-width: 100%;
+  padding: 3px;
+  margin: 0 auto 34px;
+}
+.feature-tab {
+  color: var(--muted-foreground);
+  border: 0;
+  background: transparent;
+  padding: 6px 20px;
+  font-size: 11px;
+  border-radius: 5px;
+  min-height: 25px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.feature-tab[aria-selected="true"] { color: var(--primary); background: var(--muted); }
+.feature-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  min-height: 440px;
+  background: var(--background);
+}
+.feature-copy h3 { font-size: 22px; font-weight: 500; margin: 0 0 16px; line-height: 1.3; }
+.feature-copy p { color: var(--muted-foreground); font-size: 14px; line-height: 1.7; }
+.feature-copy code { color: var(--primary); font-size: 12px; background: var(--muted); padding: 2px 5px; border-radius: 4px; }
+.demo-search { width: 100%; margin: 12px 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; background: var(--background); color: var(--foreground); }
+.fruit-list { display: grid; grid-template-columns: 1fr 1fr; list-style: none; padding: 0; margin: 0 0 22px; gap: 0; }
+.fruit-list li { border-bottom: 1px solid var(--border); padding: 9px 0; font-size: 13px; }
+.text-link { color: var(--primary); font-size: 13px; display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.text-link:hover { text-decoration: underline; }
+
+/* Code blocks */
+.code-block {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--code-background);
+  margin-bottom: 15px;
+}
+.code-heading {
+  padding: 9px 13px;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-family: "DM Mono", monospace;
+  font-weight: 500;
+}
+.code-block pre {
+  padding: 14px;
+  margin: 0;
+  overflow: auto;
+  font-size: 11.5px;
+  line-height: 1.8;
+  font-family: "DM Mono", monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.code-comment { color: var(--code-comment); }
+.code-keyword { color: var(--code-keyword); }
+.code-string { color: var(--code-string); }
+
+/* Benefits */
+.benefits { padding-top: 36px; }
+.benefit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 36px; margin-top: 48px; }
+.benefit { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; line-height: 1.6; color: var(--muted-foreground); font-size: 14px; }
+.benefit svg { width: 32px; height: 32px; color: var(--primary); flex-shrink: 0; }
+.benefit strong { color: var(--foreground); font-weight: 500; font-size: 16px; }
+
+/* Performance */
+.performance {
+  text-align: center;
+  padding-top: 50px;
+  min-height: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.performance p { max-width: 460px; margin: 18px auto 32px; font-size: 16px; line-height: 1.6; color: var(--muted-foreground); }
+.performance::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(transparent 28%, var(--hot-pink) 45%, var(--primary) 55%, transparent 69%);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M7 10l3-5' stroke='black' stroke-width='.65'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M7 10l3-5' stroke='black' stroke-width='.65'/%3E%3C/svg%3E");
+  opacity: .6;
+  z-index: -1;
+}
+
+/* Brand Row */
+.brand-row {
+  display: flex;
+  justify-content: space-around;
+  gap: 30px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 50px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  opacity: 0.85;
+}
+
+/* Learn Grid & Cards */
+.learn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  width: 100%;
+}
+.learn-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 30px;
+  position: relative;
+  min-height: 420px;
+  overflow: hidden;
+  background: var(--background);
+  transition: border-color .2s, box-shadow .2s;
+  display: flex;
+  flex-direction: column;
+}
+.learn-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.04);
+}
+.card-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+.learn-card h3 { font-size: 24px; font-weight: 500; margin: 0 0 12px; }
+.learn-card p { color: var(--muted-foreground); line-height: 1.6; margin: 0 0 20px; font-size: 14px; }
+.learn-card .text-link { margin-top: auto; padding-top: 16px; }
+
+.card-art { position: absolute; bottom: 0; right: 0; width: 55%; height: 170px; object-fit: cover; object-position: top left; pointer-events: none; }
+.mcp-art {
+  margin: 18px 0 0;
+  padding: 16px 0;
+  text-align: center;
+  color: var(--primary);
+  border-top: 1px solid var(--border);
+}
+.mcp-art strong { display: block; font-size: 16px; margin-bottom: 12px; font-weight: 500; }
+.mcp-art span { font-family: "DM Mono", monospace; font-size: 10px; border: 1px solid var(--border); border-radius: 20px; padding: 4px 8px; margin: 0 3px; }
+
+/* Page Footer */
+.page-footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 0;
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 40px;
+}
+.empty-state { padding: 18px 0; color: var(--muted-foreground); font-size: 13px; }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .benefit-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+}
+
+@media (max-width: 800px) {
+  .hero h1 { font-size: 44px; }
+  .feature-panel { grid-template-columns: 1fr; gap: 24px; padding: 20px; }
+  .learn-grid { grid-template-columns: 1fr; }
+  .learn-card { min-height: auto; }
+}
+
+@media (max-width: 600px) {
+  .hero { padding-top: 40px; }
+  .hero h1 { font-size: 36px; }
+  .hero-subtitle { font-size: 14px; }
+  .section-title { font-size: 28px; }
+  .benefit-grid { grid-template-columns: 1fr; gap: 24px; }
+  .brand-row { font-size: 18px; gap: 20px; }
+  .page-footer { flex-wrap: wrap; padding: 28px 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+
+.feature-radio { position: absolute; opacity: 0; pointer-events: none; }
+.features > .feature-panel { display: none; }
+.feature-panel button { border: 1px solid var(--border); border-radius: 4px; padding: 8px 15px; background: var(--background); color: var(--foreground); }
+
+#feature-0:checked ~ #panel-0 { display: grid; }
+#feature-0:checked ~ .feature-tabs label[for="feature-0"] { color: var(--primary); background: var(--muted); }
+#feature-1:checked ~ #panel-1 { display: grid; }
+#feature-1:checked ~ .feature-tabs label[for="feature-1"] { color: var(--primary); background: var(--muted); }
+#feature-2:checked ~ #panel-2 { display: grid; }
+#feature-2:checked ~ .feature-tabs label[for="feature-2"] { color: var(--primary); background: var(--muted); }
+#feature-3:checked ~ #panel-3 { display: grid; }
+#feature-3:checked ~ .feature-tabs label[for="feature-3"] { color: var(--primary); background: var(--muted); }
+</style>
